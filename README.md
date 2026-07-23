@@ -112,6 +112,12 @@ dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 
 The test project is a dependency-light executable test harness. It verifies all 70 descriptors have unique IDs, hidden severity, and registered fixes, then compiles every transformation and checks conservative negative cases. DOTS coverage includes all query targets, all six execution-mode switches, filter transfer, entity access, Burst job extraction, exact offered-fix sets, and rejection of captures, raw wrapper access, unsupported query forms, structural-change pipelines, and look-alike non-Unity APIs.
 
+### Automated releases
+
+Every branch push is restored, built in Release configuration, and tested by GitHub Actions. A successful push to the repository's default branch additionally publishes the exact tested analyzer DLL as a GitHub Release asset.
+
+Release tags and DLL names use the `v0.N` series. GitHub's release-workflow run number begins at 1 and advances only for new default-branch release runs, producing `v0.1`, `v0.2`, `v0.3`, and so on; rerunning an existing workflow keeps its original version. The project version remains `0.1.0` locally, while the workflow supplies the selected three-part assembly/package version during each release build.
+
 ## Use in Unity
 
 1. Build or pack the analyzer.

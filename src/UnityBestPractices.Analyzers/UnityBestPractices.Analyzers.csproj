@@ -4,7 +4,7 @@
     <AssemblyName>UnityBestPractices.Analyzers</AssemblyName>
     <RootNamespace>UnityBestPractices.Analyzers</RootNamespace>
     <PackageId>UnityBestPractices.Analyzers</PackageId>
-    <Version>1.2.0</Version>
+    <Version>0.1.0</Version>
     <Authors>UnityBestPractices contributors</Authors>
     <Description>Hidden Roslyn diagnostics and quick fixes for Unity best practices.</Description>
     <PackageTags>unity;roslyn;analyzer;codefix</PackageTags>

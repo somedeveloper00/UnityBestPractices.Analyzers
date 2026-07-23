@@ -1,6 +1,6 @@
 ; Shipped analyzer releases
 
-## Release 1.0.0
+## Release 0.1.0
 
 ### New Rules
 
@@ -17,13 +17,6 @@ UBP0008 | Unity.BestPractices | Hidden | Cache repeated Camera.main access
 UBP0009 | Unity.BestPractices | Hidden | Preallocate List capacity for known additions
 UBP0010 | Unity.BestPractices | Hidden | Multiply a stable float to square it
 UBP0011 | Unity.BestPractices | Hidden | Skip clearing a fully overwritten NativeArray
-
-## Release 1.1.0
-
-### New Rules
-
-Rule ID | Category | Severity | Notes
---------|----------|----------|--------------------
 UBP0012 | Unity.BestPractices | Hidden | Use Vector2.zero
 UBP0013 | Unity.BestPractices | Hidden | Use Vector2.one
 UBP0014 | Unity.BestPractices | Hidden | Use Vector2.up
@@ -70,13 +63,6 @@ UBP0054 | Unity.BestPractices | Hidden | Append an empty line directly
 UBP0055 | Unity.BestPractices | Hidden | Use CancellationToken.None
 UBP0056 | Unity.BestPractices | Hidden | Use Guid.Empty
 UBP0057 | Unity.BestPractices | Hidden | Use Array.Empty for Enumerable.Empty
-
-## Release 1.2.0
-
-### New Rules
-
-Rule ID | Category | Severity | Notes
---------|----------|----------|--------------------
 UBP0058 | Unity.BestPractices | Hidden | Convert Entities.ForEach to SystemAPI.Query
 UBP0059 | Unity.BestPractices | Hidden | Convert Entities.ForEach to IJobEntity.Run
 UBP0060 | Unity.BestPractices | Hidden | Convert Entities.ForEach to IJobEntity.Schedule
