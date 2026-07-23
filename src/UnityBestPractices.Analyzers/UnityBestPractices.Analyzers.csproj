@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>UnityBestPractices.Analyzers</AssemblyName>
+    <RootNamespace>UnityBestPractices.Analyzers</RootNamespace>
+    <PackageId>UnityBestPractices.Analyzers</PackageId>
+    <Version>1.2.0</Version>
+    <Authors>UnityBestPractices contributors</Authors>
+    <Description>Hidden Roslyn diagnostics and quick fixes for Unity best practices.</Description>
+    <PackageTags>unity;roslyn;analyzer;codefix</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <IsPackable>true</IsPackable>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- The release analyzer cannot statically follow descriptors created by the data-driven quick-fix registry. -->
+    <NoWarn>$(NoWarn);RS1022;RS2003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Unity versions using Roslyn 3.8 can load this assembly; newer IDE hosts are compatible too. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="3.8.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).dll"
+          Pack="true"
+          PackagePath="analyzers/dotnet/cs"
+          Visible="false" />
+    <None Include="..\..\README.md"
+          Pack="true"
+          PackagePath="\"
+          Visible="false" />
+  </ItemGroup>
+</Project>
