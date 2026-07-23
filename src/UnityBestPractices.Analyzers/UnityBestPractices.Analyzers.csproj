@@ -19,7 +19,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Unity versions using Roslyn 3.8 can load this assembly; newer IDE hosts are compatible too. -->
+    <!-- Unity's Roslyn host guidance requires netstandard2.0 with Roslyn 3.8.
+         A netstandard2.0 analyzer is compatible with Unity's netstandard2.1 player profile. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="3.8.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
   </ItemGroup>
@@ -30,6 +31,14 @@
           PackagePath="analyzers/dotnet/cs"
           Visible="false" />
     <None Include="..\..\README.md"
+          Pack="true"
+          PackagePath="\"
+          Visible="false" />
+    <None Include="..\..\README.ja.md"
+          Pack="true"
+          PackagePath="\"
+          Visible="false" />
+    <None Include="..\..\README.fa.md"
           Pack="true"
           PackagePath="\"
           Visible="false" />

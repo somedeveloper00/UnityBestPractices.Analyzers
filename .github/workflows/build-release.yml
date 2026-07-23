@@ -46,12 +46,12 @@ jobs:
           --configuration Release
           --no-build
 
-      - name: Prepare versioned DLL
+      - name: Prepare DLL
         shell: bash
         run: |
           source_dll="src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll"
           mkdir -p release
-          cp "$source_dll" "release/UnityBestPractices.Analyzers-v${RELEASE_VERSION}.dll"
+          cp "$source_dll" "release/UnityBestPractices.Analyzers.dll"
 
       - name: Publish GitHub Release
         shell: bash
@@ -59,7 +59,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           release_tag="v${RELEASE_VERSION}"
-          asset_path="release/UnityBestPractices.Analyzers-${release_tag}.dll"
+          asset_path="release/UnityBestPractices.Analyzers.dll"
           gh release create "$release_tag" "$asset_path" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \

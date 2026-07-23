@@ -1,5 +1,7 @@
 # Unity Best Practices Analyzer
 
+[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
+
 A complementary Roslyn analyzer with 70 opt-in quick fixes for Unity and high-performance C# practices not already covered by `Microsoft.Unity.Analyzers`. Every diagnostic has `Hidden` severity, so the analyzer produces no build errors or warnings and does not add noise to the Unity Console.
 
 ## Quick fixes
@@ -116,9 +118,11 @@ The test project is a dependency-light executable test harness. It verifies all 
 
 Every branch push is restored, built in Release configuration, and tested by GitHub Actions. A successful push to the repository's default branch additionally publishes the exact tested analyzer DLL as a GitHub Release asset.
 
-Release tags and DLL names use the `v0.N` series. GitHub's release-workflow run number begins at 1 and advances only for new default-branch release runs, producing `v0.1`, `v0.2`, `v0.3`, and so on; rerunning an existing workflow keeps its original version. The project version remains `0.1.0` locally, while the workflow supplies the selected three-part assembly/package version during each release build.
+Release tags use the `v0.N` series, while the release asset keeps the standard filename `UnityBestPractices.Analyzers.dll`. GitHub's release-workflow run number begins at 1 and advances only for new default-branch release runs, producing `v0.1`, `v0.2`, `v0.3`, and so on; rerunning an existing workflow keeps its original version. The project version remains `0.1.0` locally, while the workflow supplies the selected three-part assembly/package version during each release build.
 
 ## Use in Unity
+
+Unity's player scripting profile supports .NET Standard 2.1. The analyzer DLL intentionally targets `netstandard2.0`, as required by [Unity's Roslyn analyzer guidance](https://docs.unity3d.com/2023.2/Documentation/Manual/roslyn-analyzers.html), and is therefore compatible with projects using the .NET Standard 2.1 player profile. The solution includes a `netstandard2.1` compatibility project that references both public analyzer entry points; every local and CI solution build compiles it to prevent compatibility regressions.
 
 1. Build or pack the analyzer.
 2. Copy `UnityBestPractices.Analyzers.dll` from `bin/Release/netstandard2.0` (or from the NuGet package's `analyzers/dotnet/cs` directory) into a folder under the Unity project's `Assets` directory.
