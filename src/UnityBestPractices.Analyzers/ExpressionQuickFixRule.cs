@@ -26,7 +26,7 @@ internal abstract class ExpressionQuickFixRule
             title,
             message,
             "Unity.BestPractices",
-            DiagnosticSeverity.Hidden,
+            DiagnosticSeverity.Info,
             isEnabledByDefault: true,
             description: description);
     }

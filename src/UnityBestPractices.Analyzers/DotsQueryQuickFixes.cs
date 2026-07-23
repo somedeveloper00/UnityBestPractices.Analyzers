@@ -44,7 +44,7 @@ internal sealed class DotsQueryQuickFixRule
             title,
             message,
             "Unity.BestPractices",
-            DiagnosticSeverity.Hidden,
+            DiagnosticSeverity.Info,
             isEnabledByDefault: true,
             description: description);
     }

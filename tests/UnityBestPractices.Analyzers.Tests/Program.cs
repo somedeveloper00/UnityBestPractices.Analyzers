@@ -817,9 +817,10 @@ internal sealed partial class AnalyzerTests
             throw new InvalidOperationException("Diagnostic IDs must be unique.");
         }
 
-        if (descriptors.Any(descriptor => descriptor.DefaultSeverity != DiagnosticSeverity.Hidden))
+        if (descriptors.Any(descriptor => descriptor.DefaultSeverity != DiagnosticSeverity.Info))
         {
-            throw new InvalidOperationException("Every diagnostic must remain hidden.");
+            throw new InvalidOperationException(
+                "Every diagnostic must remain an Info suggestion so Rider can discover its quick fix without producing build warnings or errors.");
         }
 
         var fixableIds = _codeFix.FixableDiagnosticIds.ToImmutableHashSet(StringComparer.Ordinal);
@@ -1358,7 +1359,7 @@ internal sealed partial class AnalyzerTests
         var diagnostic = diagnostics.SingleOrDefault(item => item.Id == diagnosticId)
             ?? throw new InvalidOperationException($"Expected {diagnosticId}, got: {FormatDiagnostics(diagnostics)}");
 
-        AssertHidden(diagnostic);
+        AssertSuggestion(diagnostic);
         var actions = new List<CodeAction>();
         var context = new CodeFixContext(
             document,
@@ -1458,7 +1459,7 @@ internal sealed partial class AnalyzerTests
             .GetAnalyzerDiagnosticsAsync();
         foreach (var diagnostic in diagnostics)
         {
-            AssertHidden(diagnostic);
+            AssertSuggestion(diagnostic);
         }
 
         return diagnostics;
@@ -1504,12 +1505,12 @@ internal sealed partial class AnalyzerTests
             .Select(path => MetadataReference.CreateFromFile(path));
     }
 
-    private static void AssertHidden(Diagnostic diagnostic)
+    private static void AssertSuggestion(Diagnostic diagnostic)
     {
-        if (diagnostic.Severity != DiagnosticSeverity.Hidden)
+        if (diagnostic.Severity != DiagnosticSeverity.Info)
         {
             throw new InvalidOperationException(
-                $"{diagnostic.Id} must be hidden, but was {diagnostic.Severity}.");
+                $"{diagnostic.Id} must be an Info suggestion, but was {diagnostic.Severity}.");
         }
     }
 

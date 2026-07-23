@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
 
-`Microsoft.Unity.Analyzers` ではまだ扱われていない Unity および高性能 C# のベストプラクティスを対象に、70 個の任意適用クイックフィックスを提供する Roslyn アナライザーです。すべての診断の重大度は `Hidden` であるため、ビルドエラーや警告は発生せず、Unity Console に余計なメッセージも表示されません。
+`Microsoft.Unity.Analyzers` ではまだ扱われていない Unity および高性能 C# のベストプラクティスを対象に、70 個の任意適用クイックフィックスを提供する Roslyn アナライザーです。すべての診断の重大度は `Info` です。Rider と Visual Studio はクイックフィックスを提示できますが、ビルドエラーや警告は発生せず、Unity Console に余計なメッセージも表示されません。
 
 ## クイックフィックス
 
@@ -22,7 +22,7 @@
 
 ### その他のクイックフィックス
 
-拡張ルールは構文種別ごとに整理されています。式の最適化を追加する際はルール宣言とマッチャーだけを追加し、診断登録、`Hidden` 重大度、クイックフィックス登録、書式設定、Fix All 対応は共有されます。
+拡張ルールは構文種別ごとに整理されています。式の最適化を追加する際はルール宣言とマッチャーだけを追加し、診断登録、`Info` 提案重大度、クイックフィックス登録、書式設定、Fix All 対応は共有されます。
 
 | ID | 対象 | 修正内容 |
 |---|---|---|
@@ -112,7 +112,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.Tests
 dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 ```
 
-テストプロジェクトは依存関係の少ない実行可能テストハーネスです。70 個すべての記述子について、ID の一意性、`Hidden` 重大度、修正の登録を検証し、その後すべての変換結果をコンパイルして、保守的な除外ケースも確認します。DOTS のテスト範囲には、すべてのクエリ変換先、6 通りすべての実行モード切り替え、フィルター移行、Entity アクセス、Burst ジョブ抽出、提示される修正セットの厳密な検証、およびキャプチャ、ラッパーの直接利用、未対応クエリ形式、構造変更パイプライン、Unity 以外の類似 API の除外が含まれます。
+テストプロジェクトは依存関係の少ない実行可能テストハーネスです。70 個すべての記述子について、ID の一意性、`Info` 提案重大度、修正の登録を検証し、その後すべての変換結果をコンパイルして、保守的な除外ケースも確認します。DOTS のテスト範囲には、すべてのクエリ変換先、6 通りすべての実行モード切り替え、フィルター移行、Entity アクセス、Burst ジョブ抽出、提示される修正セットの厳密な検証、およびキャプチャ、ラッパーの直接利用、未対応クエリ形式、構造変更パイプライン、Unity 以外の類似 API の除外が含まれます。
 
 ### 自動リリース
 
@@ -126,7 +126,8 @@ Unity のプレイヤースクリプティングプロファイルは .NET Stand
 
 1. アナライザーをビルドするか、パッケージ化します。
 2. `bin/Release/netstandard2.0`（または NuGet パッケージ内の `analyzers/dotnet/cs` ディレクトリ）にある `UnityBestPractices.Analyzers.dll` を、Unity プロジェクトの `Assets` 以下のフォルダーへコピーします。
-3. Unity の Plugin Inspector で DLL を選択します。**Any Platform**、**Editor**、**Standalone** を無効にし、正確なアセットラベル `RoslynAnalyzer` を割り当てます。
-4. C# プロジェクトを再生成し、Visual Studio または Rider で開きます。対象となる式にキャレットを置き、IDE のクイックアクションを実行します。
+3. Unity の Plugin Inspector で DLL を選択します。**Auto Reference**、**Validate References**、**Any Platform**、**Editor**、**Standalone** を無効にし、正確なアセットラベル `RoslynAnalyzer` を割り当てます。
+4. Import 設定を適用し、C# プロジェクトを再生成して、Visual Studio または Rider を再起動します。Rider では **Settings | Editor | Inspection Settings | Roslyn Analyzers | Enable Roslyn analyzers** も有効であることを確認します。
+5. 薄い点線の提案にキャレットを置き、IDE のクイックアクション（Rider では `Alt+Enter`）を実行します。
 
-Unity はコンパイル時にアナライザーを読み込み、対応 IDE は同じアセンブリからコードフィックスプロバイダーを検出します。すべての記述子が `DiagnosticSeverity.Hidden` を使用するため、コンパイラーの警告やエラーではなく、電球アイコンの候補として表示されます。
+Unity はコンパイル時にアナライザーを読み込み、対応 IDE は同じアセンブリからコードフィックスプロバイダーを検出します。`Microsoft.CodeAnalysis.Workspaces` と `System.Composition` はコードフィックスプロバイダーが IDE ホストから受け取る依存関係であるため、Unity の Asset 参照検証は無効のままにします。すべての記述子は `DiagnosticSeverity.Info` を使用し、コンパイラーの警告やエラーではなく、控えめな提案と電球アクションとして表示されます。

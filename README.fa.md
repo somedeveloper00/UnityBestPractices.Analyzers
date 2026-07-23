@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
 
-یک تحلیل‌گر تکمیلی Roslyn با ۷۰ اصلاح سریع اختیاری برای بهترین روش‌های Unity و C# پربازده که هنوز توسط `Microsoft.Unity.Analyzers` پوشش داده نشده‌اند. شدت همهٔ تشخیص‌ها `Hidden` است؛ بنابراین تحلیل‌گر هیچ خطا یا هشداری در Build ایجاد نمی‌کند و Unity Console را شلوغ نمی‌کند.
+یک تحلیل‌گر تکمیلی Roslyn با ۷۰ اصلاح سریع اختیاری برای بهترین روش‌های Unity و C# پربازده که هنوز توسط `Microsoft.Unity.Analyzers` پوشش داده نشده‌اند. شدت همهٔ تشخیص‌ها `Info` است تا Rider و Visual Studio اصلاح سریع را نمایش دهند، بدون آن‌که Build خطا یا هشدار تولید کند یا Unity Console شلوغ شود.
 
 ## اصلاح‌های سریع
 
@@ -22,7 +22,7 @@
 
 ### اصلاح‌های سریع بیشتر
 
-قواعد توسعه‌یافته بر اساس نوع Syntax سازمان‌دهی شده‌اند. برای افزودن یک بهینه‌سازی عبارت جدید، تنها تعریف قاعده و Matcher لازم است؛ ثبت تشخیص، شدت `Hidden`، ثبت اصلاح سریع، قالب‌بندی و پشتیبانی Fix All مشترک هستند.
+قواعد توسعه‌یافته بر اساس نوع Syntax سازمان‌دهی شده‌اند. برای افزودن یک بهینه‌سازی عبارت جدید، تنها تعریف قاعده و Matcher لازم است؛ ثبت تشخیص، شدت پیشنهادی `Info`، ثبت اصلاح سریع، قالب‌بندی و پشتیبانی Fix All مشترک هستند.
 
 | شناسه | مورد شناسایی‌شده | اصلاح |
 |---|---|---|
@@ -112,7 +112,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.Tests
 dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 ```
 
-پروژهٔ Test یک Test Harness اجرایی با وابستگی کم است. این پروژه یکتا بودن شناسه، شدت `Hidden` و ثبت اصلاح را برای هر ۷۰ Descriptor بررسی می‌کند، سپس خروجی همهٔ تبدیل‌ها را کامپایل و حالت‌های محافظه‌کارانهٔ منفی را آزمایش می‌کند. پوشش DOTS شامل همهٔ مقصدهای Query، هر شش تغییر حالت اجرا، انتقال فیلتر، دسترسی Entity، استخراج Job با Burst، مجموعهٔ دقیق اصلاح‌های ارائه‌شده و رد کردن Captureها، دسترسی مستقیم Wrapper، شکل‌های پشتیبانی‌نشدهٔ Query، Pipelineهای تغییر ساختاری و APIهای مشابه غیر Unity است.
+پروژهٔ Test یک Test Harness اجرایی با وابستگی کم است. این پروژه یکتا بودن شناسه، شدت پیشنهادی `Info` و ثبت اصلاح را برای هر ۷۰ Descriptor بررسی می‌کند، سپس خروجی همهٔ تبدیل‌ها را کامپایل و حالت‌های محافظه‌کارانهٔ منفی را آزمایش می‌کند. پوشش DOTS شامل همهٔ مقصدهای Query، هر شش تغییر حالت اجرا، انتقال فیلتر، دسترسی Entity، استخراج Job با Burst، مجموعهٔ دقیق اصلاح‌های ارائه‌شده و رد کردن Captureها، دسترسی مستقیم Wrapper، شکل‌های پشتیبانی‌نشدهٔ Query، Pipelineهای تغییر ساختاری و APIهای مشابه غیر Unity است.
 
 ### Release خودکار
 
@@ -126,7 +126,8 @@ Tagهای Release از سری `v0.N` استفاده می‌کنند، اما Ass
 
 1. تحلیل‌گر را Build یا Pack کنید.
 2. فایل `UnityBestPractices.Analyzers.dll` را از `bin/Release/netstandard2.0` یا دایرکتوری `analyzers/dotnet/cs` در Package نوگت، به پوشه‌ای زیر `Assets` پروژهٔ Unity کپی کنید.
-3. DLL را در Plugin Inspector یونیتی انتخاب کنید. گزینه‌های **Any Platform**، **Editor** و **Standalone** را غیرفعال و Label دقیق `RoslynAnalyzer` را به Asset اختصاص دهید.
-4. پروژهٔ C# را دوباره تولید کرده و در Visual Studio یا Rider باز کنید. Caret را روی عبارت منطبق قرار دهید و فرمان Quick Action محیط توسعه را اجرا کنید.
+3. DLL را در Plugin Inspector یونیتی انتخاب کنید. گزینه‌های **Auto Reference**، **Validate References**، **Any Platform**، **Editor** و **Standalone** را غیرفعال کنید و Label دقیق `RoslynAnalyzer` را به Asset اختصاص دهید.
+4. تنظیمات Import را Apply کنید، پروژهٔ C# را دوباره تولید کنید و Visual Studio یا Rider را Restart کنید. در Rider همچنین فعال بودن **Settings | Editor | Inspection Settings | Roslyn Analyzers | Enable Roslyn analyzers** را بررسی کنید.
+5. Caret را روی پیشنهاد با خط نقطه‌ای کم‌رنگ قرار دهید و Quick Action محیط توسعه را اجرا کنید (در Rider کلید `Alt+Enter`).
 
-Unity تحلیل‌گر را برای کامپایل بارگذاری می‌کند و IDE پشتیبانی‌شده، Code Fix Provider را از همان Assembly پیدا می‌کند. چون همهٔ Descriptorها از `DiagnosticSeverity.Hidden` استفاده می‌کنند، پیشنهادها به‌شکل Light Bulb نمایش داده می‌شوند، نه Warning یا Error کامپایلر.
+Unity تحلیل‌گر را برای کامپایل بارگذاری می‌کند و IDE پشتیبانی‌شده، Code Fix Provider را از همان Assembly پیدا می‌کند. `Microsoft.CodeAnalysis.Workspaces` و `System.Composition` وابستگی‌هایی هستند که میزبان IDE برای Code Fix Provider فراهم می‌کند؛ به همین دلیل اعتبارسنجی Referenceهای Asset در Unity باید غیرفعال بماند. چون همهٔ Descriptorها از `DiagnosticSeverity.Info` استفاده می‌کنند، به‌شکل پیشنهاد کم‌مزاحمت همراه Light Bulb نمایش داده می‌شوند، نه Warning یا Error کامپایلر.

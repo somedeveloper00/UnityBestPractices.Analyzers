@@ -18,7 +18,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Encapsulate serialized field",
         "Keep serialized field '{0}' private",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "A private field with SerializeField preserves Inspector serialization without exposing mutable state as public API.");
 
@@ -27,7 +27,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Yield null for the next frame",
         "Yield null instead of a boxed value to wait for the next frame",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "Unity coroutines can yield null for one frame without boxing a value type.");
 
@@ -36,7 +36,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Use squared magnitude for a distance check",
         "Compare sqrMagnitude with the squared threshold",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "Comparing squared magnitudes avoids the square-root calculation performed by magnitude.");
 
@@ -45,7 +45,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Burst compile Unity job",
         "Add BurstCompile to job '{0}'",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "Burst can compile compatible Unity jobs to optimized native code.");
 
@@ -54,7 +54,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Mark job input as read-only",
         "Mark NativeArray field '{0}' as ReadOnly",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "ReadOnly access allows jobs that consume the same NativeArray to run concurrently.");
 
@@ -63,7 +63,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Stack allocate small temporary buffer",
         "Use stackalloc for this bounded temporary Span buffer",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "A small, non-looping stackalloc Span avoids a managed array allocation.");
 
@@ -72,7 +72,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Mutate struct element by reference",
         "Use a ref local instead of copying '{0}' and assigning it back",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "A ref local avoids copying a struct out of a ref-returning collection and writing it back.");
 
@@ -81,7 +81,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Cache repeated Camera.main lookup",
         "Cache Camera.main for the {0} accesses in this block",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "Caching repeated Camera.main access avoids repeated component lookup overhead.");
 
@@ -90,7 +90,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Preallocate list capacity",
         "Initialize this list with capacity {0}",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "Preallocating a known minimum capacity avoids list backing-array growth while adding elements.");
 
@@ -99,7 +99,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Multiply to square a scalar",
         "Multiply '{0}' by itself instead of calling Mathf.Pow",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "Direct multiplication is cheaper than a general-purpose power function for a stable scalar squared.");
 
@@ -108,7 +108,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         "Skip redundant NativeArray clearing",
         "Use UninitializedMemory because the following loop overwrites every element",
         Category,
-        DiagnosticSeverity.Hidden,
+        DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: "Skipping default memory clearing avoids redundant work when every NativeArray element is immediately assigned.");
 

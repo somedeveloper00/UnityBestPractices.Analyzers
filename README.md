@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
 
-A complementary Roslyn analyzer with 70 opt-in quick fixes for Unity and high-performance C# practices not already covered by `Microsoft.Unity.Analyzers`. Every diagnostic has `Hidden` severity, so the analyzer produces no build errors or warnings and does not add noise to the Unity Console.
+A complementary Roslyn analyzer with 70 opt-in quick fixes for Unity and high-performance C# practices not already covered by `Microsoft.Unity.Analyzers`. Every diagnostic has `Info` severity, so Rider and Visual Studio can offer the quick fix while builds produce no errors or warnings and the Unity Console stays clean.
 
 ## Quick fixes
 
@@ -22,7 +22,7 @@ A complementary Roslyn analyzer with 70 opt-in quick fixes for Unity and high-pe
 
 ### Additional quick fixes
 
-The expanded rules are implemented as syntax-kind-indexed modules. Adding another expression optimization requires a rule declaration and matcher, while diagnostic registration, hidden severity, quick-fix registration, formatting, and fix-all support are shared.
+The expanded rules use a syntax-kind-indexed registry. Adding another expression optimization requires a rule declaration and matcher, while diagnostic registration, suggestion severity, quick-fix registration, formatting, and fix-all support are shared.
 
 | ID | Recognizes | Fix |
 |---|---|---|
@@ -112,7 +112,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.Tests
 dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 ```
 
-The test project is a dependency-light executable test harness. It verifies all 70 descriptors have unique IDs, hidden severity, and registered fixes, then compiles every transformation and checks conservative negative cases. DOTS coverage includes all query targets, all six execution-mode switches, filter transfer, entity access, Burst job extraction, exact offered-fix sets, and rejection of captures, raw wrapper access, unsupported query forms, structural-change pipelines, and look-alike non-Unity APIs.
+The test project is a dependency-light executable test harness. It verifies all 70 descriptors have unique IDs, `Info` suggestion severity, and registered fixes, then compiles every transformation and checks conservative negative cases. DOTS coverage includes all query targets, all six execution-mode switches, filter transfer, entity access, Burst job extraction, exact offered-fix sets, and rejection of captures, raw wrapper access, unsupported query forms, structural-change pipelines, and look-alike non-Unity APIs.
 
 ### Automated releases
 
@@ -126,7 +126,8 @@ Unity's player scripting profile supports .NET Standard 2.1. The analyzer DLL in
 
 1. Build or pack the analyzer.
 2. Copy `UnityBestPractices.Analyzers.dll` from `bin/Release/netstandard2.0` (or from the NuGet package's `analyzers/dotnet/cs` directory) into a folder under the Unity project's `Assets` directory.
-3. Select the DLL in Unity's Plugin Inspector. Disable **Any Platform**, **Editor**, and **Standalone**, then assign the exact asset label `RoslynAnalyzer`.
-4. Regenerate/open the C# project in Visual Studio or Rider. Put the caret on a matching expression and invoke the IDE's quick-action command.
+3. Select the DLL in Unity's Plugin Inspector. Disable **Auto Reference**, **Validate References**, **Any Platform**, **Editor**, and **Standalone**, then assign the exact asset label `RoslynAnalyzer`.
+4. Apply the import settings, regenerate the C# project, and restart Visual Studio or Rider so its Roslyn host reloads the assembly. In Rider, also verify **Settings | Editor | Inspection Settings | Roslyn Analyzers | Enable Roslyn analyzers**.
+5. Put the caret on the light dotted suggestion and invoke the IDE's quick-action command (`Alt+Enter` in Rider).
 
-Unity performs analyzer loading for compilation, while the supported IDE discovers the code-fix provider from the same assembly. Because all descriptors use `DiagnosticSeverity.Hidden`, they are light-bulb suggestions rather than compiler warnings or errors.
+Unity performs analyzer loading for compilation, while the supported IDE discovers the code-fix provider from the same assembly. `Microsoft.CodeAnalysis.Workspaces` and `System.Composition` are IDE-host dependencies of that provider, which is why Unity asset-reference validation must remain disabled. Because all descriptors use `DiagnosticSeverity.Info`, they appear as low-noise suggestions with light-bulb actions rather than compiler warnings or errors.

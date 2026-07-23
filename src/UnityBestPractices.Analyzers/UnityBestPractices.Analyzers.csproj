@@ -6,7 +6,7 @@
     <PackageId>UnityBestPractices.Analyzers</PackageId>
     <Version>0.1.0</Version>
     <Authors>UnityBestPractices contributors</Authors>
-    <Description>Hidden Roslyn diagnostics and quick fixes for Unity best practices.</Description>
+    <Description>Suggestion-level Roslyn diagnostics and quick fixes for Unity best practices.</Description>
     <PackageTags>unity;roslyn;analyzer;codefix</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <DevelopmentDependency>true</DevelopmentDependency>
