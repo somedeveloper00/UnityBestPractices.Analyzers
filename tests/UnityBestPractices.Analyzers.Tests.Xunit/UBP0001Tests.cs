@@ -26,12 +26,12 @@ public sealed class UBP0001Tests
                     public float {|#0:speed|} = 5f;
                 }
                 """,
-            // The inserted line break follows the workspace's CRLF formatting option.
+            // The inserted line break follows the source file's platform newline.
             FixedCode =
                 "using UnityEngine;\n" +
                 "class Player : MonoBehaviour\n" +
                 "{\n" +
-                "    [UnityEngine.SerializeField]\r\n" +
+                "    [UnityEngine.SerializeField]" + System.Environment.NewLine +
                 "    private float speed = 5f;\n" +
                 "}",
             ReferenceAssemblies = ReferenceAssemblies.Net.Net60,

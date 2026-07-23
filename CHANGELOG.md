@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-23
+
+### Fixed
+
+- Made the UBP0001 Roslyn integration test newline expectation portable across Windows and Linux CI runners.
+
+## [0.4.0] - 2026-07-23
+
 ### Added
 
 - Production package metadata, Source Link, symbol packages, and package validation.
