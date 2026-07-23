@@ -100,6 +100,9 @@ internal sealed class EntitiesForEachQuery
         AnonymousFunctionExpressionSyntax lambda,
         ImmutableArray<DotsQueryParameter> parameters,
         ImmutableArray<DotsQueryFilter> filters,
+        bool hasStructuralChanges,
+        bool hasWithoutBurst,
+        bool hasUnsupportedCaptures,
         string executionMode,
         string jobName)
     {
@@ -108,6 +111,9 @@ internal sealed class EntitiesForEachQuery
         Lambda = lambda;
         Parameters = parameters;
         Filters = filters;
+        HasStructuralChanges = hasStructuralChanges;
+        HasWithoutBurst = hasWithoutBurst;
+        HasUnsupportedCaptures = hasUnsupportedCaptures;
         ExecutionMode = executionMode;
         JobName = jobName;
     }
@@ -121,6 +127,15 @@ internal sealed class EntitiesForEachQuery
     internal ImmutableArray<DotsQueryParameter> Parameters { get; }
 
     internal ImmutableArray<DotsQueryFilter> Filters { get; }
+
+    internal bool HasStructuralChanges { get; }
+
+    internal bool HasWithoutBurst { get; }
+
+    internal bool HasUnsupportedCaptures { get; }
+
+    internal bool SupportsJobConversion =>
+        !HasStructuralChanges && !HasWithoutBurst && !HasUnsupportedCaptures;
 
     internal string ExecutionMode { get; }
 
@@ -169,6 +184,8 @@ internal sealed class EntitiesForEachQuery
                 semanticModel,
                 cancellationToken,
                 out var filters,
+                out var hasStructuralChanges,
+                out var hasWithoutBurst,
                 out var entitiesExpression) ||
             !DotsQuerySemanticHelpers.IsEntitiesBuilderExpression(
                 entitiesExpression,
@@ -240,13 +257,7 @@ internal sealed class EntitiesForEachQuery
         }
 
         if (parameters.Count(item => item.Access == DotsParameterAccess.Entity) > 1 ||
-            parameters.Count(item => item.Access != DotsParameterAccess.Entity) == 0 ||
-            parameters.Count(item => item.Access != DotsParameterAccess.Entity) > 7 ||
-            DotsQuerySemanticHelpers.HasUnsupportedCaptures(
-                lambda.Body,
-                parameters.Select(item => item.Symbol).ToImmutableArray(),
-                semanticModel,
-                cancellationToken))
+            parameters.Count(item => item.Access != DotsParameterAccess.Entity) > 7)
         {
             return false;
         }
@@ -263,6 +274,13 @@ internal sealed class EntitiesForEachQuery
             lambda,
             parameters.ToImmutable(),
             filters,
+            hasStructuralChanges,
+            hasWithoutBurst,
+            DotsQuerySemanticHelpers.HasUnsupportedCaptures(
+                lambda.Body,
+                parameters.Select(item => item.Symbol).ToImmutableArray(),
+                semanticModel,
+                cancellationToken),
             executionMode,
             DotsQuerySemanticHelpers.CreateUniqueNestedTypeName(containingType, "EntitiesForEachJob"));
         return true;
@@ -291,9 +309,28 @@ internal sealed class EntitiesForEachQuery
             .Where(parameter => parameter.Access != DotsParameterAccess.Entity)
             .ToImmutableArray();
         var entityParameter = Parameters.FirstOrDefault(parameter => parameter.Access == DotsParameterAccess.Entity);
+        if (HasStructuralChanges)
+        {
+            return componentParameters.Length == 0 &&
+                   entityParameter is not null &&
+                   TryCreateStructuralEntitySnapshot(semanticModel, out statement);
+        }
+
+        var entityOnlyQueryType = componentParameters.Length == 0
+            ? Filters
+                .Where(filter => filter.Name == "WithAll")
+                .SelectMany(filter => filter.TypeNames)
+                .FirstOrDefault()
+            : null;
+        if (componentParameters.Length == 0 && string.IsNullOrEmpty(entityOnlyQueryType))
+        {
+            return false;
+        }
+
         var queryText =
             "Unity.Entities.SystemAPI.Query<" +
-            string.Join(", ", componentParameters.Select(parameter => parameter.SystemApiType)) +
+            (entityOnlyQueryType ??
+             string.Join(", ", componentParameters.Select(parameter => parameter.SystemApiType))) +
             ">()" +
             string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
             (entityParameter is null ? string.Empty : ".WithEntityAccess()");
@@ -321,6 +358,11 @@ internal sealed class EntitiesForEachQuery
         });
 
         var variableNames = componentParameters.Select(parameter => parameter.Name).ToList();
+        if (componentParameters.Length == 0)
+        {
+            variableNames.Add("_");
+        }
+
         if (entityParameter is not null)
         {
             variableNames.Add(entityParameter.Name);
@@ -333,6 +375,56 @@ internal sealed class EntitiesForEachQuery
             "foreach (" + iterationVariable + " in " + queryText + ")\n" +
             rewrittenBody.ToFullString());
         return !statement.ContainsDiagnostics;
+    }
+
+    private bool TryCreateStructuralEntitySnapshot(
+        SemanticModel semanticModel,
+        out StatementSyntax statement)
+    {
+        statement = null!;
+        if (UnitySymbolCache.GetTypeByMetadataName(
+                semanticModel.Compilation,
+                "Unity.Collections.Allocator") is null ||
+            Filters.Length == 0 ||
+            Filters.Any(filter =>
+                filter.Name != "WithAll" &&
+                filter.Name != "WithAny" &&
+                filter.Name != "WithNone"))
+        {
+            return false;
+        }
+
+        var entityParameter = Parameters.Single(parameter => parameter.Access == DotsParameterAccess.Entity);
+        var queryBuilder =
+            "Unity.Entities.SystemAPI.QueryBuilder()" +
+            string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
+            ".Build().ToEntityArray(Unity.Collections.Allocator.Temp)";
+        var snapshotName = CreateUniqueLocalName("entitiesSnapshot");
+        var body = DotsQuerySemanticHelpers.CreateBlock(Lambda.Body);
+        statement = SyntaxFactory.ParseStatement(
+            "{\n" +
+            "using (var " + snapshotName + " = " + queryBuilder + ")\n" +
+            "{\n" +
+            "foreach (var " + entityParameter.Name + " in " + snapshotName + ")\n" +
+            body.WithoutTrivia().ToFullString() + "\n" +
+            "}\n" +
+            "}");
+        return !statement.ContainsDiagnostics;
+    }
+
+    private string CreateUniqueLocalName(string baseName)
+    {
+        var names = ContainingType.DescendantTokens()
+            .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
+            .Select(token => token.ValueText)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        var candidate = baseName;
+        for (var suffix = 2; names.Contains(candidate); suffix++)
+        {
+            candidate = baseName + suffix;
+        }
+
+        return candidate;
     }
 
     internal BlockSyntax CreateJobBody() =>
@@ -349,14 +441,30 @@ internal sealed class EntitiesForEachQuery
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out ImmutableArray<DotsQueryFilter> filters,
+        out bool hasStructuralChanges,
+        out bool hasWithoutBurst,
         out ExpressionSyntax entitiesExpression)
     {
         var builder = ImmutableArray.CreateBuilder<DotsQueryFilter>();
+        hasStructuralChanges = false;
+        hasWithoutBurst = false;
         var current = expression;
         while (current is InvocationExpressionSyntax invocation &&
                invocation.Expression is MemberAccessExpressionSyntax access)
         {
             var methodName = access.Name.Identifier.ValueText;
+            if ((methodName == "WithStructuralChanges" || methodName == "WithoutBurst") &&
+                invocation.ArgumentList.Arguments.Count == 0 &&
+                DotsQuerySemanticHelpers.IsUnityEntitiesMethod(
+                    semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol,
+                    methodName))
+            {
+                hasStructuralChanges |= methodName == "WithStructuralChanges";
+                hasWithoutBurst |= methodName == "WithoutBurst";
+                current = access.Expression;
+                continue;
+            }
+
             if (!DotsQuerySemanticHelpers.IsSupportedFilterName(methodName) ||
                 !DotsQuerySemanticHelpers.IsUnityEntitiesMethod(
                     semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol,
@@ -364,6 +472,8 @@ internal sealed class EntitiesForEachQuery
                 !DotsQuerySemanticHelpers.TryCreateFilter(invocation, access, out var filter))
             {
                 filters = default;
+                hasStructuralChanges = false;
+                hasWithoutBurst = false;
                 entitiesExpression = null!;
                 return false;
             }

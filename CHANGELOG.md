@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-23
+
+### Fixed
+
+- Enabled UBP0058 for synchronous `Entities.ForEach` lambdas that capture locals or instance state.
+- Added conservative conversion support for entity-only `WithAll<T>()` pipelines, including `WithoutBurst()` and entity-only `WithStructuralChanges()` snapshot iteration.
+- Kept unsafe job extraction and structural component-reference conversions suppressed.
+
 ## [0.4.1] - 2026-07-23
 
 ### Fixed

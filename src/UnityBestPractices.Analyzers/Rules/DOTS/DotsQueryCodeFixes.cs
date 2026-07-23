@@ -39,7 +39,8 @@ internal static class DotsQueryCodeFixes
 
             return rule.Kind == DotsQueryQuickFixKind.EntitiesForEachToSystemApiQuery
                 ? ApplySystemApiQueryFix(document, root, semanticModel, query, cancellationToken)
-                : ApplyJobEntityFix(
+                : query.SupportsJobConversion
+                    ? ApplyJobEntityFix(
                     document,
                     root,
                     query.Statement,
@@ -49,7 +50,8 @@ internal static class DotsQueryCodeFixes
                     query.CreateJobParameters(),
                     query.CreateJobAttributes(),
                     GetTargetExecutionMode(rule.Kind),
-                    semanticModel.Compilation);
+                    semanticModel.Compilation)
+                    : document;
         }
 
         if (IsSystemApiQueryKind(rule.Kind))

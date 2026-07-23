@@ -207,6 +207,11 @@ internal static class RuleDocumentationGenerator
 
         if (rule.Category == RuleCategories.UnityDotsMigration)
         {
+            if (rule.DiagnosticId == DiagnosticIds.EntitiesForEachToSystemApiQuery)
+            {
+                return "- Synchronous conversions support local and instance captures, `WithoutBurst()`, component parameters, and entity-only lambdas constrained by at least one `WithAll<T>()` filter. Entity-only `WithStructuralChanges()` loops use a disposable entity snapshot so structural edits cannot invalidate iteration.";
+            }
+
             return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model.";
         }
 
@@ -233,6 +238,11 @@ internal static class RuleDocumentationGenerator
 
         if (rule.Category == RuleCategories.UnityDotsMigration)
         {
+            if (rule.DiagnosticId == DiagnosticIds.EntitiesForEachToSystemApiQuery)
+            {
+                return "- Nested lambdas, unresolved or unsupported filters, entity-only loops without a usable query component, and structural-change loops that expose component references are excluded. Scheduled job conversions remain unavailable for captured, `WithoutBurst()`, or structural-change pipelines.";
+            }
+
             return "- Captured locals, nested lambdas, structural-change pipelines, unsupported filters, system-instance access, and ambiguous package symbols are excluded.";
         }
 

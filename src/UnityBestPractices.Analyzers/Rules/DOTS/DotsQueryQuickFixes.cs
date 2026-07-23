@@ -141,14 +141,21 @@ internal static class DotsQueryRules
                 context.CancellationToken,
                 out var forEachQuery))
         {
-            if (forEachQuery.ExecutionMode == "Run")
+            if (forEachQuery.ExecutionMode == "Run" &&
+                forEachQuery.TryCreateSystemApiLoop(
+                    context.SemanticModel,
+                    context.CancellationToken,
+                    out _))
             {
                 Report(context, DiagnosticIds.EntitiesForEachToSystemApiQuery, statement.GetLocation());
             }
 
-            Report(context, DiagnosticIds.EntitiesForEachToJobEntityRun, statement.GetLocation());
-            Report(context, DiagnosticIds.EntitiesForEachToJobEntitySchedule, statement.GetLocation());
-            Report(context, DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel, statement.GetLocation());
+            if (forEachQuery.SupportsJobConversion)
+            {
+                Report(context, DiagnosticIds.EntitiesForEachToJobEntityRun, statement.GetLocation());
+                Report(context, DiagnosticIds.EntitiesForEachToJobEntitySchedule, statement.GetLocation());
+                Report(context, DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel, statement.GetLocation());
+            }
             return;
         }
 

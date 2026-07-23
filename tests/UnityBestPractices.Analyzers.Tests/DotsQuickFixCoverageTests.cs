@@ -112,7 +112,39 @@ internal sealed partial class AnalyzerTests
 
         await VerifyAdditionalJobModeCasesAsync();
         await VerifyDotsDiagnosticSetsAsync();
+        await VerifyEntitiesForEachRegressionCasesAsync();
         await VerifyRejectedDotsMigrationsAsync();
+    }
+
+    private async Task VerifyEntitiesForEachRegressionCasesAsync()
+    {
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class CapturedSystem : SystemBase { void Update() { " +
+            "var scale = 2f; Entities.ForEach((ref Position p) => { p.Value *= scale; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class CapturedSystem : SystemBase { void Update() { " +
+            "var scale = 2f; foreach (var p in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) " +
+            "{ p.ValueRW.Value *= scale; } } } struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class EntityOnlySystem : SystemBase { void Update() { " +
+            "Entities.WithoutBurst().WithAll<Tag>().ForEach((Entity entity) => " +
+            "{ var hash = entity.GetHashCode(); }).Run(); } } struct Tag : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class EntityOnlySystem : SystemBase { void Update() { " +
+            "foreach (var (_, entity) in Unity.Entities.SystemAPI.Query<Tag>().WithAll<Tag>().WithEntityAccess()) " +
+            "{ var hash = entity.GetHashCode(); } } } struct Tag : IComponentData { }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class StructuralEntitySystem : SystemBase { void Update() { " +
+            "Entities.WithoutBurst().WithStructuralChanges().WithAll<Tag>().ForEach((Entity entity) => " +
+            "{ var hash = entity.GetHashCode(); }).Run(); } } struct Tag : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class StructuralEntitySystem : SystemBase { void Update() { { " +
+            "using (var entitiesSnapshot = Unity.Entities.SystemAPI.QueryBuilder().WithAll<Tag>().Build()" +
+            ".ToEntityArray(Unity.Collections.Allocator.Temp)) { foreach (var entity in entitiesSnapshot) " +
+            "{ var hash = entity.GetHashCode(); } } } } } struct Tag : IComponentData { }");
     }
 
     private async Task VerifyEntitiesMigrationCaseAsync(DotsMigrationCase item)
@@ -260,7 +292,8 @@ internal sealed partial class AnalyzerTests
         await VerifyExactDotsDiagnosticsAsync(
             "using Unity.Entities; partial class CapturedEntitiesSystem : SystemBase { void Update() { " +
             "var scale = 2f; Entities.ForEach((ref Position p) => { p.Value *= scale; }).Run(); } } " +
-            "struct Position : IComponentData { public float Value; }");
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery);
 
         await VerifyExactDotsDiagnosticsAsync(
             "using Unity.Entities; partial class CapturedQuerySystem : SystemBase { void Update() { " +

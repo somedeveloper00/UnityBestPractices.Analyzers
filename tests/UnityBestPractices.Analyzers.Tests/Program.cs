@@ -176,6 +176,7 @@ internal sealed partial class AnalyzerTests
 
             public delegate void RefAction<T>(ref T value) where T : struct, IComponentData;
             public delegate void InAction<T>(in T value) where T : struct, IComponentData;
+            public delegate void EntityAction(Entity entity);
             public delegate void RefInAction<T1, T2>(ref T1 first, in T2 second)
                 where T1 : struct, IComponentData
                 where T2 : struct, IComponentData;
@@ -191,6 +192,8 @@ internal sealed partial class AnalyzerTests
                 public EntitiesBuilder WithChangeFilter<T>() where T : struct, IComponentData => this;
                 public EntitiesBuilder WithEntityQueryOptions(EntityQueryOptions options) => this;
                 public EntitiesBuilder WithStructuralChanges() => this;
+                public EntitiesBuilder WithoutBurst() => this;
+                public ForEachDescription ForEach(EntityAction action) => default;
                 public ForEachDescription ForEach<T>(RefAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(InAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T1, T2>(RefInAction<T1, T2> action)
@@ -219,6 +222,21 @@ internal sealed partial class AnalyzerTests
             {
                 public static QueryEnumerable<T1> Query<T1>() => default;
                 public static QueryEnumerable<T1, T2> Query<T1, T2>() => default;
+                public static SystemAPIQueryBuilder QueryBuilder() => default;
+            }
+
+            public struct SystemAPIQueryBuilder
+            {
+                public SystemAPIQueryBuilder WithAll<T>() => this;
+                public SystemAPIQueryBuilder WithAny<T>() => this;
+                public SystemAPIQueryBuilder WithNone<T>() => this;
+                public EntityQuery Build() => default;
+            }
+
+            public struct EntityQuery
+            {
+                public Unity.Collections.NativeArray<Entity> ToEntityArray(Unity.Collections.Allocator allocator) =>
+                    default;
             }
 
             public struct QueryEnumerable<T1>
@@ -280,7 +298,7 @@ internal sealed partial class AnalyzerTests
             public enum Allocator { Temp, TempJob, Persistent }
             public enum NativeArrayOptions { UninitializedMemory, ClearMemory }
 
-            public struct NativeArray<T> where T : struct
+            public struct NativeArray<T> : System.IDisposable where T : struct
             {
                 private T[] _items;
                 public NativeArray(
@@ -299,6 +317,12 @@ internal sealed partial class AnalyzerTests
                 }
 
                 public void Dispose() { }
+                public Enumerator GetEnumerator() => default;
+                public struct Enumerator
+                {
+                    public T Current => default;
+                    public bool MoveNext() => false;
+                }
             }
 
             public struct NativeList<T> where T : struct
@@ -1442,7 +1466,7 @@ internal sealed partial class AnalyzerTests
         await VerifyJobEntityModeFixAsync("ScheduleParallel", "Run", DiagnosticIds.JobEntityScheduleParallelToRun);
         await VerifyJobEntityModeFixAsync("ScheduleParallel", "Schedule", DiagnosticIds.JobEntityScheduleParallelToSchedule);
 
-        await VerifyNoDiagnosticAsync(
+        await VerifyExactDotsDiagnosticsAsync(
             """
             using Unity.Entities;
 
@@ -1460,7 +1484,8 @@ internal sealed partial class AnalyzerTests
                     }).Run();
                 }
             }
-            """);
+            """,
+            DiagnosticIds.EntitiesForEachToSystemApiQuery);
     }
 
     private Task VerifyJobEntityModeFixAsync(string sourceMode, string targetMode, string diagnosticId)
