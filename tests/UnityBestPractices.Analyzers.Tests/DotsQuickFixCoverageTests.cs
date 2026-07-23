@@ -133,7 +133,8 @@ internal sealed partial class AnalyzerTests
             "{ var hash = entity.GetHashCode(); }).Run(); } } struct Tag : IComponentData { }",
             DiagnosticIds.EntitiesForEachToSystemApiQuery,
             "using Unity.Entities; partial class EntityOnlySystem : SystemBase { void Update() { " +
-            "foreach (var (_, entity) in Unity.Entities.SystemAPI.Query<Tag>().WithAll<Tag>().WithEntityAccess()) " +
+            "foreach (var (_, entity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRO<Tag>>()" +
+            ".WithAll<Tag>().WithEntityAccess()) " +
             "{ var hash = entity.GetHashCode(); } } } struct Tag : IComponentData { }");
 
         await VerifyFixAsync(
@@ -142,8 +143,10 @@ internal sealed partial class AnalyzerTests
             "{ var hash = entity.GetHashCode(); }).Run(); } } struct Tag : IComponentData { }",
             DiagnosticIds.EntitiesForEachToSystemApiQuery,
             "using Unity.Entities; partial class StructuralEntitySystem : SystemBase { void Update() { { " +
-            "using (var entitiesSnapshot = Unity.Entities.SystemAPI.QueryBuilder().WithAll<Tag>().Build()" +
-            ".ToEntityArray(Unity.Collections.Allocator.Temp)) { foreach (var entity in entitiesSnapshot) " +
+            "using (var entitiesSnapshot = new Unity.Collections.NativeList<Unity.Entities.Entity>" +
+            "(Unity.Collections.Allocator.Temp)) { foreach (var (_, entity) in Unity.Entities.SystemAPI" +
+            ".Query<Unity.Entities.RefRO<Tag>>().WithAll<Tag>().WithEntityAccess()) " +
+            "{ entitiesSnapshot.Add(entity); } foreach (var entity in entitiesSnapshot) " +
             "{ var hash = entity.GetHashCode(); } } } } } struct Tag : IComponentData { }");
     }
 

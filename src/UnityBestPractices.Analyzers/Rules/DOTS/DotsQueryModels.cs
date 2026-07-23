@@ -329,8 +329,9 @@ internal sealed class EntitiesForEachQuery
 
         var queryText =
             "Unity.Entities.SystemAPI.Query<" +
-            (entityOnlyQueryType ??
-             string.Join(", ", componentParameters.Select(parameter => parameter.SystemApiType))) +
+            (entityOnlyQueryType is null
+                ? string.Join(", ", componentParameters.Select(parameter => parameter.SystemApiType))
+                : "Unity.Entities.RefRO<" + entityOnlyQueryType + ">") +
             ">()" +
             string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
             (entityParameter is null ? string.Empty : ".WithEntityAccess()");
@@ -385,26 +386,38 @@ internal sealed class EntitiesForEachQuery
         if (UnitySymbolCache.GetTypeByMetadataName(
                 semanticModel.Compilation,
                 "Unity.Collections.Allocator") is null ||
-            Filters.Length == 0 ||
-            Filters.Any(filter =>
-                filter.Name != "WithAll" &&
-                filter.Name != "WithAny" &&
-                filter.Name != "WithNone"))
+            UnitySymbolCache.GetTypeByMetadataName(
+                semanticModel.Compilation,
+                "Unity.Collections.NativeList`1") is null)
         {
             return false;
         }
 
         var entityParameter = Parameters.Single(parameter => parameter.Access == DotsParameterAccess.Entity);
-        var queryBuilder =
-            "Unity.Entities.SystemAPI.QueryBuilder()" +
+        var queryComponent = Filters
+            .Where(filter => filter.Name == "WithAll")
+            .SelectMany(filter => filter.TypeNames)
+            .FirstOrDefault();
+        if (string.IsNullOrEmpty(queryComponent))
+        {
+            return false;
+        }
+
+        var query =
+            "Unity.Entities.SystemAPI.Query<Unity.Entities.RefRO<" + queryComponent + ">>()" +
             string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
-            ".Build().ToEntityArray(Unity.Collections.Allocator.Temp)";
+            ".WithEntityAccess()";
         var snapshotName = CreateUniqueLocalName("entitiesSnapshot");
         var body = DotsQuerySemanticHelpers.CreateBlock(Lambda.Body);
         statement = SyntaxFactory.ParseStatement(
             "{\n" +
-            "using (var " + snapshotName + " = " + queryBuilder + ")\n" +
+            "using (var " + snapshotName +
+            " = new Unity.Collections.NativeList<Unity.Entities.Entity>(Unity.Collections.Allocator.Temp))\n" +
             "{\n" +
+            "foreach (var (_, " + entityParameter.Name + ") in " + query + ")\n" +
+            "{\n" +
+            snapshotName + ".Add(" + entityParameter.Name + ");\n" +
+            "}\n" +
             "foreach (var " + entityParameter.Name + " in " + snapshotName + ")\n" +
             body.WithoutTrivia().ToFullString() + "\n" +
             "}\n" +

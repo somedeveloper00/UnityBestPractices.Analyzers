@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-07-23
+
+### Changed
+
+- Entity-only UBP0058 conversions now use the conventional `SystemAPI.Query<RefRO<T>>().WithEntityAccess()` shape.
+- Structural entity-only conversions collect entity IDs through the same `SystemAPI.Query` form before applying structural work to a disposable snapshot.
+
 ## [0.4.2] - 2026-07-23
 
 ### Fixed

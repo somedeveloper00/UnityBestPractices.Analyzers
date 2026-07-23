@@ -325,9 +325,11 @@ internal sealed partial class AnalyzerTests
                 }
             }
 
-            public struct NativeList<T> where T : struct
+            public struct NativeList<T> : System.IDisposable where T : struct
             {
                 private T[] _items;
+                public NativeList(Allocator allocator) { _items = default; }
+                public void Add(T item) { }
                 public T this[int index]
                 {
                     get => _items[index];
@@ -335,6 +337,13 @@ internal sealed partial class AnalyzerTests
                 }
 
                 public ref T ElementAt(int index) => ref _items[index];
+                public void Dispose() { }
+                public Enumerator GetEnumerator() => default;
+                public struct Enumerator
+                {
+                    public T Current => default;
+                    public bool MoveNext() => false;
+                }
             }
         }
         """;
