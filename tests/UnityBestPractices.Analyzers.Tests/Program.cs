@@ -173,6 +173,7 @@ internal sealed partial class AnalyzerTests
                 public EntitiesBuilder WithNone<T>() where T : struct, IComponentData => this;
                 public EntitiesBuilder WithChangeFilter<T>() where T : struct, IComponentData => this;
                 public EntitiesBuilder WithEntityQueryOptions(EntityQueryOptions options) => this;
+                public EntitiesBuilder WithStructuralChanges() => this;
                 public ForEachDescription ForEach<T>(RefAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(InAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T1, T2>(RefInAction<T1, T2> action)

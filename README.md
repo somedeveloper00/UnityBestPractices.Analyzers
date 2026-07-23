@@ -110,7 +110,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.Tests
 dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 ```
 
-The test project is a dependency-light executable test harness. It verifies all 70 descriptors have unique IDs, hidden severity, and registered fixes, then compiles every transformation and checks conservative negative cases. DOTS coverage includes all query targets, all six execution-mode switches, filter transfer, entity access, Burst job extraction, and rejected captured lambdas.
+The test project is a dependency-light executable test harness. It verifies all 70 descriptors have unique IDs, hidden severity, and registered fixes, then compiles every transformation and checks conservative negative cases. DOTS coverage includes all query targets, all six execution-mode switches, filter transfer, entity access, Burst job extraction, exact offered-fix sets, and rejection of captures, raw wrapper access, unsupported query forms, structural-change pipelines, and look-alike non-Unity APIs.
 
 ## Use in Unity
 

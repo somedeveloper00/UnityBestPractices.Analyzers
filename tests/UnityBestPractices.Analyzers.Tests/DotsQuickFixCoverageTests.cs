@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityBestPractices.Analyzers;
 
@@ -17,7 +18,8 @@ internal sealed partial class AnalyzerTests
             string systemApiBody,
             string jobParameters,
             string jobAttributes = "",
-            string existingMembers = "")
+            string existingMembers = "",
+            string? systemApiJobParameters = null)
         {
             Name = name;
             Chain = chain;
@@ -28,6 +30,7 @@ internal sealed partial class AnalyzerTests
             QuerySuffix = querySuffix;
             SystemApiBody = systemApiBody;
             JobParameters = jobParameters;
+            SystemApiJobParameters = systemApiJobParameters ?? jobParameters;
             JobAttributes = jobAttributes;
             ExistingMembers = existingMembers;
         }
@@ -41,6 +44,7 @@ internal sealed partial class AnalyzerTests
         internal string QuerySuffix { get; }
         internal string SystemApiBody { get; }
         internal string JobParameters { get; }
+        internal string SystemApiJobParameters { get; }
         internal string JobAttributes { get; }
         internal string ExistingMembers { get; }
     }
@@ -66,7 +70,9 @@ internal sealed partial class AnalyzerTests
                 "position.Value += velocity.Value + entity.GetHashCode();",
                 "var (position, velocity, entity)", "Unity.Entities.RefRW<Position>, Unity.Entities.RefRO<Velocity>",
                 ".WithEntityAccess()", "position.ValueRW.Value += velocity.ValueRO.Value + entity.GetHashCode();",
-                "Entity entity, ref Position position, in Velocity velocity"),
+                "Entity entity, ref Position position, in Velocity velocity",
+                systemApiJobParameters:
+                    "ref Position position, in Velocity velocity, Unity.Entities.Entity entity"),
             new DotsMigrationCase(
                 "WithAll", ".WithAll<Tag>()", "ref Position position", "position.Value += 1f;",
                 "var position", "Unity.Entities.RefRW<Position>", ".WithAll<Tag>()", "position.ValueRW.Value += 1f;",
@@ -105,6 +111,8 @@ internal sealed partial class AnalyzerTests
         }
 
         await VerifyAdditionalJobModeCasesAsync();
+        await VerifyDotsDiagnosticSetsAsync();
+        await VerifyRejectedDotsMigrationsAsync();
     }
 
     private async Task VerifyEntitiesMigrationCaseAsync(DotsMigrationCase item)
@@ -118,15 +126,15 @@ internal sealed partial class AnalyzerTests
         await VerifyFixAsync(
             source,
             DiagnosticIds.EntitiesForEachToJobEntityRun,
-            CreateJobSource(item, "EntitiesForEachJob", "Run"));
+            CreateJobSource(item, "EntitiesForEachJob", "Run", fromSystemApi: false));
         await VerifyFixAsync(
             source,
             DiagnosticIds.EntitiesForEachToJobEntitySchedule,
-            CreateJobSource(item, "EntitiesForEachJob", "Schedule"));
+            CreateJobSource(item, "EntitiesForEachJob", "Schedule", fromSystemApi: false));
         await VerifyFixAsync(
             source,
             DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel,
-            CreateJobSource(item, "EntitiesForEachJob", "ScheduleParallel"));
+            CreateJobSource(item, "EntitiesForEachJob", "ScheduleParallel", fromSystemApi: false));
     }
 
     private async Task VerifySystemApiMigrationCaseAsync(DotsMigrationCase item)
@@ -135,15 +143,15 @@ internal sealed partial class AnalyzerTests
         await VerifyFixAsync(
             source,
             DiagnosticIds.SystemApiQueryToJobEntityRun,
-            CreateJobSource(item, "SystemApiQueryJob", "Run"));
+            CreateJobSource(item, "SystemApiQueryJob", "Run", fromSystemApi: true));
         await VerifyFixAsync(
             source,
             DiagnosticIds.SystemApiQueryToJobEntitySchedule,
-            CreateJobSource(item, "SystemApiQueryJob", "Schedule"));
+            CreateJobSource(item, "SystemApiQueryJob", "Schedule", fromSystemApi: true));
         await VerifyFixAsync(
             source,
             DiagnosticIds.SystemApiQueryToJobEntityScheduleParallel,
-            CreateJobSource(item, "SystemApiQueryJob", "ScheduleParallel"));
+            CreateJobSource(item, "SystemApiQueryJob", "ScheduleParallel", fromSystemApi: true));
     }
 
     private static string CreateEntitiesForEachSource(DotsMigrationCase item) =>
@@ -159,14 +167,16 @@ internal sealed partial class AnalyzerTests
     private static string CreateJobSource(
         DotsMigrationCase item,
         string baseJobName,
-        string executionMode)
+        string executionMode,
+        bool fromSystemApi)
     {
         var jobName = item.Name == "NameCollision" ? baseJobName + "2" : baseJobName;
         var attributes = string.IsNullOrEmpty(item.JobAttributes) ? string.Empty : item.JobAttributes + " ";
         return "using Unity.Entities; partial class " + item.Name + "System : SystemBase { void Update() { new " +
                jobName + "()." + executionMode + "(); } " + item.ExistingMembers +
                " [Unity.Burst.BurstCompile] " + attributes + "private partial struct " + jobName +
-               " : Unity.Entities.IJobEntity { public void Execute(" + item.JobParameters + ") { " + item.Body +
+               " : Unity.Entities.IJobEntity { public void Execute(" +
+               (fromSystemApi ? item.SystemApiJobParameters : item.JobParameters) + ") { " + item.Body +
                " } } } " + ComponentDeclarations;
     }
 
@@ -209,6 +219,105 @@ internal sealed partial class AnalyzerTests
             " } } [Unity.Burst.BurstCompile] partial struct MovementJob : IJobEntity { public void Execute(ref Position position) { } } struct Position : IComponentData { public float Value; }";
         return VerifyFixAsync(prefix + sourceCall + suffix, diagnosticId, prefix + targetCall + suffix);
     }
+
+    private async Task VerifyDotsDiagnosticSetsAsync()
+    {
+        const string components =
+            "struct Position : IComponentData { public float Value; } " +
+            "struct Velocity : IComponentData { public float Value; }";
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class S : SystemBase { void Update() { " +
+            "Entities.ForEach((ref Position p, in Velocity v) => { p.Value += v.Value; }).Run(); } } " +
+            components,
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel);
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class S : SystemBase { void Update() { " +
+            "Entities.ForEach((ref Position p, in Velocity v) => { p.Value += v.Value; }).Schedule(); } } " +
+            components,
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel);
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class S : SystemBase { void Update() { foreach " +
+            "(var (p, v) in SystemAPI.Query<RefRW<Position>, RefRO<Velocity>>()) " +
+            "{ p.ValueRW.Value += v.ValueRO.Value; } } } " + components,
+            DiagnosticIds.SystemApiQueryToJobEntityRun,
+            DiagnosticIds.SystemApiQueryToJobEntitySchedule,
+            DiagnosticIds.SystemApiQueryToJobEntityScheduleParallel);
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; class S { void Update() { new MovementJob().Run(); } } " +
+            "partial struct MovementJob : IJobEntity { public void Execute(ref Position p) { } } " +
+            components,
+            DiagnosticIds.JobEntityRunToSchedule,
+            DiagnosticIds.JobEntityRunToScheduleParallel);
+    }
+
+    private async Task VerifyRejectedDotsMigrationsAsync()
+    {
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class CapturedEntitiesSystem : SystemBase { void Update() { " +
+            "var scale = 2f; Entities.ForEach((ref Position p) => { p.Value *= scale; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class CapturedQuerySystem : SystemBase { void Update() { " +
+            "var scale = 2f; foreach (var p in SystemAPI.Query<RefRW<Position>>()) " +
+            "{ p.ValueRW.Value *= scale; } } } struct Position : IComponentData { public float Value; }");
+
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class RawWrapperSystem : SystemBase { void Update() { " +
+            "foreach (var p in SystemAPI.Query<RefRW<Position>>()) { object wrapper = p; } } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class StructuralSystem : SystemBase { void Update() { " +
+            "Entities.WithStructuralChanges().ForEach((ref Position p) => { p.Value++; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class UnsupportedWrapperSystem : SystemBase { void Update() { " +
+            "foreach (var p in SystemAPI.Query<Position>()) { var value = p.Value; } } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyExactDotsDiagnosticsAsync(
+            "namespace Other { public delegate void RefAction<T>(ref T value); " +
+            "public struct Builder { public Description ForEach<T>(RefAction<T> action) => default; } " +
+            "public struct Description { public void Run() { } } " +
+            "public abstract class SystemBase { protected Builder Entities => default; } } " +
+            "class LookalikeSystem : Other.SystemBase { void Update() { " +
+            "Entities.ForEach((ref Position p) => { p.Value++; }).Run(); } } " +
+            "struct Position { public float Value; }");
+
+        await VerifyExactDotsDiagnosticsAsync(
+            "namespace Other { public interface IJob { } public struct FakeJob : IJob { } " +
+            "public static class JobExtensions { public static void Run<T>(this T job) where T : struct, IJob { } } } " +
+            "class Runner { void Update() { Other.JobExtensions.Run(new Other.FakeJob()); } }");
+    }
+
+    private async Task VerifyExactDotsDiagnosticsAsync(string source, params string[] expectedIds)
+    {
+        var document = CreateDocument(source);
+        var diagnostics = await GetDiagnosticsAsync(document);
+        var actualIds = diagnostics
+            .Select(diagnostic => diagnostic.Id)
+            .Where(IsDotsQueryDiagnostic)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+        var orderedExpectedIds = expectedIds.OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        if (!actualIds.SequenceEqual(orderedExpectedIds, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Unexpected DOTS diagnostics. Expected: " + string.Join(", ", orderedExpectedIds) +
+                "; actual: " + string.Join(", ", actualIds));
+        }
+    }
+
+    private static bool IsDotsQueryDiagnostic(string diagnosticId) =>
+        string.CompareOrdinal(diagnosticId, DiagnosticIds.EntitiesForEachToSystemApiQuery) >= 0 &&
+        string.CompareOrdinal(diagnosticId, DiagnosticIds.JobEntityScheduleParallelToSchedule) <= 0;
 
     private const string ComponentDeclarations =
         "struct Position : IComponentData { public float Value; } " +
