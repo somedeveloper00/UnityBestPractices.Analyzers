@@ -1,0 +1,9 @@
+root = false
+
+# DOTS migration fixes are review-required. Apply and test them individually.
+[*.cs]
+dotnet_analyzer_diagnostic.severity = none
+dotnet_analyzer_diagnostic.category-Unity.DOTS.Migration.severity = suggestion
+
+ubp_enable_review_required = true
+ubp_enable_dots_migration = true

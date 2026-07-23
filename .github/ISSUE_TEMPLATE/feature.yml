@@ -1,0 +1,30 @@
+name: Rule proposal
+description: Propose a conservative Unity or C# diagnostic.
+title: "[Rule] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: pattern
+    attributes:
+      label: Before and after patterns
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: Performance or correctness value
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: False-positive risks and semantic guards
+    validations:
+      required: true
+  - type: textarea
+    id: overlap
+    attributes:
+      label: Existing Unity analyzer overlap
+      description: Explain why Microsoft.Unity.Analyzers or another standard rule does not already cover it.
+    validations:
+      required: true

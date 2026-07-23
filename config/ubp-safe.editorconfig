@@ -1,0 +1,17 @@
+root = false
+
+# Enables only transformations classified as Safe.
+[*.cs]
+dotnet_analyzer_diagnostic.severity = none
+dotnet_analyzer_diagnostic.category-Unity.Performance.Safe.severity = suggestion
+dotnet_analyzer_diagnostic.category-Unity.Correctness.severity = suggestion
+dotnet_analyzer_diagnostic.category-CSharp.Performance.severity = suggestion
+
+# These CSharp.Performance rules are review-required.
+dotnet_diagnostic.UBP0006.severity = none
+dotnet_diagnostic.UBP0007.severity = none
+dotnet_diagnostic.UBP0042.severity = none
+dotnet_diagnostic.UBP0057.severity = none
+
+ubp_enable_review_required = false
+ubp_enable_dots_migration = false

@@ -11,106 +11,28 @@ namespace UnityBestPractices.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
 {
-    private const string Category = "Unity.BestPractices";
-
-    private static readonly DiagnosticDescriptor EncapsulateSerializedFieldRule = new(
-        DiagnosticIds.EncapsulateSerializedField,
-        "Encapsulate serialized field",
-        "Keep serialized field '{0}' private",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "A private field with SerializeField preserves Inspector serialization without exposing mutable state as public API.");
-
-    private static readonly DiagnosticDescriptor YieldNullRule = new(
-        DiagnosticIds.YieldNull,
-        "Yield null for the next frame",
-        "Yield null instead of a boxed value to wait for the next frame",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "Unity coroutines can yield null for one frame without boxing a value type.");
-
-    private static readonly DiagnosticDescriptor SquaredMagnitudeRule = new(
-        DiagnosticIds.UseSquaredMagnitude,
-        "Use squared magnitude for a distance check",
-        "Compare sqrMagnitude with the squared threshold",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "Comparing squared magnitudes avoids the square-root calculation performed by magnitude.");
-
-    private static readonly DiagnosticDescriptor BurstCompileRule = new(
-        DiagnosticIds.AddBurstCompile,
-        "Burst compile Unity job",
-        "Add BurstCompile to job '{0}'",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "Burst can compile compatible Unity jobs to optimized native code.");
-
-    private static readonly DiagnosticDescriptor ReadOnlyNativeArrayRule = new(
-        DiagnosticIds.MarkNativeArrayReadOnly,
-        "Mark job input as read-only",
-        "Mark NativeArray field '{0}' as ReadOnly",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "ReadOnly access allows jobs that consume the same NativeArray to run concurrently.");
-
-    private static readonly DiagnosticDescriptor StackallocRule = new(
-        DiagnosticIds.UseStackalloc,
-        "Stack allocate small temporary buffer",
-        "Use stackalloc for this bounded temporary Span buffer",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "A small, non-looping stackalloc Span avoids a managed array allocation.");
-
-    private static readonly DiagnosticDescriptor RefLocalRule = new(
-        DiagnosticIds.UseRefLocal,
-        "Mutate struct element by reference",
-        "Use a ref local instead of copying '{0}' and assigning it back",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "A ref local avoids copying a struct out of a ref-returning collection and writing it back.");
-
-    private static readonly DiagnosticDescriptor CacheCameraMainRule = new(
-        DiagnosticIds.CacheCameraMain,
-        "Cache repeated Camera.main lookup",
-        "Cache Camera.main for the {0} accesses in this block",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "Caching repeated Camera.main access avoids repeated component lookup overhead.");
-
-    private static readonly DiagnosticDescriptor PreallocateListRule = new(
-        DiagnosticIds.PreallocateList,
-        "Preallocate list capacity",
-        "Initialize this list with capacity {0}",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "Preallocating a known minimum capacity avoids list backing-array growth while adding elements.");
-
-    private static readonly DiagnosticDescriptor MultiplySquareRule = new(
-        DiagnosticIds.UseMultiplicationForSquare,
-        "Multiply to square a scalar",
-        "Multiply '{0}' by itself instead of calling Mathf.Pow",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "Direct multiplication is cheaper than a general-purpose power function for a stable scalar squared.");
-
-    private static readonly DiagnosticDescriptor UninitializedNativeArrayRule = new(
-        DiagnosticIds.UseUninitializedNativeArray,
-        "Skip redundant NativeArray clearing",
-        "Use UninitializedMemory because the following loop overwrites every element",
-        Category,
-        DiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        description: "Skipping default memory clearing avoids redundant work when every NativeArray element is immediately assigned.");
+    private static readonly DiagnosticDescriptor EncapsulateSerializedFieldRule =
+        DiagnosticCatalog.Get(DiagnosticIds.EncapsulateSerializedField).Descriptor;
+    private static readonly DiagnosticDescriptor YieldNullRule =
+        DiagnosticCatalog.Get(DiagnosticIds.YieldNull).Descriptor;
+    private static readonly DiagnosticDescriptor SquaredMagnitudeRule =
+        DiagnosticCatalog.Get(DiagnosticIds.UseSquaredMagnitude).Descriptor;
+    private static readonly DiagnosticDescriptor BurstCompileRule =
+        DiagnosticCatalog.Get(DiagnosticIds.AddBurstCompile).Descriptor;
+    private static readonly DiagnosticDescriptor ReadOnlyNativeArrayRule =
+        DiagnosticCatalog.Get(DiagnosticIds.MarkNativeArrayReadOnly).Descriptor;
+    private static readonly DiagnosticDescriptor StackallocRule =
+        DiagnosticCatalog.Get(DiagnosticIds.UseStackalloc).Descriptor;
+    private static readonly DiagnosticDescriptor RefLocalRule =
+        DiagnosticCatalog.Get(DiagnosticIds.UseRefLocal).Descriptor;
+    private static readonly DiagnosticDescriptor CacheCameraMainRule =
+        DiagnosticCatalog.Get(DiagnosticIds.CacheCameraMain).Descriptor;
+    private static readonly DiagnosticDescriptor PreallocateListRule =
+        DiagnosticCatalog.Get(DiagnosticIds.PreallocateList).Descriptor;
+    private static readonly DiagnosticDescriptor MultiplySquareRule =
+        DiagnosticCatalog.Get(DiagnosticIds.UseMultiplicationForSquare).Descriptor;
+    private static readonly DiagnosticDescriptor UninitializedNativeArrayRule =
+        DiagnosticCatalog.Get(DiagnosticIds.UseUninitializedNativeArray).Descriptor;
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(
@@ -126,37 +48,52 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             MultiplySquareRule,
             UninitializedNativeArrayRule)
         .AddRange(ExpressionQuickFixRegistry.Descriptors)
-        .AddRange(DotsQueryRules.Descriptors);
+        .AddRange(DotsQueryRules.Descriptors)
+        .AddRange(AdvancedUnityRules.Descriptors);
 
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
 
-        context.RegisterSyntaxNodeAction(AnalyzeFieldDeclaration, SyntaxKind.FieldDeclaration);
-        context.RegisterSyntaxNodeAction(AnalyzeYieldStatement, SyntaxKind.YieldReturnStatement);
-        context.RegisterSyntaxNodeAction(AnalyzeStructDeclaration, SyntaxKind.StructDeclaration);
-        context.RegisterSyntaxNodeAction(AnalyzeVariableDeclarator, SyntaxKind.VariableDeclarator);
-        context.RegisterSyntaxNodeAction(AnalyzeLocalDeclaration, SyntaxKind.LocalDeclarationStatement);
-        context.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeObjectCreation, SyntaxKind.ObjectCreationExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeInvocation, SyntaxKind.InvocationExpression);
-        context.RegisterSyntaxNodeAction(
-            AnalyzeExpressionQuickFix,
-            ExpressionQuickFixRegistry.SyntaxKinds.ToArray());
-        context.RegisterSyntaxNodeAction(
-            DotsQueryRules.AnalyzeExpressionStatement,
-            SyntaxKind.ExpressionStatement);
-        context.RegisterSyntaxNodeAction(
-            DotsQueryRules.AnalyzeSystemApiQuery,
-            SyntaxKind.ForEachStatement,
-            SyntaxKind.ForEachVariableStatement);
-        context.RegisterSyntaxNodeAction(
-            AnalyzeRelationalExpression,
-            SyntaxKind.LessThanExpression,
-            SyntaxKind.LessThanOrEqualExpression,
-            SyntaxKind.GreaterThanExpression,
-            SyntaxKind.GreaterThanOrEqualExpression);
+        context.RegisterCompilationStartAction(startContext =>
+        {
+            _ = UnitySymbolCache.For(startContext.Compilation);
+            startContext.RegisterSyntaxNodeAction(AnalyzeFieldDeclaration, SyntaxKind.FieldDeclaration);
+            startContext.RegisterSyntaxNodeAction(AnalyzeYieldStatement, SyntaxKind.YieldReturnStatement);
+            startContext.RegisterSyntaxNodeAction(AnalyzeStructDeclaration, SyntaxKind.StructDeclaration);
+            startContext.RegisterSyntaxNodeAction(AnalyzeVariableDeclarator, SyntaxKind.VariableDeclarator);
+            startContext.RegisterSyntaxNodeAction(AnalyzeLocalDeclaration, SyntaxKind.LocalDeclarationStatement);
+            startContext.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
+            startContext.RegisterSyntaxNodeAction(AnalyzeObjectCreation, SyntaxKind.ObjectCreationExpression);
+            startContext.RegisterSyntaxNodeAction(AnalyzeInvocation, SyntaxKind.InvocationExpression);
+            startContext.RegisterSyntaxNodeAction(
+                AdvancedUnityRules.AnalyzeReturn,
+                SyntaxKind.ReturnStatement);
+            startContext.RegisterSyntaxNodeAction(
+                AdvancedUnityRules.AnalyzeAssignment,
+                SyntaxKind.SimpleAssignmentExpression);
+            startContext.RegisterSyntaxNodeAction(
+                AdvancedUnityRules.AnalyzeTypeDeclaration,
+                SyntaxKind.ClassDeclaration,
+                SyntaxKind.StructDeclaration);
+            startContext.RegisterSyntaxNodeAction(
+                AnalyzeExpressionQuickFix,
+                ExpressionQuickFixRegistry.SyntaxKinds.ToArray());
+            startContext.RegisterSyntaxNodeAction(
+                DotsQueryRules.AnalyzeExpressionStatement,
+                SyntaxKind.ExpressionStatement);
+            startContext.RegisterSyntaxNodeAction(
+                DotsQueryRules.AnalyzeSystemApiQuery,
+                SyntaxKind.ForEachStatement,
+                SyntaxKind.ForEachVariableStatement);
+            startContext.RegisterSyntaxNodeAction(
+                AnalyzeRelationalExpression,
+                SyntaxKind.LessThanExpression,
+                SyntaxKind.LessThanOrEqualExpression,
+                SyntaxKind.GreaterThanExpression,
+                SyntaxKind.GreaterThanOrEqualExpression);
+        });
     }
 
     private static void AnalyzeFieldDeclaration(SyntaxNodeAnalysisContext context)
@@ -165,15 +102,21 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         if (IsEncapsulatableSerializedField(declaration, context.SemanticModel, context.CancellationToken))
         {
             var variable = declaration.Declaration.Variables[0];
-            context.ReportDiagnostic(
-                Diagnostic.Create(EncapsulateSerializedFieldRule, variable.Identifier.GetLocation(), variable.Identifier.ValueText));
+            Report(
+                context,
+                EncapsulateSerializedFieldRule,
+                variable.Identifier.GetLocation(),
+                variable.Identifier.ValueText);
         }
 
         if (IsReadOnlyNativeArrayCandidate(declaration, context.SemanticModel, context.CancellationToken))
         {
             var variable = declaration.Declaration.Variables[0];
-            context.ReportDiagnostic(
-                Diagnostic.Create(ReadOnlyNativeArrayRule, variable.Identifier.GetLocation(), variable.Identifier.ValueText));
+            Report(
+                context,
+                ReadOnlyNativeArrayRule,
+                variable.Identifier.GetLocation(),
+                variable.Identifier.ValueText);
         }
     }
 
@@ -185,7 +128,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        context.ReportDiagnostic(Diagnostic.Create(YieldNullRule, yieldStatement.Expression!.GetLocation()));
+        Report(context, YieldNullRule, yieldStatement.Expression!.GetLocation());
     }
 
     private static void AnalyzeRelationalExpression(SyntaxNodeAnalysisContext context)
@@ -201,7 +144,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        context.ReportDiagnostic(Diagnostic.Create(SquaredMagnitudeRule, binary.GetLocation()));
+        Report(context, SquaredMagnitudeRule, binary.GetLocation());
     }
 
     private static void AnalyzeStructDeclaration(SyntaxNodeAnalysisContext context)
@@ -212,23 +155,29 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        context.ReportDiagnostic(
-            Diagnostic.Create(BurstCompileRule, declaration.Identifier.GetLocation(), declaration.Identifier.ValueText));
+        Report(context, BurstCompileRule, declaration.Identifier.GetLocation(), declaration.Identifier.ValueText);
     }
 
     private static void AnalyzeVariableDeclarator(SyntaxNodeAnalysisContext context)
     {
         var declarator = (VariableDeclaratorSyntax)context.Node;
-        if (!CanUseStackalloc(declarator, context.SemanticModel, context.CancellationToken, out _))
+        var configuration = AnalyzerConfiguration.For(context);
+        if (!CanUseStackalloc(
+                declarator,
+                context.SemanticModel,
+                context.CancellationToken,
+                out _,
+                configuration.MaxStackallocBytes))
         {
             return;
         }
 
-        context.ReportDiagnostic(Diagnostic.Create(StackallocRule, declarator.Initializer!.Value.GetLocation()));
+        Report(context, StackallocRule, declarator.Initializer!.Value.GetLocation());
     }
 
     private static void AnalyzeLocalDeclaration(SyntaxNodeAnalysisContext context)
     {
+        AdvancedUnityRules.AnalyzeLocalDeclaration(context);
         var declaration = (LocalDeclarationStatementSyntax)context.Node;
         if (!TryGetCopyBackPattern(
                 declaration,
@@ -239,8 +188,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        context.ReportDiagnostic(
-            Diagnostic.Create(RefLocalRule, pattern.Variable.Identifier.GetLocation(), pattern.Variable.Identifier.ValueText));
+        Report(context, RefLocalRule, pattern.Variable.Identifier.GetLocation(), pattern.Variable.Identifier.ValueText);
     }
 
     private static void AnalyzeMemberAccess(SyntaxNodeAnalysisContext context)
@@ -258,20 +206,21 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        context.ReportDiagnostic(
-            Diagnostic.Create(CacheCameraMainRule, memberAccess.GetLocation(), accesses.Length));
+        Report(context, CacheCameraMainRule, memberAccess.GetLocation(), accesses.Length);
     }
 
     private static void AnalyzeObjectCreation(SyntaxNodeAnalysisContext context)
     {
         var creation = (ObjectCreationExpressionSyntax)context.Node;
+        var configuration = AnalyzerConfiguration.For(context);
         if (TryGetListPreallocation(
                 creation,
                 context.SemanticModel,
                 context.CancellationToken,
-                out var addCount))
+                out var addCount,
+                configuration.MinimumListAdds))
         {
-            context.ReportDiagnostic(Diagnostic.Create(PreallocateListRule, creation.GetLocation(), addCount));
+            Report(context, PreallocateListRule, creation.GetLocation(), addCount);
         }
 
         if (TryGetNativeArrayInitialization(
@@ -280,12 +229,13 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
                 context.CancellationToken,
                 out _))
         {
-            context.ReportDiagnostic(Diagnostic.Create(UninitializedNativeArrayRule, creation.GetLocation()));
+            Report(context, UninitializedNativeArrayRule, creation.GetLocation());
         }
     }
 
     private static void AnalyzeInvocation(SyntaxNodeAnalysisContext context)
     {
+        AdvancedUnityRules.AnalyzeInvocation(context);
         var invocation = (InvocationExpressionSyntax)context.Node;
         if (!TryGetMathfSquare(
                 invocation,
@@ -296,8 +246,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        context.ReportDiagnostic(
-            Diagnostic.Create(MultiplySquareRule, invocation.GetLocation(), value.ToString()));
+        Report(context, MultiplySquareRule, invocation.GetLocation(), value.ToString());
     }
 
     private static void AnalyzeExpressionQuickFix(SyntaxNodeAnalysisContext context)
@@ -318,8 +267,20 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            context.ReportDiagnostic(Diagnostic.Create(rule.Descriptor, expression.GetLocation()));
+            Report(context, rule.Descriptor, expression.GetLocation());
             return;
+        }
+    }
+
+    private static void Report(
+        SyntaxNodeAnalysisContext context,
+        DiagnosticDescriptor descriptor,
+        Location location,
+        params object[] messageArguments)
+    {
+        if (AnalyzerConfiguration.For(context).IsRuleEnabled(descriptor.Id))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(descriptor, location, messageArguments));
         }
     }
 
@@ -329,7 +290,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         System.Threading.CancellationToken cancellationToken)
     {
         var jobType = semanticModel.GetDeclaredSymbol(declaration, cancellationToken);
-        var burstCompile = semanticModel.Compilation.GetTypeByMetadataName("Unity.Burst.BurstCompileAttribute");
+        var burstCompile = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Burst.BurstCompileAttribute");
         return jobType is not null &&
                burstCompile is not null &&
                IsUnityJobType(jobType) &&
@@ -349,8 +312,12 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         }
 
         var field = semanticModel.GetDeclaredSymbol(declaration.Declaration.Variables[0], cancellationToken) as IFieldSymbol;
-        var nativeArray = semanticModel.Compilation.GetTypeByMetadataName("Unity.Collections.NativeArray`1");
-        var readOnlyAttribute = semanticModel.Compilation.GetTypeByMetadataName("Unity.Collections.ReadOnlyAttribute");
+        var nativeArray = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Collections.NativeArray`1");
+        var readOnlyAttribute = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Collections.ReadOnlyAttribute");
         if (field?.Type is not INamedTypeSymbol fieldType ||
             nativeArray is null ||
             readOnlyAttribute is null ||
@@ -382,7 +349,8 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         VariableDeclaratorSyntax declarator,
         SemanticModel semanticModel,
         System.Threading.CancellationToken cancellationToken,
-        out ArrayCreationExpressionSyntax arrayCreation)
+        out ArrayCreationExpressionSyntax arrayCreation,
+        int maxStackallocBytes = AnalyzerConfiguration.DefaultMaxStackallocBytes)
     {
         arrayCreation = null!;
         if (declarator.Initializer?.Value is not ArrayCreationExpressionSyntax candidate)
@@ -434,7 +402,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             !TryGetArrayLength(candidate, semanticModel, cancellationToken, out var length) ||
             !TryGetStackElementSize(elementType, out var elementSize) ||
             length <= 0 ||
-            (long)length * elementSize > 1024)
+            (long)length * elementSize > maxStackallocBytes)
         {
             return false;
         }
@@ -609,7 +577,8 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         ObjectCreationExpressionSyntax creation,
         SemanticModel semanticModel,
         System.Threading.CancellationToken cancellationToken,
-        out int addCount)
+        out int addCount,
+        int minimumListAdds = AnalyzerConfiguration.DefaultMinimumListAdds)
     {
         addCount = 0;
         if (creation.ArgumentList is not { Arguments.Count: 0 } ||
@@ -622,7 +591,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         }
 
         var local = semanticModel.GetDeclaredSymbol(variable, cancellationToken) as ILocalSymbol;
-        var listType = semanticModel.Compilation.GetTypeByMetadataName("System.Collections.Generic.List`1");
+        var listType = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "System.Collections.Generic.List`1");
         if (local?.Type is not INamedTypeSymbol namedType ||
             listType is null ||
             !SymbolEqualityComparer.Default.Equals(namedType.OriginalDefinition, listType))
@@ -641,7 +612,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             addCount++;
         }
 
-        return addCount >= 5;
+        return addCount >= minimumListAdds;
     }
 
     internal static bool TryGetMathfSquare(
@@ -657,7 +628,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         }
 
         var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
-        var mathf = semanticModel.Compilation.GetTypeByMetadataName("UnityEngine.Mathf");
+        var mathf = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "UnityEngine.Mathf");
         if (method is null ||
             mathf is null ||
             method.Name != "Pow" ||
@@ -701,8 +674,12 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         }
 
         var local = semanticModel.GetDeclaredSymbol(variable, cancellationToken) as ILocalSymbol;
-        var nativeArray = semanticModel.Compilation.GetTypeByMetadataName("Unity.Collections.NativeArray`1");
-        var options = semanticModel.Compilation.GetTypeByMetadataName("Unity.Collections.NativeArrayOptions");
+        var nativeArray = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Collections.NativeArray`1");
+        var options = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Collections.NativeArrayOptions");
         var constructor = semanticModel.GetSymbolInfo(creation, cancellationToken).Symbol as IMethodSymbol;
         if (local?.Type is not INamedTypeSymbol localType ||
             nativeArray is null ||
@@ -738,7 +715,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         }
 
         var property = semanticModel.GetSymbolInfo(access, cancellationToken).Symbol as IPropertySymbol;
-        var camera = semanticModel.Compilation.GetTypeByMetadataName("UnityEngine.Camera");
+        var camera = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "UnityEngine.Camera");
         return property is not null &&
                property.IsStatic &&
                camera is not null &&
@@ -1153,7 +1132,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        return semanticModel.Compilation.GetTypeByMetadataName("UnityEngine.SerializeField") is not null;
+        return UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "UnityEngine.SerializeField") is not null;
     }
 
     internal static bool IsBoxedNextFrameYield(
@@ -1173,8 +1154,12 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         }
 
         var method = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken);
-        var enumerator = semanticModel.Compilation.GetTypeByMetadataName("System.Collections.IEnumerator");
-        var monoBehaviour = semanticModel.Compilation.GetTypeByMetadataName("UnityEngine.MonoBehaviour");
+        var enumerator = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "System.Collections.IEnumerator");
+        var monoBehaviour = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "UnityEngine.MonoBehaviour");
         return method is not null &&
                enumerator is not null &&
                monoBehaviour is not null &&
@@ -1254,8 +1239,12 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        var vector2 = semanticModel.Compilation.GetTypeByMetadataName("UnityEngine.Vector2");
-        var vector3 = semanticModel.Compilation.GetTypeByMetadataName("UnityEngine.Vector3");
+        var vector2 = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "UnityEngine.Vector2");
+        var vector3 = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "UnityEngine.Vector3");
         return SymbolEqualityComparer.Default.Equals(property.ContainingType, vector2) ||
                SymbolEqualityComparer.Default.Equals(property.ContainingType, vector3);
     }
@@ -1277,8 +1266,12 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
 
     private static bool IsUnitySerializedOwner(INamedTypeSymbol containingType, Compilation compilation)
     {
-        var monoBehaviour = compilation.GetTypeByMetadataName("UnityEngine.MonoBehaviour");
-        var scriptableObject = compilation.GetTypeByMetadataName("UnityEngine.ScriptableObject");
+        var monoBehaviour = UnitySymbolCache.GetTypeByMetadataName(
+            compilation,
+            "UnityEngine.MonoBehaviour");
+        var scriptableObject = UnitySymbolCache.GetTypeByMetadataName(
+            compilation,
+            "UnityEngine.ScriptableObject");
         return monoBehaviour is not null && IsSameOrDerivedFrom(containingType, monoBehaviour) ||
                scriptableObject is not null && IsSameOrDerivedFrom(containingType, scriptableObject);
     }
@@ -1317,7 +1310,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        var unityObject = compilation.GetTypeByMetadataName("UnityEngine.Object");
+        var unityObject = UnitySymbolCache.GetTypeByMetadataName(compilation, "UnityEngine.Object");
         if (unityObject is not null && IsSameOrDerivedFrom(namedType, unityObject))
         {
             return true;
@@ -1330,7 +1323,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return IsUnitySerializableType(namedType.TypeArguments[0], compilation);
         }
 
-        var serializableAttribute = compilation.GetTypeByMetadataName("System.SerializableAttribute");
+        var serializableAttribute = UnitySymbolCache.GetTypeByMetadataName(
+            compilation,
+            "System.SerializableAttribute");
         return !namedType.IsGenericType &&
                serializableAttribute is not null &&
                namedType.GetAttributes().Any(attribute =>

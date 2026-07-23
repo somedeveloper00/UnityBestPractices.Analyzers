@@ -1,8 +1,34 @@
 # Unity Best Practices Analyzer
 
+[![Build](https://img.shields.io/github/actions/workflow/status/somedeveloper00/UnityBestPractices.Analyzers/ci.yml?branch=master&label=build)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/somedeveloper00/UnityBestPractices.Analyzers/ci.yml?branch=master&label=tests)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/somedeveloper00/UnityBestPractices.Analyzers)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 [English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
 
-A complementary Roslyn analyzer with 70 opt-in quick fixes for Unity and high-performance C# practices not already covered by `Microsoft.Unity.Analyzers`. Every diagnostic has `Info` severity, so Rider and Visual Studio can offer the quick fix while builds produce no errors or warnings and the Unity Console stays clean.
+A complementary Roslyn analyzer with 74 low-noise diagnostics and 72 opt-in quick fixes for Unity and high-performance C# practices not already covered by `Microsoft.Unity.Analyzers`. Every diagnostic defaults to `Info`, so Rider and Visual Studio can offer actions while builds produce no warnings or errors and the Unity Console stays clean.
+
+## Safety model
+
+Every rule has an explicit classification in the [generated rule index](docs/rules/index.md).
+The rationale for every review-required rule is recorded in [rule safety decisions](docs/safety.md).
+
+| Classification | Meaning | Fix All |
+| --- | --- | --- |
+| `Safe` | The code action is expected to preserve observable behavior under its exact documented preconditions. | Available only when the implementation is safe across the requested scope. |
+| `ReviewRequired` | Accessibility, floating-point behavior, allocation lifetime, threading, synchronization, serialization, or ECS scheduling can change. | Never exposed through the global batch Fix All provider. |
+| `Experimental` | The rule is opt-in while its compatibility envelope is established. | Not supported. |
+
+`UBP0001` remains review-required. Its diagnostic can identify a public serialized field, but its fix is offered only after solution-wide reference analysis proves that no reference outside the declaring type or its nested types would become inaccessible. DOTS migrations (`UBP0058`–`UBP0070`) are also review-required: changing `Run`, `Schedule`, or `ScheduleParallel` can change execution timing, synchronization, dependency propagation, thread safety, and scheduling behavior.
+
+## Rule categories
+
+- `Unity.Performance.Safe` and `CSharp.Performance` contain conservative allocation and API optimizations.
+- `Unity.Performance.Review` contains performance transformations that require runtime review.
+- `Unity.Correctness` covers job dependencies and native-container lifetime.
+- `Unity.DOTS.Migration` covers Entities 1.x query and execution-mode migrations.
+- `Unity.API.Design` covers Unity-facing API and serialization design.
 
 ## Quick fixes
 
@@ -93,6 +119,15 @@ These quick fixes use the current Entities 1.x query systems. `SystemAPI.Query` 
 | `UBP0069` | A parameterless `IJobEntity.ScheduleParallel()` invocation | Switches execution to `Run()` |
 | `UBP0070` | A parameterless `IJobEntity.ScheduleParallel()` invocation | Switches execution to `Schedule()` |
 
+### Correctness and caching
+
+| ID | Recognizes | Fix |
+|---|---|---|
+| `UBP0071` | A returned `Unity.Jobs.JobHandle` discarded from a supported `Schedule` call | Assigns the handle to a collision-free local so it can be propagated or combined |
+| `UBP0072` | A narrowly provable, unused local `NativeArray<T>` allocated with `Allocator.Persistent` | Diagnostic only; disposal and ownership must be chosen by the developer |
+| `UBP0073` | A `Temp` or `TempJob` `NativeArray<T>` returned, stored in a field, or captured by an escaping delegate | Diagnostic only; the correct lifetime or ownership depends on the application |
+| `UBP0074` | Repeated constant `Shader.PropertyToID` calls in one type | Adds a uniquely named static readonly ID field and replaces repeated calls |
+
 The analyzer resolves Unity symbols semantically. It ignores unrelated types with similar member names, unsupported field types, non-Unity iterators, dynamic distance thresholds, generated code, and Unity/package versions where the required symbols are absent.
 
 Performance transformations have conservative safety limits. Stack allocation is offered only for primitive or enum element types, only outside loops, and only when the total allocation is at most 1 KiB; the fix inserts `Span.Clear()` when necessary to preserve managed-array zero initialization. Ref-local conversion requires a real ref-returning access path, an unchanged receiver/index, a detected mutation, and no use of the copied local after its matching write-back. Read-only job fields are suggested only when every in-job use is a recognized read. List capacity is inferred only from uninterrupted `Add` statements. Squaring is limited to side-effect-free scalar identifiers. Uninitialized native memory is offered only when the next statement is a canonical loop that assigns every index without reading the array's previous contents.
@@ -101,33 +136,88 @@ DOTS extraction is offered only for semantic Unity Entities calls using direct `
 
 ## Deliberately out of scope
 
-This package was checked against the current `Microsoft.Unity.Analyzers` catalog (`UNT0001` through `UNT0043`). It intentionally does not duplicate existing rules such as empty Unity messages, `CompareTag`, `TryGetComponent`, non-allocating physics APIs, cached yield instructions, transform position/rotation APIs, mesh-array loop access, or `Animator.StringToHash`.
+This package was checked against the current [`Microsoft.Unity.Analyzers` catalog](https://github.com/microsoft/Microsoft.Unity.Analyzers/tree/main/doc) (`UNT0001` through `UNT0043`). It intentionally does not duplicate existing rules such as empty Unity messages, `CompareTag`, `TryGetComponent`, non-allocating physics APIs, cached yield instructions, transform position/rotation APIs, mesh-array loop access, or `Animator.StringToHash`.
 
 The rules follow the official guidance for [Burst-compiled jobs](https://docs.unity3d.com/Packages/com.unity.burst@1.8/manual/compilation-burstcompile.html), [read-only NativeContainers](https://docs.unity3d.com/Manual/job-system-native-container.html), [`SystemAPI.Query`](https://docs.unity.cn/Packages/com.unity.entities%401.0/api/Unity.Entities.SystemAPI.Query.html), [`IJobEntity` scheduling](https://docs.unity.cn/Packages/com.unity.entities%401.0/api/Unity.Entities.IJobEntityExtensions.ScheduleParallel.html), [`Camera.main` caching](https://docs.unity3d.com/ScriptReference/Camera-main.html), [`NativeArrayOptions.UninitializedMemory`](https://docs.unity3d.com/ScriptReference/Unity.Collections.NativeArrayOptions.UninitializedMemory.html), [bounded `stackalloc`](https://learn.microsoft.com/dotnet/csharp/language-reference/operators/stackalloc), and [C# ref-based copy avoidance](https://learn.microsoft.com/dotnet/csharp/advanced-topics/performance/).
+
+## Installation
+
+### Unity Package Manager
+
+Download `com.somedeveloper.unity-best-practices-analyzers-<version>.tgz` from the matching [GitHub release](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases), then choose **Window > Package Manager > + > Add package from tarball**. The package includes the analyzer DLL and its `.meta` file with the `RoslynAnalyzer` label and disabled reference validation.
+
+If a Unity version does not retain imported labels, select `Packages/Unity Best Practices Analyzers/Editor/Analyzers/UnityBestPractices.Analyzers.dll`, disable **Auto Reference**, **Validate References**, and all platforms, assign the exact label `RoslynAnalyzer`, and apply the import settings.
+
+### NuGet
+
+Stable releases contain `UnityBestPractices.Analyzers.<version>.nupkg` and a symbol package. Until NuGet.org publishing is enabled, download the package from GitHub Releases and add its directory as a local package source:
+
+```powershell
+dotnet nuget add source C:\path\to\downloaded-packages -n UnityBestPracticesLocal
+dotnet add package UnityBestPractices.Analyzers --version 0.4.0 --source UnityBestPracticesLocal
+```
+
+The `.nupkg` places the DLL under `analyzers/dotnet/cs` and includes the README, translations, changelog, license, repository commit metadata, portable symbols, and Source Link data. NuGet.org publishing is intentionally disabled unless the repository is configured with a `NUGET_API_KEY` secret.
+
+### Manual DLL
+
+1. Download the standard-named `UnityBestPractices.Analyzers.dll` release asset.
+2. Copy it below the Unity project's `Assets` directory.
+3. In the Plugin Inspector, disable **Auto Reference**, **Validate References**, **Any Platform**, **Editor**, and **Standalone**, then add the exact `RoslynAnalyzer` asset label.
+4. Regenerate the C# project and restart Rider or Visual Studio. In Rider, enable Roslyn analyzers under **Settings > Editor > Inspection Settings > Roslyn Analyzers**.
+5. Put the caret on the suggestion and invoke the IDE quick-action command (`Alt+Enter` in Rider).
+
+Unity performs analyzer loading for compilation while the IDE discovers the code-fix provider from the same assembly. `Microsoft.CodeAnalysis.Workspaces` and `System.Composition` are IDE-host dependencies, so Unity asset-reference validation must remain disabled.
+
+## Configuration
+
+Use standard `dotnet_diagnostic.UBPxxxx.severity` and category severity settings to promote, suppress, or disable rules. Conservative options configure the stack allocation ceiling, list preallocation threshold, DOTS migrations, and review-required rules. See [configuration](docs/configuration.md) and the ready-to-copy [`config`](config) presets.
+
+```ini
+[*.cs]
+dotnet_diagnostic.UBP0009.severity = warning
+dotnet_diagnostic.UBP0058.severity = none
+ubp_max_stackalloc_bytes = 512
+ubp_enable_review_required = false
+```
+
+Missing or invalid option values use conservative defaults and never crash analysis.
+
+## Compatibility
+
+The analyzer targets `netstandard2.0` and Roslyn 3.8, which is the conservative Unity analyzer-host baseline and is compatible with projects using Unity's .NET Standard 2.1 player profile. It does not reference Unity assemblies at runtime; all Unity and package APIs are resolved semantically. Missing packages, generated code, look-alike APIs, and incomplete syntax are excluded safely.
+
+| Surface | Tested fixture |
+| --- | --- |
+| Oldest base Unity family | Unity 2021.3 LTS |
+| Oldest DOTS family | Unity 2022.3, Entities 1.0.11, Collections 2.1.4, Burst 1.8.2 |
+| Current LTS family | Unity 6.3 LTS manifest fixture |
+
+The current-LTS DOTS matrix is not claimed until Unity publishes and the project tests a verified package set for that editor. See the [integration fixture process](tests/UnityIntegration/README.md).
 
 ## Build and test
 
 ```powershell
-dotnet run --project tests/UnityBestPractices.Analyzers.Tests
-dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
+dotnet restore UnityBestPractices.sln
+dotnet build UnityBestPractices.sln -c Release --no-restore
+dotnet run --project tests/UnityBestPractices.Analyzers.Tests -c Release --no-build
+dotnet test tests/UnityBestPractices.Analyzers.Tests.Xunit -c Release --no-build
+dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Release --no-build
+dotnet pack src/UnityBestPractices.Analyzers -c Release --no-build -o artifacts/packages
 ```
 
-The test project is a dependency-light executable test harness. It verifies all 70 descriptors have unique IDs, `Info` suggestion severity, and registered fixes, then compiles every transformation and checks conservative negative cases. DOTS coverage includes all query targets, all six execution-mode switches, filter transfer, entity access, Burst job extraction, exact offered-fix sets, and rejection of captures, raw wrapper access, unsupported query forms, structural-change pipelines, and look-alike non-Unity APIs.
+The dependency-light harness verifies the full 74-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
 
-### Automated releases
+## Release process
 
-Every branch push is restored, built in Release configuration, and tested by GitHub Actions. A successful push to the repository's default branch additionally publishes the exact tested analyzer DLL as a GitHub Release asset.
+Project, assembly, file, informational, NuGet, UPM, and Git tag versions use the same SemVer value. To release:
 
-Release tags use the `v0.N` series, while the release asset keeps the standard filename `UnityBestPractices.Analyzers.dll`. GitHub's release-workflow run number begins at 1 and advances only for new default-branch release runs, producing `v0.1`, `v0.2`, `v0.3`, and so on; rerunning an existing workflow keeps its original version. The project version remains `0.1.0` locally, while the workflow supplies the selected three-part assembly/package version during each release build.
+1. Update `<Version>` in the analyzer project and `CHANGELOG.md`.
+2. Merge a green CI build.
+3. Create and push the matching tag, for example `v0.4.0`.
 
-## Use in Unity
+The tag workflow rejects mismatched versions, rebuilds and retests the tagged commit, validates both package formats, and creates or updates the same GitHub release. Assets include the default-named DLL, `.nupkg`, `.snupkg`, UPM `.tgz`, and `SHA256SUMS`. Rerunning a tag cannot select a different version.
 
-Unity's player scripting profile supports .NET Standard 2.1. The analyzer DLL intentionally targets `netstandard2.0`, as required by [Unity's Roslyn analyzer guidance](https://docs.unity3d.com/2023.2/Documentation/Manual/roslyn-analyzers.html), and is therefore compatible with projects using the .NET Standard 2.1 player profile. The solution includes a `netstandard2.1` compatibility project that references both public analyzer entry points; every local and CI solution build compiles it to prevent compatibility regressions.
+## Contributing and policy
 
-1. Build or pack the analyzer.
-2. Copy `UnityBestPractices.Analyzers.dll` from `bin/Release/netstandard2.0` (or from the NuGet package's `analyzers/dotnet/cs` directory) into a folder under the Unity project's `Assets` directory.
-3. Select the DLL in Unity's Plugin Inspector. Disable **Auto Reference**, **Validate References**, **Any Platform**, **Editor**, and **Standalone**, then assign the exact asset label `RoslynAnalyzer`.
-4. Apply the import settings, regenerate the C# project, and restart Visual Studio or Rider so its Roslyn host reloads the assembly. In Rider, also verify **Settings | Editor | Inspection Settings | Roslyn Analyzers | Enable Roslyn analyzers**.
-5. Put the caret on the light dotted suggestion and invoke the IDE's quick-action command (`Alt+Enter` in Rider).
-
-Unity performs analyzer loading for compilation, while the supported IDE discovers the code-fix provider from the same assembly. `Microsoft.CodeAnalysis.Workspaces` and `System.Composition` are IDE-host dependencies of that provider, which is why Unity asset-reference validation must remain disabled. Because all descriptors use `DiagnosticSeverity.Info`, they appear as low-noise suggestions with light-bulb actions rather than compiler warnings or errors.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a rule. New diagnostics need documented semantic guards and false-positive risks and must not duplicate the current `Microsoft.Unity.Analyzers` catalog. Security reports follow [SECURITY.md](SECURITY.md); project changes are recorded in [CHANGELOG.md](CHANGELOG.md).

@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  release:
+    name: Build and publish release assets
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Verify tag and project versions match
+        id: version
+        shell: bash
+        run: |
+          project_version="$(dotnet msbuild src/UnityBestPractices.Analyzers/UnityBestPractices.Analyzers.csproj -getProperty:Version)"
+          tag_version="${GITHUB_REF_NAME#v}"
+          test "$tag_version" = "$project_version"
+          echo "value=$project_version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore UnityBestPractices.sln
+
+      - name: Build
+        run: >
+          dotnet build UnityBestPractices.sln
+          --configuration Release
+          --no-restore
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        shell: bash
+        run: |
+          dotnet run \
+            --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj \
+            --configuration Release \
+            --no-build
+          dotnet test \
+            tests/UnityBestPractices.Analyzers.Tests.Xunit/UnityBestPractices.Analyzers.Tests.Xunit.csproj \
+            --configuration Release \
+            --no-build \
+            --no-restore
+
+      - name: Validate assembly version coherence
+        shell: pwsh
+        run: >
+          ./eng/Validate-VersionCoherence.ps1
+          -AnalyzerDll "src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll"
+          -ExpectedVersion "${{ steps.version.outputs.value }}"
+
+      - name: Pack NuGet and symbols
+        run: >
+          dotnet pack
+          src/UnityBestPractices.Analyzers/UnityBestPractices.Analyzers.csproj
+          --configuration Release
+          --no-build
+          --no-restore
+          --output artifacts/packages
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Validate NuGet package
+        shell: pwsh
+        run: >
+          ./eng/Validate-NuGetPackage.ps1
+          -PackagePath "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.nupkg"
+          -ExpectedVersion "${{ steps.version.outputs.value }}"
+          -SymbolPackagePath "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.snupkg"
+
+      - name: Assemble UPM package
+        shell: pwsh
+        run: |
+          ./eng/Assemble-UpmPackage.ps1 `
+            -Version "${{ steps.version.outputs.value }}" `
+            -AnalyzerDll "src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll" `
+            -OutputDirectory "artifacts/upm"
+          ./eng/Validate-UpmPackage.ps1 `
+            -PackageRoot "artifacts/upm/package" `
+            -ExpectedVersion "${{ steps.version.outputs.value }}"
+
+      - name: Prepare release assets and checksums
+        shell: bash
+        run: |
+          mkdir -p release
+          cp src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll release/
+          cp artifacts/packages/*.nupkg release/
+          cp artifacts/packages/*.snupkg release/
+          tar -czf "release/com.somedeveloper.unity-best-practices-analyzers-${{ steps.version.outputs.value }}.tgz" \
+            -C artifacts/upm package
+          (
+            cd release
+            sha256sum UnityBestPractices.Analyzers.dll *.nupkg *.snupkg *.tgz > SHA256SUMS
+          )
+
+      - name: Create or update GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
+
+      - name: Publish to NuGet.org when configured
+        if: env.NUGET_API_KEY != ''
+        run: >
+          dotnet nuget push
+          "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

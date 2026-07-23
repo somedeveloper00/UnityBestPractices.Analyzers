@@ -1,0 +1,13 @@
+root = false
+
+# Enables conservative C# and Unity performance suggestions.
+[*.cs]
+dotnet_analyzer_diagnostic.severity = none
+dotnet_analyzer_diagnostic.category-Unity.Performance.Safe.severity = suggestion
+dotnet_analyzer_diagnostic.category-Unity.Performance.Review.severity = suggestion
+dotnet_analyzer_diagnostic.category-CSharp.Performance.severity = suggestion
+
+ubp_enable_review_required = true
+ubp_enable_dots_migration = false
+ubp_max_stackalloc_bytes = 1024
+ubp_minimum_list_adds = 5

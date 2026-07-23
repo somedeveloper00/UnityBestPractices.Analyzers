@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
 
-یک تحلیل‌گر تکمیلی Roslyn با ۷۰ اصلاح سریع اختیاری برای بهترین روش‌های Unity و C# پربازده که هنوز توسط `Microsoft.Unity.Analyzers` پوشش داده نشده‌اند. شدت همهٔ تشخیص‌ها `Info` است تا Rider و Visual Studio اصلاح سریع را نمایش دهند، بدون آن‌که Build خطا یا هشدار تولید کند یا Unity Console شلوغ شود.
+یک تحلیل‌گر تکمیلی Roslyn با ۷۴ تشخیص کم‌مزاحمت و ۷۲ اصلاح سریع اختیاری برای بهترین روش‌های Unity و C# پربازده که هنوز توسط `Microsoft.Unity.Analyzers` پوشش داده نشده‌اند. شدت پیش‌فرض همهٔ تشخیص‌ها `Info` است تا Rider و Visual Studio اکشن‌ها را نمایش دهند، بدون آن‌که Build خطا یا هشدار تولید کند یا Unity Console شلوغ شود.
 
 ## اصلاح‌های سریع
 
@@ -93,6 +93,15 @@
 | `UBP0069` | فراخوانی بدون پارامتر `IJobEntity.ScheduleParallel()` | اجرا را به `Run()` تغییر می‌دهد |
 | `UBP0070` | فراخوانی بدون پارامتر `IJobEntity.ScheduleParallel()` | اجرا را به `Schedule()` تغییر می‌دهد |
 
+### صحت و Cache
+
+| شناسه | مورد شناسایی‌شده | اصلاح |
+|---|---|---|
+| `UBP0071` | دور انداختن `Unity.Jobs.JobHandle` بازگشتی از یک `Schedule` پشتیبانی‌شده | Handle را در متغیر محلی بدون تداخل نام ذخیره می‌کند تا قابل انتقال یا ترکیب باشد |
+| `UBP0072` | `NativeArray<T>` محلی و استفاده‌نشده با `Allocator.Persistent` که نشت آن به‌صورت محدود قابل اثبات است | فقط تشخیص؛ مالکیت و محل Dispose به تصمیم توسعه‌دهنده نیاز دارد |
+| `UBP0073` | خروج `NativeArray<T>` با `Temp` یا `TempJob` از طریق return، فیلد یا Delegate طولانی‌عمر | فقط تشخیص؛ طول عمر صحیح وابسته به برنامه است |
+| `UBP0074` | فراخوانی تکراری `Shader.PropertyToID` با ثابت یکسان در یک Type | فیلد `static readonly` با نام یکتا می‌سازد و فراخوانی‌ها را جایگزین می‌کند |
+
 تحلیل‌گر، Symbolهای Unity را به‌شکل معنایی Resolve می‌کند. نوع‌های نامرتبط با نام اعضای مشابه، نوع فیلدهای پشتیبانی‌نشده، Iteratorهای غیر Unity، آستانه‌های فاصلهٔ پویا، کد تولیدشده و نسخه‌های Unity یا Package فاقد Symbolهای لازم نادیده گرفته می‌شوند.
 
 تبدیل‌های کارایی محدودیت‌های ایمنی محافظه‌کارانه دارند. تخصیص روی Stack فقط برای عناصر Primitive یا Enum، خارج از حلقه و با اندازهٔ کل حداکثر ۱ KiB پیشنهاد می‌شود؛ در صورت نیاز برای حفظ مقداردهی صفر آرایهٔ Managed، اصلاح `Span.Clear()` را درج می‌کند. تبدیل به متغیر محلی `ref` به مسیر دسترسی واقعی با بازگشت ref، Receiver و Index بدون تغییر، یک Mutation شناسایی‌شده و عدم استفاده از کپی محلی پس از بازنویسی متناظر نیاز دارد. فیلد Job فقط زمانی به‌صورت فقط‌خواندنی پیشنهاد می‌شود که همهٔ استفاده‌های آن در Job از نوع خواندن شناخته‌شده باشند. ظرفیت List تنها از دستورهای پیوستهٔ `Add` استنتاج می‌شود. تبدیل به ضرب برای توان دوم به شناسه‌های Scalar بدون عارضهٔ جانبی محدود است. حافظهٔ Native مقداردهی‌نشده فقط زمانی پیشنهاد می‌شود که دستور بعدی یک حلقهٔ استاندارد باشد که بدون خواندن محتوای قبلی آرایه، همهٔ Indexها را مقداردهی کند.
@@ -105,6 +114,14 @@
 
 قواعد از راهنمای رسمی [Jobهای کامپایل‌شده با Burst](https://docs.unity3d.com/Packages/com.unity.burst@1.8/manual/compilation-burstcompile.html)، [NativeContainerهای فقط‌خواندنی](https://docs.unity3d.com/Manual/job-system-native-container.html)، [`SystemAPI.Query`](https://docs.unity.cn/Packages/com.unity.entities%401.0/api/Unity.Entities.SystemAPI.Query.html)، [زمان‌بندی `IJobEntity`](https://docs.unity.cn/Packages/com.unity.entities%401.0/api/Unity.Entities.IJobEntityExtensions.ScheduleParallel.html)، [Cache کردن `Camera.main`](https://docs.unity3d.com/ScriptReference/Camera-main.html)، [`NativeArrayOptions.UninitializedMemory`](https://docs.unity3d.com/ScriptReference/Unity.Collections.NativeArrayOptions.UninitializedMemory.html)، [`stackalloc` محدود](https://learn.microsoft.com/dotnet/csharp/language-reference/operators/stackalloc) و [جلوگیری از کپی با ref در C#](https://learn.microsoft.com/dotnet/csharp/advanced-topics/performance/) پیروی می‌کنند.
 
+## ایمنی، نصب و پیکربندی
+
+هر قاعده یکی از طبقه‌بندی‌های `Safe`، `ReviewRequired` یا `Experimental` را دارد. قواعد `ReviewRequired` و `Experimental` از Fix All استفاده نمی‌کنند. اصلاح `UBP0001` فقط وقتی نمایش داده می‌شود که تحلیل Reference در کل Solution ثابت کند ارجاع ناسازگار بیرونی وجود ندارد. تبدیل‌های `UBP0058` تا `UBP0070` ممکن است زمان اجرا، همگام‌سازی، Dependency، Thread Safety و زمان‌بندی ECS را تغییر دهند و باید تک‌به‌تک بررسی شوند. [فهرست قواعد](docs/rules/index.md) جزئیات را دارد.
+
+روش پیشنهادی نصب، دریافت فایل UPM با پسوند `.tgz` از GitHub Release و انتخاب **Package Manager > Add package from tarball** است. Release همچنین `.nupkg`، `.snupkg`، DLL با نام استاندارد و Checksum دارد. برای نصب دستی DLL، گزینه‌های **Auto Reference**، **Validate References** و همهٔ Platformها را غیرفعال و Label دقیق `RoslynAnalyzer` را تنظیم کنید.
+
+شدت‌ها و آستانه‌های محافظه‌کارانه از طریق `.editorconfig` قابل تنظیم‌اند. [راهنمای پیکربندی](docs/configuration.md) و Presetهای [`config`](config) را ببینید. تحلیل‌گر `netstandard2.0` و Roslyn 3.8 را حفظ می‌کند و با پروفایل Player مبتنی بر .NET Standard 2.1 یونیتی سازگار است.
+
 ## Build و Test
 
 ```powershell
@@ -112,13 +129,11 @@ dotnet run --project tests/UnityBestPractices.Analyzers.Tests
 dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 ```
 
-پروژهٔ Test یک Test Harness اجرایی با وابستگی کم است. این پروژه یکتا بودن شناسه، شدت پیشنهادی `Info` و ثبت اصلاح را برای هر ۷۰ Descriptor بررسی می‌کند، سپس خروجی همهٔ تبدیل‌ها را کامپایل و حالت‌های محافظه‌کارانهٔ منفی را آزمایش می‌کند. پوشش DOTS شامل همهٔ مقصدهای Query، هر شش تغییر حالت اجرا، انتقال فیلتر، دسترسی Entity، استخراج Job با Burst، مجموعهٔ دقیق اصلاح‌های ارائه‌شده و رد کردن Captureها، دسترسی مستقیم Wrapper، شکل‌های پشتیبانی‌نشدهٔ Query، Pipelineهای تغییر ساختاری و APIهای مشابه غیر Unity است.
+تست‌ها هر ۷۴ Descriptor، قواعد دارای اصلاح، مستندات، سیاست Fix All، Referenceهای کل Solution، همهٔ تبدیل‌های DOTS، موارد منفی محافظه‌کارانه، محتوای Package، سازگاری و آستانه‌های کلی Performance را بررسی می‌کنند.
 
 ### Release خودکار
 
-هر Push به هر Branch توسط GitHub Actions بازیابی، در پیکربندی Release ساخته و آزمایش می‌شود. Push موفق به Branch پیش‌فرض Repository، همان DLL آزمایش‌شدهٔ تحلیل‌گر را نیز به‌عنوان Asset یک GitHub Release منتشر می‌کند.
-
-Tagهای Release از سری `v0.N` استفاده می‌کنند، اما Asset انتشار نام استاندارد `UnityBestPractices.Analyzers.dll` را حفظ می‌کند. شمارهٔ اجرای Workflow انتشار GitHub از ۱ شروع می‌شود و فقط برای اجرای انتشار جدید روی Branch پیش‌فرض افزایش می‌یابد؛ بنابراین نسخه‌ها به‌ترتیب `v0.1`، `v0.2`، `v0.3` و پس از آن خواهند بود. اجرای دوبارهٔ همان Workflow نسخهٔ اصلی آن را حفظ می‌کند. نسخهٔ محلی پروژه `0.1.0` باقی می‌ماند و Workflow هنگام Build انتشار، نسخهٔ سه‌بخشی انتخاب‌شده را به Assembly و Package می‌دهد.
+هر Push و Pull Request، Build، همهٔ تست‌ها، اعتبارسنجی NuGet/UPM، هماهنگی مستندات و بررسی Performance را اجرا می‌کند. Release فقط از Tag دقیق SemVer مطابق نسخهٔ پروژه، مانند `v0.4.0`، ساخته می‌شود. اجرای دوباره نسخهٔ دیگری نمی‌سازد و DLL، `.nupkg`، `.snupkg`، فایل UPM با پسوند `.tgz` و `SHA256SUMS` منتشر می‌شوند. انتشار در NuGet.org فقط با Secret به نام `NUGET_API_KEY` فعال است.
 
 ## استفاده در Unity
 

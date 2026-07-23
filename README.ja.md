@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
 
-`Microsoft.Unity.Analyzers` ではまだ扱われていない Unity および高性能 C# のベストプラクティスを対象に、70 個の任意適用クイックフィックスを提供する Roslyn アナライザーです。すべての診断の重大度は `Info` です。Rider と Visual Studio はクイックフィックスを提示できますが、ビルドエラーや警告は発生せず、Unity Console に余計なメッセージも表示されません。
+`Microsoft.Unity.Analyzers` ではまだ扱われていない Unity および高性能 C# のベストプラクティスを対象に、74 個の低ノイズ診断と 72 個の任意適用クイックフィックスを提供する Roslyn アナライザーです。すべての診断の既定重大度は `Info` です。Rider と Visual Studio はアクションを提示できますが、ビルドエラーや警告は発生せず、Unity Console に余計なメッセージも表示されません。
 
 ## クイックフィックス
 
@@ -93,6 +93,15 @@
 | `UBP0069` | 引数なしの `IJobEntity.ScheduleParallel()` 呼び出し | 実行方法を `Run()` に切り替えます |
 | `UBP0070` | 引数なしの `IJobEntity.ScheduleParallel()` 呼び出し | 実行方法を `Schedule()` に切り替えます |
 
+### 正確性とキャッシュ
+
+| ID | 対象 | 修正内容 |
+|---|---|---|
+| `UBP0071` | 対応する `Schedule` 呼び出しから返された `Unity.Jobs.JobHandle` が破棄される場合 | 依存関係を伝播・結合できるよう、衝突しないローカル変数に代入します |
+| `UBP0072` | `Allocator.Persistent` で確保され、未使用かつ未破棄であることを狭い条件で証明できるローカル `NativeArray<T>` | 診断のみ。所有権と破棄位置は開発者が判断します |
+| `UBP0073` | `Temp` / `TempJob` の `NativeArray<T>` が return、フィールド保存、または長寿命デリゲートにキャプチャされる場合 | 診断のみ。正しい寿命はアプリケーションに依存します |
+| `UBP0074` | 同じ型内で同じ定数を使う `Shader.PropertyToID` の反復呼び出し | 一意な名前の `static readonly` ID フィールドを追加し、反復呼び出しを置換します |
+
 アナライザーは Unity のシンボルをセマンティックに解決します。似たメンバー名を持つ無関係な型、未対応のフィールド型、Unity 以外のイテレーター、動的な距離しきい値、生成コード、および必要なシンボルが存在しない Unity／パッケージバージョンは無視します。
 
 パフォーマンス変換には保守的な安全制限があります。スタック割り当ては、プリミティブ型または列挙型の要素について、ループ外かつ合計 1 KiB 以下の場合にのみ提示されます。マネージド配列のゼロ初期化を維持する必要がある場合、修正は `Span.Clear()` を挿入します。`ref` ローカルへの変換には、実際に ref を返すアクセス経路、変化しないレシーバーとインデックス、検出可能な変更、および対応する書き戻し後にコピーしたローカル変数が使われないことが必要です。読み取り専用ジョブフィールドは、ジョブ内のすべての利用が既知の読み取りである場合にだけ提案されます。リスト容量は連続した `Add` 文だけから推測されます。二乗への変換は副作用のないスカラー識別子に限定されます。未初期化 Native メモリは、直後の標準ループが以前の配列内容を読まずにすべてのインデックスへ代入する場合にだけ提示されます。
@@ -105,6 +114,14 @@ DOTS の抽出は、直接の `IComponentData` パラメーター、対応する
 
 各ルールは、公式の [Burst コンパイル済みジョブ](https://docs.unity3d.com/Packages/com.unity.burst@1.8/manual/compilation-burstcompile.html)、[読み取り専用 NativeContainer](https://docs.unity3d.com/Manual/job-system-native-container.html)、[`SystemAPI.Query`](https://docs.unity.cn/Packages/com.unity.entities%401.0/api/Unity.Entities.SystemAPI.Query.html)、[`IJobEntity` のスケジューリング](https://docs.unity.cn/Packages/com.unity.entities%401.0/api/Unity.Entities.IJobEntityExtensions.ScheduleParallel.html)、[`Camera.main` のキャッシュ](https://docs.unity3d.com/ScriptReference/Camera-main.html)、[`NativeArrayOptions.UninitializedMemory`](https://docs.unity3d.com/ScriptReference/Unity.Collections.NativeArrayOptions.UninitializedMemory.html)、[制限付き `stackalloc`](https://learn.microsoft.com/dotnet/csharp/language-reference/operators/stackalloc)、[ref を用いた C# のコピー回避](https://learn.microsoft.com/dotnet/csharp/advanced-topics/performance/)のガイダンスに従っています。
 
+## 安全性、インストール、設定
+
+各ルールは `Safe`、`ReviewRequired`、`Experimental` に分類されます。`ReviewRequired` と `Experimental` は Fix All を提供しません。`UBP0001` の修正はソリューション全体の参照解析で外部参照がない場合だけ表示されます。`UBP0058`～`UBP0070` は実行タイミング、同期、依存関係、スレッド安全性、ECS スケジューリングが変わり得るため、1 件ずつ確認してください。詳細は[ルール一覧](docs/rules/index.md)を参照してください。
+
+推奨インストールは GitHub Release の UPM `.tgz` を **Package Manager > Add package from tarball** で追加する方法です。Release には検証済み `.nupkg`、`.snupkg`、標準名 DLL、チェックサムも含まれます。手動 DLL の場合は **Auto Reference**、**Validate References**、全プラットフォームを無効にし、`RoslynAnalyzer` ラベルを設定します。
+
+重大度と保守的なしきい値は `.editorconfig` で設定できます。[設定ガイド](docs/configuration.md)と [`config`](config) のプリセットを参照してください。アナライザーは `netstandard2.0` / Roslyn 3.8 を維持し、Unity の .NET Standard 2.1 プレイヤープロファイルと互換性があります。
+
 ## ビルドとテスト
 
 ```powershell
@@ -112,13 +129,11 @@ dotnet run --project tests/UnityBestPractices.Analyzers.Tests
 dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 ```
 
-テストプロジェクトは依存関係の少ない実行可能テストハーネスです。70 個すべての記述子について、ID の一意性、`Info` 提案重大度、修正の登録を検証し、その後すべての変換結果をコンパイルして、保守的な除外ケースも確認します。DOTS のテスト範囲には、すべてのクエリ変換先、6 通りすべての実行モード切り替え、フィルター移行、Entity アクセス、Burst ジョブ抽出、提示される修正セットの厳密な検証、およびキャプチャ、ラッパーの直接利用、未対応クエリ形式、構造変更パイプライン、Unity 以外の類似 API の除外が含まれます。
+テストは 74 個すべての記述子、修正可能ルール、ドキュメント、Fix All 方針、ソリューション全体の参照、DOTS の全変換先、保守的な除外、パッケージ内容、互換性、および広い性能回帰しきい値を検証します。
 
 ### 自動リリース
 
-すべてのブランチへの push は GitHub Actions により restore、Release ビルド、テストが行われます。リポジトリのデフォルトブランチへの push が成功すると、テスト済みのアナライザー DLL が GitHub Release のアセットとして公開されます。
-
-リリースタグには `v0.N` 系列を使用し、リリースアセットは標準ファイル名 `UnityBestPractices.Analyzers.dll` を維持します。GitHub のリリースワークフロー実行番号は 1 から始まり、新しいデフォルトブランチのリリース実行時だけ増加するため、`v0.1`、`v0.2`、`v0.3` の順になります。同じワークフローを再実行しても元のバージョンは変わりません。ローカルのプロジェクトバージョンは `0.1.0` のままです。リリースビルド時には、ワークフローが選択した 3 部構成のアセンブリ／パッケージバージョンを渡します。
+すべての push と pull request でビルド、全テスト、NuGet/UPM 検証、ドキュメント整合性、性能チェックを実行します。リリースはプロジェクト版と完全一致する SemVer タグ（例 `v0.4.0`）だけから作成されます。再実行しても別バージョンは作られず、DLL、`.nupkg`、`.snupkg`、UPM `.tgz`、`SHA256SUMS` が公開されます。NuGet.org 公開は `NUGET_API_KEY` が設定された場合だけ有効です。
 
 ## Unity での使用方法
 

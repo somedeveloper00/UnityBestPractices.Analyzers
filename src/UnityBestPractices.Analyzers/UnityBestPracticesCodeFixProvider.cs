@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.FindSymbols;
 
 namespace UnityBestPractices.Analyzers;
 
@@ -28,14 +29,44 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
         DiagnosticIds.UseMultiplicationForSquare,
         DiagnosticIds.UseUninitializedNativeArray)
         .AddRange(ExpressionQuickFixRegistry.DiagnosticIds)
-        .AddRange(DotsQueryRules.FixableDiagnosticIds);
+        .AddRange(DotsQueryRules.FixableDiagnosticIds)
+        .Add(DiagnosticIds.DiscardedScheduledJobHandle)
+        .Add(DiagnosticIds.CacheShaderPropertyId);
 
-    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
+    public override FixAllProvider GetFixAllProvider() => RuleAwareFixAllProvider.Instance;
 
-    public override Task RegisterCodeFixesAsync(CodeFixContext context)
+    public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         foreach (var diagnostic in context.Diagnostics)
         {
+            if (diagnostic.Id == DiagnosticIds.DiscardedScheduledJobHandle)
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        DiagnosticCatalog.Get(diagnostic.Id).FixTitle,
+                        cancellationToken => AdvancedUnityRules.AssignJobHandleAsync(
+                            context.Document,
+                            diagnostic,
+                            cancellationToken),
+                        diagnostic.Id),
+                    diagnostic);
+                continue;
+            }
+
+            if (diagnostic.Id == DiagnosticIds.CacheShaderPropertyId)
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        DiagnosticCatalog.Get(diagnostic.Id).FixTitle,
+                        cancellationToken => AdvancedUnityRules.CacheShaderPropertyIdAsync(
+                            context.Document,
+                            diagnostic,
+                            cancellationToken),
+                        diagnostic.Id),
+                    diagnostic);
+                continue;
+            }
+
             if (DotsQueryRules.TryGetRule(diagnostic.Id, out var dotsRule))
             {
                 context.RegisterCodeFix(
@@ -69,6 +100,14 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
             switch (diagnostic.Id)
             {
                 case DiagnosticIds.EncapsulateSerializedField:
+                    if (!await CanSafelyEncapsulateFieldAsync(
+                            context.Document,
+                            diagnostic,
+                            context.CancellationToken).ConfigureAwait(false))
+                    {
+                        break;
+                    }
+
                     context.RegisterCodeFix(
                         CodeAction.Create(
                             "Make private and add SerializeField",
@@ -169,7 +208,79 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
             }
         }
 
-        return Task.CompletedTask;
+    }
+
+    private static async Task<bool> CanSafelyEncapsulateFieldAsync(
+        Document document,
+        Diagnostic diagnostic,
+        CancellationToken cancellationToken)
+    {
+        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        if (root is null || semanticModel is null)
+        {
+            return false;
+        }
+
+        var variable = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true)
+            .FirstAncestorOrSelf<VariableDeclaratorSyntax>();
+        var fieldDeclaration = variable?.FirstAncestorOrSelf<FieldDeclarationSyntax>();
+        var fieldSymbol = variable is null
+            ? null
+            : semanticModel.GetDeclaredSymbol(variable, cancellationToken) as IFieldSymbol;
+        if (fieldDeclaration is null ||
+            fieldSymbol?.ContainingType is null ||
+            !UnityBestPracticesAnalyzer.IsEncapsulatableSerializedField(
+                fieldDeclaration,
+                semanticModel,
+                cancellationToken))
+        {
+            return false;
+        }
+
+        var references = await SymbolFinder.FindReferencesAsync(
+            fieldSymbol,
+            document.Project.Solution,
+            cancellationToken).ConfigureAwait(false);
+        foreach (var reference in references)
+        {
+            foreach (var location in reference.Locations)
+            {
+                var referenceDocument = document.Project.Solution.GetDocument(location.Document.Id);
+                var referenceModel = referenceDocument is null
+                    ? null
+                    : await referenceDocument.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+                if (referenceModel is null)
+                {
+                    return false;
+                }
+
+                var enclosingType = referenceModel
+                    .GetEnclosingSymbol(location.Location.SourceSpan.Start, cancellationToken)
+                    ?.ContainingType;
+                if (!IsWithinDeclaringType(enclosingType, fieldSymbol.ContainingType))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsWithinDeclaringType(
+        INamedTypeSymbol? referenceType,
+        INamedTypeSymbol declaringType)
+    {
+        for (var current = referenceType; current is not null; current = current.ContainingType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, declaringType))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static async Task<Document> EncapsulateFieldAsync(
@@ -203,10 +314,29 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
         var serializeFieldAttribute = SyntaxFactory.AttributeList(
             SyntaxFactory.SingletonSeparatedList(
                 SyntaxFactory.Attribute(SyntaxFactory.ParseName("UnityEngine.SerializeField"))));
+        var leadingTrivia = field.GetLeadingTrivia();
+        var indentation = SyntaxFactory.TriviaList(
+            leadingTrivia
+                .Reverse()
+                .TakeWhile(trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                .Reverse());
+        var endOfLine = root
+            .DescendantTrivia(descendIntoTrivia: true)
+            .FirstOrDefault(trivia => trivia.IsKind(SyntaxKind.EndOfLineTrivia));
+        if (endOfLine == default)
+        {
+            endOfLine = SyntaxFactory.EndOfLine("\n");
+        }
+
+        serializeFieldAttribute = serializeFieldAttribute
+            .WithLeadingTrivia(leadingTrivia)
+            .WithTrailingTrivia(
+                SyntaxFactory.TriviaList(endOfLine)
+                    .AddRange(indentation));
         var replacement = field
+            .WithLeadingTrivia(default(SyntaxTriviaList))
             .WithModifiers(field.Modifiers.Replace(publicToken, privateToken))
-            .WithAttributeLists(field.AttributeLists.Add(serializeFieldAttribute))
-            .WithAdditionalAnnotations(Formatter.Annotation);
+            .WithAttributeLists(field.AttributeLists.Insert(0, serializeFieldAttribute));
 
         return document.WithSyntaxRoot(root.ReplaceNode(field, replacement));
     }
@@ -344,12 +474,16 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
 
         var declarator = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true)
             .FirstAncestorOrSelf<VariableDeclaratorSyntax>();
+        var configuration = AnalyzerConfiguration.For(
+            document.Project.AnalyzerOptions.AnalyzerConfigOptionsProvider,
+            root.SyntaxTree);
         if (declarator is null ||
             !UnityBestPracticesAnalyzer.CanUseStackalloc(
                 declarator,
                 semanticModel,
                 cancellationToken,
-                out var arrayCreation))
+                out var arrayCreation,
+                configuration.MaxStackallocBytes))
         {
             return document;
         }
@@ -480,12 +614,16 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
 
         var creation = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true)
             .FirstAncestorOrSelf<ObjectCreationExpressionSyntax>();
+        var configuration = AnalyzerConfiguration.For(
+            document.Project.AnalyzerOptions.AnalyzerConfigOptionsProvider,
+            root.SyntaxTree);
         if (creation is null ||
             !UnityBestPracticesAnalyzer.TryGetListPreallocation(
                 creation,
                 semanticModel,
                 cancellationToken,
-                out var addCount))
+                out var addCount,
+                configuration.MinimumListAdds))
         {
             return document;
         }

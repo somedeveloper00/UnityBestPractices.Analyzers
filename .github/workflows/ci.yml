@@ -1,0 +1,187 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  validate:
+    name: Build, test, and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Read package version
+        id: version
+        shell: bash
+        run: |
+          version="$(dotnet msbuild src/UnityBestPractices.Analyzers/UnityBestPractices.Analyzers.csproj -getProperty:Version)"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore UnityBestPractices.sln
+
+      - name: Release build and compatibility build
+        run: >
+          dotnet build UnityBestPractices.sln
+          --configuration Release
+          --no-restore
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Run 74-rule regression and Fix All tests
+        run: >
+          dotnet run
+          --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj
+          --configuration Release
+          --no-build
+
+      - name: Validate assembly version coherence
+        shell: pwsh
+        run: >
+          ./eng/Validate-VersionCoherence.ps1
+          -AnalyzerDll "src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll"
+          -ExpectedVersion "${{ steps.version.outputs.value }}"
+
+      - name: Run xUnit Roslyn integration tests
+        run: >
+          dotnet test
+          tests/UnityBestPractices.Analyzers.Tests.Xunit/UnityBestPractices.Analyzers.Tests.Xunit.csproj
+          --configuration Release
+          --no-build
+          --no-restore
+
+      - name: Validate documentation and catalog generation
+        shell: bash
+        run: |
+          dotnet run \
+            --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            -- --generate-rule-docs .
+          git diff --exit-code -- docs/rules
+
+      - name: Run analyzer performance regression checks
+        run: >
+          dotnet run
+          --project tests/UnityBestPractices.Analyzers.PerformanceTests/UnityBestPractices.Analyzers.PerformanceTests.csproj
+          --configuration Release
+          --no-build
+
+      - name: Pack NuGet and symbols
+        run: >
+          dotnet pack
+          src/UnityBestPractices.Analyzers/UnityBestPractices.Analyzers.csproj
+          --configuration Release
+          --no-build
+          --no-restore
+          --output artifacts/packages
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Validate NuGet contents and metadata
+        shell: pwsh
+        run: >
+          ./eng/Validate-NuGetPackage.ps1
+          -PackagePath "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.nupkg"
+          -ExpectedVersion "${{ steps.version.outputs.value }}"
+          -SymbolPackagePath "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.snupkg"
+
+      - name: Assemble and validate UPM package
+        shell: pwsh
+        run: |
+          ./eng/Assemble-UpmPackage.ps1 `
+            -Version "${{ steps.version.outputs.value }}" `
+            -AnalyzerDll "src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll" `
+            -OutputDirectory "artifacts/upm"
+          ./eng/Validate-UpmPackage.ps1 `
+            -PackageRoot "artifacts/upm/package" `
+            -ExpectedVersion "${{ steps.version.outputs.value }}"
+
+      - name: Validate Unity fixture manifests
+        shell: bash
+        run: |
+          for manifest in tests/UnityIntegration/*/Packages/manifest.json; do
+            jq empty "$manifest"
+          done
+
+      - name: Upload validated packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnityBestPractices.Analyzers-${{ steps.version.outputs.value }}
+          if-no-files-found: error
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
+            artifacts/upm/package/**
+
+  unity-integration:
+    name: Unity ${{ matrix.unity-version }} integration
+    needs: validate
+    if: vars.ENABLE_UNITY_INTEGRATION == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - fixture: "2021.3"
+            unity-version: "2021.3.45f1"
+          - fixture: "dots-2022.3"
+            unity-version: "2022.3.62f1"
+          - fixture: "6000.3"
+            unity-version: "6000.3.8f1"
+    env:
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download validated UPM package
+        uses: actions/download-artifact@v4
+        with:
+          pattern: UnityBestPractices.Analyzers-*
+          path: artifacts/download
+          merge-multiple: true
+
+      - name: Install local analyzer package in fixture
+        shell: bash
+        run: |
+          fixture="tests/UnityIntegration/${{ matrix.fixture }}"
+          mkdir -p "$fixture/Packages/com.somedeveloper.unity-best-practices-analyzers"
+          cp -R artifacts/download/upm/package/. \
+            "$fixture/Packages/com.somedeveloper.unity-best-practices-analyzers/"
+          jq '.dependencies["com.somedeveloper.unity-best-practices-analyzers"] = "file:com.somedeveloper.unity-best-practices-analyzers"' \
+            "$fixture/Packages/manifest.json" > "$fixture/Packages/manifest.updated.json"
+          mv "$fixture/Packages/manifest.updated.json" "$fixture/Packages/manifest.json"
+
+      - name: Run Unity EditMode smoke tests
+        uses: game-ci/unity-test-runner@v4
+        with:
+          projectPath: tests/UnityIntegration/${{ matrix.fixture }}
+          unityVersion: ${{ matrix.unity-version }}
+          testMode: EditMode

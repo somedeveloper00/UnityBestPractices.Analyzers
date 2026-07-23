@@ -1,0 +1,22 @@
+{
+  "name": "com.somedeveloper.unity-best-practices-analyzers",
+  "version": "{{VERSION}}",
+  "displayName": "Unity Best Practices Analyzers",
+  "description": "Suggestion-level Roslyn analyzers and quick fixes for conservative Unity, Burst, Jobs, DOTS, and C# performance practices.",
+  "unity": "2021.3",
+  "documentationUrl": "https://github.com/somedeveloper00/UnityBestPractices.Analyzers",
+  "changelogUrl": "https://github.com/somedeveloper00/UnityBestPractices.Analyzers/blob/master/CHANGELOG.md",
+  "licensesUrl": "https://github.com/somedeveloper00/UnityBestPractices.Analyzers/blob/master/LICENSE",
+  "keywords": [
+    "roslyn",
+    "analyzer",
+    "performance",
+    "burst",
+    "jobs",
+    "dots"
+  ],
+  "author": {
+    "name": "UnityBestPractices.Analyzers contributors",
+    "url": "https://github.com/somedeveloper00/UnityBestPractices.Analyzers"
+  }
+}

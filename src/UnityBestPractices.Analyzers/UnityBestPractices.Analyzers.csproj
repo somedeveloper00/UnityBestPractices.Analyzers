@@ -4,18 +4,36 @@
     <AssemblyName>UnityBestPractices.Analyzers</AssemblyName>
     <RootNamespace>UnityBestPractices.Analyzers</RootNamespace>
     <PackageId>UnityBestPractices.Analyzers</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.4.0</Version>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
+    <InformationalVersion>$(Version)</InformationalVersion>
     <Authors>UnityBestPractices contributors</Authors>
     <Description>Suggestion-level Roslyn diagnostics and quick fixes for Unity best practices.</Description>
-    <PackageTags>unity;roslyn;analyzer;codefix</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/somedeveloper00/UnityBestPractices.Analyzers</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/somedeveloper00/UnityBestPractices.Analyzers.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>unity;roslyn;analyzer;code-fix;burst;jobs;dots;ecs;performance</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>https://github.com/somedeveloper00/UnityBestPractices.Analyzers/blob/master/CHANGELOG.md</PackageReleaseNotes>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <DevelopmentDependency>true</DevelopmentDependency>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Deterministic>true</Deterministic>
     <IsPackable>true</IsPackable>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <!-- The release analyzer cannot statically follow descriptors created by the data-driven quick-fix registry. -->
-    <NoWarn>$(NoWarn);RS1022;RS2003</NoWarn>
+    <!-- The release analyzer cannot statically follow descriptors created by the central data-driven catalog.
+         Catalog/release consistency is enforced by the repository validation tests instead. -->
+    <NoWarn>$(NoWarn);RS1022;RS2002;RS2003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,10 +41,15 @@
          A netstandard2.0 analyzer is compatible with Unity's netstandard2.1 player profile. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="3.8.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="$(OutputPath)$(AssemblyName).dll"
+          Pack="true"
+          PackagePath="analyzers/dotnet/cs"
+          Visible="false" />
+    <None Include="$(OutputPath)$(AssemblyName).pdb"
           Pack="true"
           PackagePath="analyzers/dotnet/cs"
           Visible="false" />
@@ -39,6 +62,14 @@
           PackagePath="\"
           Visible="false" />
     <None Include="..\..\README.fa.md"
+          Pack="true"
+          PackagePath="\"
+          Visible="false" />
+    <None Include="..\..\LICENSE"
+          Pack="true"
+          PackagePath="\"
+          Visible="false" />
+    <None Include="..\..\CHANGELOG.md"
           Pack="true"
           PackagePath="\"
           Visible="false" />

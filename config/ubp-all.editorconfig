@@ -1,0 +1,10 @@
+root = false
+
+# Enables every implemented rule at suggestion severity.
+[*.cs]
+dotnet_analyzer_diagnostic.severity = suggestion
+
+ubp_enable_review_required = true
+ubp_enable_dots_migration = true
+ubp_max_stackalloc_bytes = 1024
+ubp_minimum_list_adds = 5

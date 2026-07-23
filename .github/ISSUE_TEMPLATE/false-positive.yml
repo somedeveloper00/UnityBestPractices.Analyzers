@@ -1,0 +1,30 @@
+name: False positive
+description: Report a diagnostic that is offered outside its documented constraints.
+title: "[False positive] UBP"
+labels: ["false-positive"]
+body:
+  - type: input
+    id: rule
+    attributes:
+      label: Diagnostic ID
+      placeholder: UBP0000
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Minimal source and relevant symbol definitions
+    validations:
+      required: true
+  - type: textarea
+    id: semantics
+    attributes:
+      label: Why the transformation is unsafe or inapplicable
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Analyzer, Unity, and package versions
+    validations:
+      required: true

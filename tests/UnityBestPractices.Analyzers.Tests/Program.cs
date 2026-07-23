@@ -13,6 +13,12 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using UnityBestPractices.Analyzers;
 
+if (args.Length == 2 && args[0] == "--generate-rule-docs")
+{
+    RuleDocumentationGenerator.Generate(args[1]);
+    return;
+}
+
 var tests = new AnalyzerTests();
 await tests.RunAsync();
 
@@ -95,6 +101,11 @@ internal sealed partial class AnalyzerTests
                 public static Color cyan => default;
                 public static Color magenta => default;
             }
+
+            public static class Shader
+            {
+                public static int PropertyToID(string propertyName) => 0;
+            }
         }
 
         namespace Unity.Burst
@@ -104,7 +115,13 @@ internal sealed partial class AnalyzerTests
 
         namespace Unity.Jobs
         {
+            public struct JobHandle { }
             public interface IJob { void Execute(); }
+            public static class IJobExtensions
+            {
+                public static JobHandle Schedule<T>(this T job) where T : struct, IJob => default;
+                public static JobHandle ScheduleParallel<T>(this T job) where T : struct, IJob => default;
+            }
         }
 
         namespace Unity.Entities
@@ -280,6 +297,8 @@ internal sealed partial class AnalyzerTests
                     get => _items[index];
                     set => _items[index] = value;
                 }
+
+                public void Dispose() { }
             }
 
             public struct NativeList<T> where T : struct
@@ -303,6 +322,10 @@ internal sealed partial class AnalyzerTests
     public async Task RunAsync()
     {
         VerifyCatalogIntegrity();
+        RepositoryConsistencyVerifier.Verify();
+        await VerifyConfigurationAsync();
+        await VerifyEncapsulationSafetyAsync();
+        await VerifyFixAllScopesAsync();
 
         await VerifyFixAsync(
             """
@@ -654,6 +677,7 @@ internal sealed partial class AnalyzerTests
         await VerifyAdditionalLegacyQuickFixCasesAsync();
         await VerifyDotsEdgeCaseMatrixAsync();
         await VerifyDotsQueryQuickFixesAsync();
+        await VerifyAdvancedRulesAsync();
 
         await VerifyNoDiagnosticAsync(
             """
@@ -778,7 +802,7 @@ internal sealed partial class AnalyzerTests
 
                 NativeArray<int> PartialOverwrite(int length)
                 {
-                    var values = new NativeArray<int>(length, Allocator.Temp);
+                    var values = new NativeArray<int>(length, Allocator.Persistent);
                     for (var i = 1; i < values.Length; i++)
                     {
                         values[i] = i;
@@ -789,7 +813,7 @@ internal sealed partial class AnalyzerTests
 
                 NativeArray<int> ReadsOldValues(int length)
                 {
-                    var values = new NativeArray<int>(length, Allocator.Temp);
+                    var values = new NativeArray<int>(length, Allocator.Persistent);
                     for (var i = 0; i < values.Length; i++)
                     {
                         values[i] = values[i] + 1;
@@ -804,17 +828,372 @@ internal sealed partial class AnalyzerTests
         Console.WriteLine("All analyzer and code-fix tests passed.");
     }
 
+    private async Task VerifyAdvancedRulesAsync()
+    {
+        await VerifyFixAsync(
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update()
+                {
+                    new WorkJob().Schedule();
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """,
+            DiagnosticIds.DiscardedScheduledJobHandle,
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update()
+                {
+                    var jobHandle = new WorkJob().Schedule();
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """);
+
+        await VerifyFixAsync(
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update()
+                {
+                    new WorkJob().ScheduleParallel();
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """,
+            DiagnosticIds.DiscardedScheduledJobHandle,
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update()
+                {
+                    var jobHandle = new WorkJob().ScheduleParallel();
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """);
+
+        await VerifyFixAsync(
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update()
+                {
+                    new WorkJob().Schedule();
+                    var jobHandle = default(JobHandle);
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """,
+            DiagnosticIds.DiscardedScheduledJobHandle,
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update()
+                {
+                    var jobHandle1 = new WorkJob().Schedule();
+                    var jobHandle = default(JobHandle);
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """);
+
+        await VerifyFixAsync(
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update()
+                {
+                    // dependency must be preserved
+                    new WorkJob().Schedule();
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """,
+            DiagnosticIds.DiscardedScheduledJobHandle,
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update()
+                {
+                    // dependency must be preserved
+                    var jobHandle = new WorkJob().Schedule();
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """);
+
+        var shaderCases = new[]
+        {
+            (Property: "_Color", Field: "ColorId", Container: "class", Existing: ""),
+            (Property: "_Base-Color", Field: "BaseColorId", Container: "class", Existing: ""),
+            (Property: "123", Field: "ShaderProperty123Id", Container: "class", Existing: ""),
+            (Property: "___", Field: "ShaderPropertyId", Container: "class", Existing: ""),
+            (Property: "_Color", Field: "ColorId1", Container: "class", Existing: "private int ColorId;"),
+            (Property: "_EmissionColor", Field: "EmissionColorId", Container: "struct", Existing: ""),
+            (Property: "_MainTex", Field: "MainTexId", Container: "class", Existing: "private static int OtherId;"),
+            (Property: "_Metallic", Field: "MetallicId", Container: "struct", Existing: "private float value;"),
+            (Property: "_Smoothness", Field: "SmoothnessId", Container: "class", Existing: "private const int Count = 2;"),
+            (Property: "_Detail_Mask", Field: "DetailMaskId", Container: "class", Existing: "private string name;"),
+        };
+        for (var index = 0; index < shaderCases.Length; index++)
+        {
+            var testCase = shaderCases[index];
+            var source = $$"""
+                using UnityEngine;
+                {{testCase.Container}} ShaderUser{{index}}
+                {
+                    {{testCase.Existing}}
+                    int First() => Shader.PropertyToID("{{testCase.Property}}");
+                    int Second() => Shader.PropertyToID("{{testCase.Property}}");
+                }
+                """;
+            var expected = $$"""
+                using UnityEngine;
+                {{testCase.Container}} ShaderUser{{index}}
+                {
+                    private static readonly int {{testCase.Field}} = UnityEngine.Shader.PropertyToID("{{testCase.Property}}");
+                    {{testCase.Existing}}
+                    int First() => {{testCase.Field}};
+                    int Second() => {{testCase.Field}};
+                }
+                """;
+            await VerifyFixAsync(source, DiagnosticIds.CacheShaderPropertyId, expected);
+        }
+
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Collections;
+            class Owner
+            {
+                void Create()
+                {
+                    var values = new NativeArray<int>(8, Allocator.Persistent);
+                }
+            }
+            """,
+            DiagnosticIds.UndisposedPersistentNativeContainer,
+            expected: true);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Collections;
+            class Owner
+            {
+                void Create()
+                {
+                    var values = new NativeArray<int>(8, Allocator.Persistent);
+                    values.Dispose();
+                }
+            }
+            """,
+            DiagnosticIds.UndisposedPersistentNativeContainer,
+            expected: false);
+
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Collections;
+            class Owner
+            {
+                NativeArray<int> Create()
+                {
+                    return new NativeArray<int>(8, Allocator.Temp);
+                }
+            }
+            """,
+            DiagnosticIds.InvalidTemporaryAllocatorEscape,
+            expected: true);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Collections;
+            class Owner
+            {
+                NativeArray<int> Create()
+                {
+                    var values = new NativeArray<int>(8, Allocator.TempJob);
+                    return values;
+                }
+            }
+            """,
+            DiagnosticIds.InvalidTemporaryAllocatorEscape,
+            expected: true);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Collections;
+            class Owner
+            {
+                private NativeArray<int> _values;
+                void Create()
+                {
+                    _values = new NativeArray<int>(8, Allocator.Temp);
+                }
+            }
+            """,
+            DiagnosticIds.InvalidTemporaryAllocatorEscape,
+            expected: true);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using System;
+            using Unity.Collections;
+            class Owner
+            {
+                Func<int> Create()
+                {
+                    var values = new NativeArray<int>(8, Allocator.TempJob);
+                    return () => values.Length;
+                }
+            }
+            """,
+            DiagnosticIds.InvalidTemporaryAllocatorEscape,
+            expected: true);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Collections;
+            class Owner
+            {
+                int Use()
+                {
+                    var values = new NativeArray<int>(8, Allocator.Temp);
+                    return values.Length;
+                }
+            }
+            """,
+            DiagnosticIds.InvalidTemporaryAllocatorEscape,
+            expected: false);
+
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                JobHandle Update() => new WorkJob().Schedule();
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """,
+            DiagnosticIds.DiscardedScheduledJobHandle,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Jobs;
+            namespace Other
+            {
+                static class LookAlike
+                {
+                    public static JobHandle Schedule() => default;
+                }
+            }
+            class Runner
+            {
+                void Update()
+                {
+                    Other.LookAlike.Schedule();
+                }
+            }
+            """,
+            DiagnosticIds.DiscardedScheduledJobHandle,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using Unity.Jobs;
+            namespace Unity.Entities
+            {
+                static class DependencyUpdatingApi
+                {
+                    public static JobHandle Schedule() => default;
+                }
+            }
+            class Runner
+            {
+                void Update()
+                {
+                    Unity.Entities.DependencyUpdatingApi.Schedule();
+                }
+            }
+            """,
+            DiagnosticIds.DiscardedScheduledJobHandle,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using UnityEngine;
+            class DynamicProperty
+            {
+                int Get(string name)
+                {
+                    var first = Shader.PropertyToID(name);
+                    return Shader.PropertyToID(name);
+                }
+            }
+            """,
+            DiagnosticIds.CacheShaderPropertyId,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            """
+            using UnityEngine;
+            class ScopedConstant
+            {
+                int Get()
+                {
+                    const string propertyName = "_Color";
+                    return Shader.PropertyToID(propertyName) + Shader.PropertyToID(propertyName);
+                }
+            }
+            """,
+            DiagnosticIds.CacheShaderPropertyId,
+            expected: false);
+    }
+
     private void VerifyCatalogIntegrity()
     {
         var descriptors = _analyzer.SupportedDiagnostics;
-        if (descriptors.Length != 70)
+        if (descriptors.Length != 74)
         {
-            throw new InvalidOperationException($"Expected 70 diagnostics, got {descriptors.Length}.");
+            throw new InvalidOperationException($"Expected 74 diagnostics, got {descriptors.Length}.");
         }
 
-        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 70)
+        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 74)
         {
             throw new InvalidOperationException("Diagnostic IDs must be unique.");
+        }
+
+        var expectedIds = Enumerable.Range(1, 74)
+            .Select(number => $"UBP{number:0000}")
+            .ToArray();
+        var actualIds = descriptors
+            .Select(descriptor => descriptor.Id)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+        if (!actualIds.SequenceEqual(expectedIds, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The stable diagnostic ID sequence changed: " + string.Join(", ", actualIds));
         }
 
         if (descriptors.Any(descriptor => descriptor.DefaultSeverity != DiagnosticSeverity.Info))
@@ -824,11 +1203,42 @@ internal sealed partial class AnalyzerTests
         }
 
         var fixableIds = _codeFix.FixableDiagnosticIds.ToImmutableHashSet(StringComparer.Ordinal);
-        var missingFixes = descriptors.Where(descriptor => !fixableIds.Contains(descriptor.Id)).ToArray();
+        var missingFixes = DiagnosticCatalog.All
+            .Where(metadata => metadata.HasCodeFix && !fixableIds.Contains(metadata.DiagnosticId))
+            .ToArray();
         if (missingFixes.Length != 0)
         {
             throw new InvalidOperationException(
-                "Every diagnostic must have a quick fix: " + string.Join(", ", missingFixes.Select(item => item.Id)));
+                "Every fixable diagnostic must have a quick fix: " +
+                string.Join(", ", missingFixes.Select(item => item.DiagnosticId)));
+        }
+
+        var unexpectedFixes = DiagnosticCatalog.All
+            .Where(metadata => !metadata.HasCodeFix && fixableIds.Contains(metadata.DiagnosticId))
+            .ToArray();
+        if (unexpectedFixes.Length != 0)
+        {
+            throw new InvalidOperationException(
+                "Diagnostic-only rules registered code fixes: " +
+                string.Join(", ", unexpectedFixes.Select(item => item.DiagnosticId)));
+        }
+
+        var fixAllIds = _codeFix.GetFixAllProvider()
+            .GetSupportedFixAllDiagnosticIds(_codeFix)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        var expectedFixAllIds = DiagnosticCatalog.All
+            .Where(rule => rule.SupportsFixAll)
+            .Select(rule => rule.DiagnosticId)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        if (!fixAllIds.SetEquals(expectedFixAllIds))
+        {
+            throw new InvalidOperationException("The Fix All provider must exactly match the safe rule catalog.");
+        }
+
+        if (DiagnosticCatalog.All.Any(rule =>
+                rule.Safety != RuleSafety.Safe && rule.SupportsFixAll))
+        {
+            throw new InvalidOperationException("Review-required and experimental rules cannot support Fix All.");
         }
     }
 
@@ -1370,6 +1780,13 @@ internal sealed partial class AnalyzerTests
 
         var action = actions.SingleOrDefault()
             ?? throw new InvalidOperationException($"No code fix was registered for {diagnosticId}.");
+        var expectedTitle = DiagnosticCatalog.Get(diagnosticId).FixTitle;
+        if (!string.Equals(action.Title, expectedTitle, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Unexpected code-action title for {diagnosticId}: '{action.Title}', expected '{expectedTitle}'.");
+        }
+
         var operations = await action.GetOperationsAsync(CancellationToken.None);
         var applyChanges = operations.OfType<ApplyChangesOperation>().Single();
         var changedDocument = applyChanges.ChangedSolution.GetDocument(document.Id)
@@ -1418,13 +1835,14 @@ internal sealed partial class AnalyzerTests
             DiagnosticIds.SystemApiQueryToJobEntitySchedule,
             DiagnosticIds.SystemApiQueryToJobEntityScheduleParallel);
         var failures = new List<string>();
-        foreach (var descriptor in _analyzer.SupportedDiagnostics)
+        complicatedFixes = complicatedFixes.Add(DiagnosticIds.CacheShaderPropertyId);
+        foreach (var metadata in DiagnosticCatalog.All.Where(metadata => metadata.HasCodeFix))
         {
-            _positiveCaseCounts.TryGetValue(descriptor.Id, out var count);
-            var required = complicatedFixes.Contains(descriptor.Id) ? 10 : 4;
+            _positiveCaseCounts.TryGetValue(metadata.DiagnosticId, out var count);
+            var required = complicatedFixes.Contains(metadata.DiagnosticId) ? 10 : 4;
             if (count < required)
             {
-                failures.Add(descriptor.Id + ": " + count + "/" + required);
+                failures.Add(metadata.DiagnosticId + ": " + count + "/" + required);
             }
         }
 
@@ -1444,6 +1862,374 @@ internal sealed partial class AnalyzerTests
         }
     }
 
+    private async Task VerifyConfigurationAsync()
+    {
+        const string threeAdds = """
+            using System.Collections.Generic;
+            class Builder
+            {
+                void Build()
+                {
+                    var values = new List<int>();
+                    values.Add(1);
+                    values.Add(2);
+                    values.Add(3);
+                }
+            }
+            """;
+
+        await VerifyDiagnosticPresenceAsync(
+            threeAdds,
+            DiagnosticIds.PreallocateList,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            threeAdds,
+            DiagnosticIds.PreallocateList,
+            expected: true,
+            """
+            root = true
+
+            [*.cs]
+            ubp_minimum_list_adds = 3
+            """);
+        await VerifyDiagnosticPresenceAsync(
+            threeAdds,
+            DiagnosticIds.PreallocateList,
+            expected: false,
+            """
+            root = true
+
+            [*.cs]
+            ubp_minimum_list_adds = invalid
+            """);
+        await VerifyDiagnosticPresenceAsync(
+            threeAdds,
+            DiagnosticIds.PreallocateList,
+            expected: true,
+            """
+            root = true
+
+            [*.cs]
+            ubp_minimum_list_adds = 8
+
+            [Test.cs]
+            ubp_minimum_list_adds = 3
+            """);
+
+        const string reviewRule = """
+            using UnityEngine;
+            class Distance
+            {
+                bool Near(Vector3 value) => value.magnitude < 5f;
+            }
+            """;
+        await VerifyDiagnosticPresenceAsync(
+            reviewRule,
+            DiagnosticIds.UseSquaredMagnitude,
+            expected: false,
+            """
+            root = true
+
+            [*.cs]
+            ubp_enable_review_required = false
+            """);
+
+        const string dotsSource = """
+            using Unity.Entities;
+
+            class JobRunner
+            {
+                void Update()
+                {
+                    new MovementJob().Run();
+                }
+            }
+
+            [Unity.Burst.BurstCompile]
+            partial struct MovementJob : IJobEntity
+            {
+                public void Execute(ref Position position) { }
+            }
+
+            struct Position : IComponentData { public float Value; }
+            """;
+        await VerifyDiagnosticPresenceAsync(
+            dotsSource,
+            DiagnosticIds.JobEntityRunToSchedule,
+            expected: false,
+            """
+            root = true
+
+            [*.cs]
+            ubp_enable_dots_migration = false
+            """);
+    }
+
+    private async Task VerifyEncapsulationSafetyAsync()
+    {
+        const string declaration = """
+            using UnityEngine;
+            public partial class PlayerSettings : MonoBehaviour
+            {
+                public float movementSpeed = 5f;
+            }
+            """;
+
+        await VerifyEncapsulationFixAvailabilityAsync(
+            declaration,
+            """
+            public class Consumer
+            {
+                float Read(PlayerSettings settings) => settings.movementSpeed;
+            }
+            """,
+            expectedFix: false);
+
+        await VerifyEncapsulationFixAvailabilityAsync(
+            declaration,
+            """
+            public sealed class SpecializedSettings : PlayerSettings
+            {
+                float Read() => movementSpeed;
+            }
+            """,
+            expectedFix: false);
+
+        await VerifyEncapsulationFixAvailabilityAsync(
+            declaration,
+            """
+            public class MetadataConsumer
+            {
+                string FieldName => nameof(PlayerSettings.movementSpeed);
+            }
+            """,
+            expectedFix: false);
+
+        await VerifyEncapsulationFixAvailabilityAsync(
+            declaration,
+            """
+            public partial class PlayerSettings
+            {
+                float Read() => movementSpeed;
+            }
+            """,
+            expectedFix: true);
+
+        await VerifyEncapsulationFixAvailabilityAsync(
+            """
+            using UnityEngine;
+            public class PlayerSettings : MonoBehaviour
+            {
+                public float movementSpeed = 5f;
+
+                private sealed class Reader
+                {
+                    float Read(PlayerSettings settings) => settings.movementSpeed;
+                }
+            }
+            """,
+            "public sealed class Unrelated { }",
+            expectedFix: true);
+    }
+
+    private async Task VerifyEncapsulationFixAvailabilityAsync(
+        string declaration,
+        string additionalSource,
+        bool expectedFix)
+    {
+        var document = CreateDocument(
+            declaration,
+            editorConfig: null,
+            additionalSource: additionalSource);
+        var diagnostics = await GetDiagnosticsAsync(document);
+        var diagnostic = diagnostics.Single(item => item.Id == DiagnosticIds.EncapsulateSerializedField);
+        var actions = new List<CodeAction>();
+        await _codeFix.RegisterCodeFixesAsync(
+            new CodeFixContext(
+                document,
+                diagnostic,
+                (action, _) => actions.Add(action),
+                CancellationToken.None));
+
+        if ((actions.Count != 0) != expectedFix)
+        {
+            throw new InvalidOperationException(
+                $"UBP0001 fix availability should be {expectedFix}, but {actions.Count} actions were offered.");
+        }
+    }
+
+    private async Task VerifyFixAllScopesAsync()
+    {
+        await VerifyFixAllScopeAsync(FixAllScope.Document, expectedFixedDocuments: 1);
+        await VerifyFixAllScopeAsync(FixAllScope.Project, expectedFixedDocuments: 2);
+        await VerifyFixAllScopeAsync(FixAllScope.Solution, expectedFixedDocuments: 3);
+    }
+
+    private async Task VerifyFixAllScopeAsync(FixAllScope scope, int expectedFixedDocuments)
+    {
+        var (solution, startingDocumentId) = CreateFixAllSolution();
+        var startingDocument = solution.GetDocument(startingDocumentId)
+            ?? throw new InvalidOperationException("Could not locate the Fix All starting document.");
+        var startingDiagnostic = (await GetDiagnosticsAsync(startingDocument))
+            .First(diagnostic => diagnostic.Id == DiagnosticIds.YieldNull);
+        var registeredActions = new List<CodeAction>();
+        await _codeFix.RegisterCodeFixesAsync(
+            new CodeFixContext(
+                startingDocument,
+                startingDiagnostic,
+                (action, _) => registeredActions.Add(action),
+                CancellationToken.None));
+        var equivalenceKey = registeredActions.Single().EquivalenceKey
+            ?? throw new InvalidOperationException("The representative safe fix has no equivalence key.");
+        var context = new FixAllContext(
+            startingDocument,
+            _codeFix,
+            scope,
+            equivalenceKey,
+            new[] { DiagnosticIds.YieldNull },
+            new AnalyzerDiagnosticProvider(_analyzer, DiagnosticIds.YieldNull),
+            CancellationToken.None);
+        var action = await _codeFix.GetFixAllProvider().GetFixAsync(context)
+            ?? throw new InvalidOperationException($"No {scope} Fix All action was created.");
+        var operations = await action.GetOperationsAsync(CancellationToken.None);
+        var changedSolution = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution;
+
+        var fixedDocuments = 0;
+        var unchangedDocuments = 0;
+        foreach (var project in changedSolution.Projects)
+        {
+            foreach (var document in project.Documents.Where(document => document.Name != "UnityStubs.cs"))
+            {
+                var text = (await document.GetTextAsync()).ToString();
+                if (text.Contains("yield return null;", StringComparison.Ordinal) &&
+                    !text.Contains("yield return 0;", StringComparison.Ordinal))
+                {
+                    fixedDocuments++;
+                }
+                else if (text.Contains("yield return 0;", StringComparison.Ordinal))
+                {
+                    unchangedDocuments++;
+                }
+            }
+        }
+
+        if (fixedDocuments != expectedFixedDocuments || unchangedDocuments != 3 - expectedFixedDocuments)
+        {
+            throw new InvalidOperationException(
+                $"{scope} Fix All fixed {fixedDocuments} documents and left {unchangedDocuments}; expected {expectedFixedDocuments} and {3 - expectedFixedDocuments}.");
+        }
+    }
+
+    private static (Solution Solution, DocumentId StartingDocumentId) CreateFixAllSolution()
+    {
+        var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+        DocumentId? startingDocumentId = null;
+        for (var projectIndex = 0; projectIndex < 2; projectIndex++)
+        {
+            var projectId = ProjectId.CreateNewId();
+            solution = solution
+                .AddProject(projectId, $"FixAllProject{projectIndex}", $"FixAllProject{projectIndex}", LanguageNames.CSharp)
+                .WithProjectCompilationOptions(
+                    projectId,
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                .WithProjectParseOptions(projectId, new CSharpParseOptions(LanguageVersion.CSharp9));
+            foreach (var reference in GetPlatformReferences())
+            {
+                solution = solution.AddMetadataReference(projectId, reference);
+            }
+
+            solution = solution.AddDocument(
+                DocumentId.CreateNewId(projectId),
+                "UnityStubs.cs",
+                SourceText.From(UnityStubs));
+            var documentCount = projectIndex == 0 ? 2 : 1;
+            for (var documentIndex = 0; documentIndex < documentCount; documentIndex++)
+            {
+                var documentId = DocumentId.CreateNewId(projectId);
+                startingDocumentId ??= documentId;
+                var typeSuffix = projectIndex * 2 + documentIndex;
+                solution = solution.AddDocument(
+                    documentId,
+                    $"Coroutine{typeSuffix}.cs",
+                    SourceText.From(
+                        $$"""
+                        using System.Collections;
+                        using UnityEngine;
+                        class Coroutine{{typeSuffix}} : MonoBehaviour
+                        {
+                            IEnumerator Run()
+                            {
+                                yield return 0;
+                                yield return 0;
+                            }
+                        }
+                        """));
+            }
+        }
+
+        return (
+            solution,
+            startingDocumentId ?? throw new InvalidOperationException("No Fix All document was created."));
+    }
+
+    private sealed class AnalyzerDiagnosticProvider : FixAllContext.DiagnosticProvider
+    {
+        private readonly DiagnosticAnalyzer _analyzer;
+        private readonly string _diagnosticId;
+
+        internal AnalyzerDiagnosticProvider(DiagnosticAnalyzer analyzer, string diagnosticId)
+        {
+            _analyzer = analyzer;
+            _diagnosticId = diagnosticId;
+        }
+
+        public override async Task<IEnumerable<Diagnostic>> GetDocumentDiagnosticsAsync(
+            Document document,
+            CancellationToken cancellationToken)
+        {
+            var syntaxTree = await document.GetSyntaxTreeAsync(cancellationToken);
+            return (await GetAllDiagnosticsAsync(document.Project, cancellationToken))
+                .Where(diagnostic => diagnostic.Location.SourceTree == syntaxTree);
+        }
+
+        public override async Task<IEnumerable<Diagnostic>> GetProjectDiagnosticsAsync(
+            Project project,
+            CancellationToken cancellationToken) =>
+            (await GetAllDiagnosticsAsync(project, cancellationToken))
+                .Where(diagnostic => diagnostic.Location == Location.None);
+
+        public override async Task<IEnumerable<Diagnostic>> GetAllDiagnosticsAsync(
+            Project project,
+            CancellationToken cancellationToken)
+        {
+            var compilation = await project.GetCompilationAsync(cancellationToken)
+                ?? throw new InvalidOperationException("Could not compile the Fix All project.");
+            return (await compilation
+                    .WithAnalyzers(
+                        ImmutableArray.Create(_analyzer),
+                        project.AnalyzerOptions,
+                        cancellationToken)
+                    .GetAnalyzerDiagnosticsAsync(cancellationToken))
+                .Where(diagnostic => diagnostic.Id == _diagnosticId);
+        }
+    }
+
+    private async Task VerifyDiagnosticPresenceAsync(
+        string source,
+        string diagnosticId,
+        bool expected,
+        string? editorConfig = null)
+    {
+        var diagnostics = await GetDiagnosticsAsync(CreateDocument(source, editorConfig));
+        var present = diagnostics.Any(diagnostic => diagnostic.Id == diagnosticId);
+        if (present != expected)
+        {
+            throw new InvalidOperationException(
+                $"Expected {diagnosticId} presence to be {expected}, got: {FormatDiagnostics(diagnostics)}");
+        }
+    }
+
     private async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(Document document)
     {
         var compilation = await document.Project.GetCompilationAsync()
@@ -1455,7 +2241,9 @@ internal sealed partial class AnalyzerTests
         }
 
         var diagnostics = await compilation
-            .WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(_analyzer))
+            .WithAnalyzers(
+                ImmutableArray.Create<DiagnosticAnalyzer>(_analyzer),
+                document.Project.AnalyzerOptions)
             .GetAnalyzerDiagnosticsAsync();
         foreach (var diagnostic in diagnostics)
         {
@@ -1465,9 +2253,13 @@ internal sealed partial class AnalyzerTests
         return diagnostics;
     }
 
-    private static Document CreateDocument(string source)
+    private static Document CreateDocument(
+        string source,
+        string? editorConfig = null,
+        string? additionalSource = null)
     {
         var workspace = new AdhocWorkspace();
+        var virtualProjectDirectory = Path.Combine(Path.GetTempPath(), "UnityBestPracticesAnalyzerTests");
         var projectId = ProjectId.CreateNewId();
         var stubsDocumentId = DocumentId.CreateNewId(projectId);
         var documentId = DocumentId.CreateNewId(projectId);
@@ -1490,7 +2282,27 @@ internal sealed partial class AnalyzerTests
         solution = solution.AddDocument(
             documentId,
             "Test.cs",
-            SourceText.From(source));
+            SourceText.From(source),
+            filePath: Path.Combine(virtualProjectDirectory, "Test.cs"));
+        if (additionalSource != null)
+        {
+            solution = solution.AddDocument(
+                DocumentId.CreateNewId(projectId),
+                "Additional.cs",
+                SourceText.From(additionalSource),
+                filePath: Path.Combine(virtualProjectDirectory, "Additional.cs"));
+        }
+
+        if (editorConfig != null)
+        {
+            var configDocumentId = DocumentId.CreateNewId(projectId);
+            solution = solution.AddAnalyzerConfigDocument(
+                configDocumentId,
+                ".editorconfig",
+                SourceText.From(editorConfig),
+                filePath: Path.Combine(virtualProjectDirectory, ".editorconfig"));
+        }
+
         return solution.GetDocument(documentId)
             ?? throw new InvalidOperationException("Could not create the test document.");
     }
