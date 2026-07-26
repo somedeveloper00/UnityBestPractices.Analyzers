@@ -568,8 +568,8 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             .ToArray();
         if (container is null ||
             intermediateStatements.Any(PreventsRefLocalRewrite) ||
-            ReferencesSymbol(intermediateStatements, container, semanticModel, cancellationToken) ||
-            indexSymbol is not null && ReferencesSymbol(intermediateStatements, indexSymbol, semanticModel, cancellationToken) ||
+            HasUnsafeContainerUse(intermediateStatements, container, semanticModel, cancellationToken) ||
+            indexSymbol is not null && IsSymbolMutated(intermediateStatements, indexSymbol, semanticModel, cancellationToken) ||
             !MutatesLocal(intermediateStatements, local, semanticModel, cancellationToken))
         {
             return false;
@@ -1182,10 +1182,10 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             expressionStatement.Expression is not AssignmentExpressionSyntax
             {
                 RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
-                Left: ElementAccessExpressionSyntax target,
+                Left: ExpressionSyntax target,
                 Right: IdentifierNameSyntax value,
             } ||
-            !SyntaxFactory.AreEquivalent(originalElement, target) ||
+            !IsMatchingWriteBackTarget(originalElement, target, semanticModel, cancellationToken) ||
             !SymbolEqualityComparer.Default.Equals(
                 semanticModel.GetSymbolInfo(value, cancellationToken).Symbol,
                 local))
@@ -1195,6 +1195,39 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
 
         writeBack = expressionStatement;
         return true;
+    }
+
+    private static bool IsMatchingWriteBackTarget(
+        ElementAccessExpressionSyntax originalElement,
+        ExpressionSyntax target,
+        SemanticModel semanticModel,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        if (target is ElementAccessExpressionSyntax targetElement)
+        {
+            return SyntaxFactory.AreEquivalent(originalElement, targetElement);
+        }
+
+        if (target is not InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax
+                {
+                    Expression: var receiver,
+                    Name: IdentifierNameSyntax { Identifier.ValueText: "ElementAt" },
+                },
+                ArgumentList.Arguments.Count: 1,
+            } invocation ||
+            originalElement.ArgumentList.Arguments.Count != 1 ||
+            !SyntaxFactory.AreEquivalent(originalElement.Expression, receiver) ||
+            !SyntaxFactory.AreEquivalent(
+                originalElement.ArgumentList.Arguments[0].Expression,
+                invocation.ArgumentList.Arguments[0].Expression) ||
+            semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        {
+            return false;
+        }
+
+        return method.ReturnsByRef && !method.ReturnsByRefReadonly;
     }
 
     private static bool PreventsRefLocalRewrite(StatementSyntax statement) =>
@@ -1212,15 +1245,77 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             node is AnonymousFunctionExpressionSyntax ||
             node is LocalFunctionStatementSyntax);
 
-    private static bool ReferencesSymbol(
+    private static bool HasUnsafeContainerUse(
+        StatementSyntax[] statements,
+        ISymbol symbol,
+        SemanticModel semanticModel,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        foreach (var identifier in statements
+                     .SelectMany(statement => statement.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+                     .Where(identifier => SymbolEqualityComparer.Default.Equals(
+                         semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                         symbol)))
+        {
+            // Reading another value through the same indexer does not move or
+            // replace the ref target. Other receiver uses remain conservative:
+            // a DynamicBuffer method call, a ref argument, or reassignment can
+            // invalidate the element reference before the original write-back.
+            if (identifier.Parent is not ElementAccessExpressionSyntax elementAccess ||
+                elementAccess.Expression != identifier ||
+                IsExpressionMutated(elementAccess))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSymbolMutated(
         StatementSyntax[] statements,
         ISymbol symbol,
         SemanticModel semanticModel,
         System.Threading.CancellationToken cancellationToken) =>
         statements.SelectMany(statement => statement.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
-            .Any(identifier => SymbolEqualityComparer.Default.Equals(
+            .Where(identifier => SymbolEqualityComparer.Default.Equals(
                 semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
-                symbol));
+                symbol))
+            .Any(IsExpressionMutated);
+
+    private static bool IsExpressionMutated(ExpressionSyntax expression)
+    {
+        for (SyntaxNode? current = expression;
+             current is ExpressionSyntax ||
+             current is ArgumentSyntax;
+             current = current.Parent)
+        {
+            if (current.Parent is AssignmentExpressionSyntax assignment &&
+                assignment.Left.Span.Contains(expression.Span))
+            {
+                return true;
+            }
+
+            if (current.Parent is PrefixUnaryExpressionSyntax prefix &&
+                (prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
+                 prefix.IsKind(SyntaxKind.PreDecrementExpression)) ||
+                current.Parent is PostfixUnaryExpressionSyntax postfix &&
+                (postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
+                 postfix.IsKind(SyntaxKind.PostDecrementExpression)))
+            {
+                return true;
+            }
+
+            if (current is ArgumentSyntax argument &&
+                (argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
+                 argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool MutatesLocal(
         StatementSyntax[] statements,

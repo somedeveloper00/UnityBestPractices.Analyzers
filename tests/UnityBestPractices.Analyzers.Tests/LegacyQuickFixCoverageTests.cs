@@ -173,6 +173,82 @@ internal sealed partial class AnalyzerTests
             "struct CopyOnly<T> where T : struct { public T this[int index] { get => default; set { } } } struct CopyOnlyItem { public int Value; } class CopyOnlyMutator { void Change(CopyOnly<CopyOnlyItem> items) { var item = items[2]; item.Value = 1; items[2] = item; } }",
             DiagnosticIds.UseRefLocal,
             expected: false);
+
+        await VerifyFixAsync(
+            """
+            using Unity.Entities;
+            struct SpellRuntimeData : IBufferElementData
+            {
+                public short IndexInWheel;
+                public float CooldownTime;
+                public bool IsInRange;
+            }
+
+            class SpellSystem
+            {
+                void Update(DynamicBuffer<SpellRuntimeData> spellsIdList, float deltaTime)
+                {
+                    for (int i = 0; i < spellsIdList.Length; ++i)
+                    {
+                        if (spellsIdList[i].IndexInWheel == short.MaxValue)
+                            continue;
+
+                        var newCombatWheelData = spellsIdList[i];
+                        if (newCombatWheelData.CooldownTime > 0)
+                        {
+                            newCombatWheelData.CooldownTime -= deltaTime;
+                        }
+
+                        var currentIndex = spellsIdList[i].IndexInWheel;
+                        newCombatWheelData.IsInRange = currentIndex >= 0;
+                        spellsIdList.ElementAt(i) = newCombatWheelData;
+                    }
+                }
+            }
+            """,
+            DiagnosticIds.UseRefLocal,
+            """
+            using Unity.Entities;
+            struct SpellRuntimeData : IBufferElementData
+            {
+                public short IndexInWheel;
+                public float CooldownTime;
+                public bool IsInRange;
+            }
+
+            class SpellSystem
+            {
+                void Update(DynamicBuffer<SpellRuntimeData> spellsIdList, float deltaTime)
+                {
+                    for (int i = 0; i < spellsIdList.Length; ++i)
+                    {
+                        if (spellsIdList[i].IndexInWheel == short.MaxValue)
+                            continue;
+
+                        ref var newCombatWheelData = ref spellsIdList.ElementAt(i);
+                        if (newCombatWheelData.CooldownTime > 0)
+                        {
+                            newCombatWheelData.CooldownTime -= deltaTime;
+                        }
+
+                        var currentIndex = spellsIdList[i].IndexInWheel;
+                        newCombatWheelData.IsInRange = currentIndex >= 0;
+                    }
+                }
+            }
+            """);
+
+        // The target must remain stable until the copy-back. Changing the index
+        // or invoking a potentially mutating buffer member can change or
+        // invalidate the element a ref local would point at.
+        await VerifyDiagnosticPresenceAsync(
+            "struct MovingItem { public int Value; } class MovingMutator { void Change(MovingItem[] items, int index) { var item = items[index]; item.Value++; index++; items[index] = item; } }",
+            DiagnosticIds.UseRefLocal,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            "using Unity.Entities; struct ClearedItem : IBufferElementData { public int Value; } class ClearedMutator { void Change(DynamicBuffer<ClearedItem> items, int index) { var item = items[index]; item.Value++; items.Clear(); items.ElementAt(index) = item; } }",
+            DiagnosticIds.UseRefLocal,
+            expected: false);
     }
 
     private async Task VerifyCameraCacheCasesAsync()

@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.10] - 2026-07-26
+
+### Fixed
+
+- UBP0007 now recognizes `DynamicBuffer<T>` copy-modify-write-back patterns
+  whose final assignment uses the ref-returning `ElementAt(int)`, including
+  loops that safely read another buffered element before the write-back.
+
 ## [0.4.9] - 2026-07-26
 
 ### Fixed
