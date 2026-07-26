@@ -77,4 +77,5 @@ public static class DiagnosticIds
     public const string UndisposedPersistentNativeContainer = "UBP0072";
     public const string InvalidTemporaryAllocatorEscape = "UBP0073";
     public const string CacheShaderPropertyId = "UBP0074";
+    public const string MatchFolderNamespace = "UBP0075";
 }

@@ -49,7 +49,8 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             UninitializedNativeArrayRule)
         .AddRange(ExpressionQuickFixRegistry.Descriptors)
         .AddRange(DotsQueryRules.Descriptors)
-        .AddRange(AdvancedUnityRules.Descriptors);
+        .AddRange(AdvancedUnityRules.Descriptors)
+        .Add(NamespaceConsistencyRules.Descriptor);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -93,6 +94,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
                 SyntaxKind.LessThanOrEqualExpression,
                 SyntaxKind.GreaterThanExpression,
                 SyntaxKind.GreaterThanOrEqualExpression);
+            startContext.RegisterCompilationEndAction(NamespaceConsistencyRules.AnalyzeCompilation);
         });
     }
 
@@ -1104,7 +1106,12 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
                 method.Parameters[0].Type.SpecialType == SpecialType.System_Int32);
         if (elementAt is null)
         {
-            return false;
+            return TryCreateNativeArraySpanTarget(
+                elementAccess,
+                namedType,
+                semanticModel,
+                cancellationToken,
+                out refTarget);
         }
 
         refTarget = SyntaxFactory.InvocationExpression(
@@ -1113,6 +1120,52 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
                 elementAccess.Expression.WithoutTrivia(),
                 SyntaxFactory.IdentifierName("ElementAt")),
             SyntaxFactory.ArgumentList(elementAccess.ArgumentList.Arguments));
+        return true;
+    }
+
+    private static bool TryCreateNativeArraySpanTarget(
+        ElementAccessExpressionSyntax elementAccess,
+        INamedTypeSymbol receiverType,
+        SemanticModel semanticModel,
+        System.Threading.CancellationToken cancellationToken,
+        out ExpressionSyntax refTarget)
+    {
+        refTarget = null!;
+        var nativeArrayType = semanticModel.Compilation.GetTypeByMetadataName(
+            "Unity.Collections.NativeArray`1");
+        var spanType = semanticModel.Compilation.GetTypeByMetadataName("System.Span`1");
+        var elementType = semanticModel.GetTypeInfo(elementAccess, cancellationToken).Type;
+        if (nativeArrayType is null ||
+            spanType is null ||
+            elementType is null ||
+            !SymbolEqualityComparer.Default.Equals(receiverType.OriginalDefinition, nativeArrayType))
+        {
+            return false;
+        }
+
+        var asSpan = receiverType.GetMembers("AsSpan")
+            .OfType<IMethodSymbol>()
+            .FirstOrDefault(method =>
+                !method.IsStatic &&
+                method.DeclaredAccessibility == Accessibility.Public &&
+                method.Parameters.Length == 0 &&
+                method.ReturnType is INamedTypeSymbol returnedSpan &&
+                SymbolEqualityComparer.Default.Equals(returnedSpan.OriginalDefinition, spanType) &&
+                returnedSpan.TypeArguments.Length == 1 &&
+                SymbolEqualityComparer.Default.Equals(returnedSpan.TypeArguments[0], elementType));
+        if (asSpan is null)
+        {
+            return false;
+        }
+
+        var spanInvocation = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                elementAccess.Expression.WithoutTrivia(),
+                SyntaxFactory.IdentifierName("AsSpan")));
+        refTarget = SyntaxFactory.ElementAccessExpression(
+            spanInvocation,
+            SyntaxFactory.BracketedArgumentList(elementAccess.ArgumentList.Arguments));
         return true;
     }
 

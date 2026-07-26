@@ -33,5 +33,6 @@ The central catalog is authoritative. This document records why rules currently 
 | UBP0068 | `IJobEntity.Schedule` to `ScheduleParallel` changes worker concurrency and component access requirements. |
 | UBP0069 | `IJobEntity.ScheduleParallel` to `Run` removes parallelism and introduces immediate execution. |
 | UBP0070 | `IJobEntity.ScheduleParallel` to `Schedule` changes parallel scheduling to a single scheduled job. |
+| UBP0075 | Adding a namespace changes type identity and can affect serialized type names, external references, reflection, and Unity asset bindings even when neighboring files establish a clear convention. |
 
 Safe rules may still omit Fix All when one code action rewrites multiple locations or generates names that could conflict with independently batched actions. UBP0071 and UBP0074 use that conservative policy.

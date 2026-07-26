@@ -14,6 +14,8 @@ internal enum DotsParameterAccess
 {
     ReadOnly,
     ReadWrite,
+    BufferReadOnly,
+    BufferReadWrite,
     Entity,
     EntityIndexInQuery,
 }
@@ -42,8 +44,10 @@ internal sealed class DotsQueryParameter
 
     internal string JobParameter => Access switch
     {
-        DotsParameterAccess.ReadWrite => "ref " + TypeName + " " + Name,
-        DotsParameterAccess.ReadOnly => "in " + TypeName + " " + Name,
+        DotsParameterAccess.ReadWrite or DotsParameterAccess.BufferReadWrite =>
+            "ref " + TypeName + " " + Name,
+        DotsParameterAccess.ReadOnly or DotsParameterAccess.BufferReadOnly =>
+            "in " + TypeName + " " + Name,
         DotsParameterAccess.EntityIndexInQuery =>
             "[Unity.Entities.EntityIndexInQuery] int " + Name,
         _ => TypeName + " " + Name,
@@ -53,6 +57,7 @@ internal sealed class DotsQueryParameter
     {
         DotsParameterAccess.ReadWrite => "Unity.Entities.RefRW<" + TypeName + ">",
         DotsParameterAccess.ReadOnly => "Unity.Entities.RefRO<" + TypeName + ">",
+        DotsParameterAccess.BufferReadOnly or DotsParameterAccess.BufferReadWrite => TypeName,
         _ => string.Empty,
     };
 }
@@ -240,6 +245,9 @@ internal sealed class EntitiesForEachQuery
         var entityType = UnitySymbolCache.GetTypeByMetadataName(
             semanticModel.Compilation,
             "Unity.Entities.Entity");
+        var dynamicBufferType = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Entities.DynamicBuffer`1");
         var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
         if (componentData is null || entityType is null)
         {
@@ -271,7 +279,22 @@ internal sealed class EntitiesForEachQuery
                 access = DotsParameterAccess.EntityIndexInQuery;
             }
             else if (symbol.Type is INamedTypeSymbol namedType &&
-                     namedType.AllInterfaces.Any(@interface =>
+                     dynamicBufferType is not null &&
+                     SymbolEqualityComparer.Default.Equals(
+                         namedType.OriginalDefinition,
+                         dynamicBufferType))
+            {
+                if (symbol.RefKind != RefKind.Ref && symbol.RefKind != RefKind.In)
+                {
+                    return false;
+                }
+
+                access = symbol.RefKind == RefKind.Ref
+                    ? DotsParameterAccess.BufferReadWrite
+                    : DotsParameterAccess.BufferReadOnly;
+            }
+            else if (symbol.Type is INamedTypeSymbol componentNamedType &&
+                     componentNamedType.AllInterfaces.Any(@interface =>
                          SymbolEqualityComparer.Default.Equals(@interface, componentData)))
             {
                 access = symbol.RefKind == RefKind.Ref
@@ -353,12 +376,24 @@ internal sealed class EntitiesForEachQuery
                 parameter.Access != DotsParameterAccess.EntityIndexInQuery)
             .ToImmutableArray();
         var entityParameter = Parameters.FirstOrDefault(parameter => parameter.Access == DotsParameterAccess.Entity);
-        if (Parameters.Any(parameter => parameter.Access == DotsParameterAccess.EntityIndexInQuery))
+        var entityIndexParameter = Parameters.FirstOrDefault(
+            parameter => parameter.Access == DotsParameterAccess.EntityIndexInQuery);
+        if (componentParameters.Any(
+                parameter => parameter.Access == DotsParameterAccess.BufferReadOnly))
         {
+            // SystemAPI.Query<DynamicBuffer<T>> always requests read-write access.
+            // Converting an `in DynamicBuffer<T>` parameter would silently broaden
+            // the query's dependency and write-access semantics.
             return false;
         }
+
         if (HasStructuralChanges)
         {
+            if (entityIndexParameter is not null)
+            {
+                return false;
+            }
+
             return componentParameters.Length == 0 &&
                    entityParameter is not null &&
                    TryCreateStructuralEntitySnapshot(semanticModel, out statement);
@@ -401,6 +436,12 @@ internal sealed class EntitiesForEachQuery
                     SymbolEqualityComparer.Default.Equals(
                         semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
                         item.Symbol));
+                if (parameter.Access == DotsParameterAccess.BufferReadOnly ||
+                    parameter.Access == DotsParameterAccess.BufferReadWrite)
+                {
+                    return identifier;
+                }
+
                 var valueProperty = parameter.Access == DotsParameterAccess.ReadWrite ? "ValueRW" : "ValueRO";
                 return SyntaxFactory.MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
@@ -423,9 +464,27 @@ internal sealed class EntitiesForEachQuery
         var iterationVariable = variableNames.Count == 1
             ? "var " + variableNames[0]
             : "var (" + string.Join(", ", variableNames) + ")";
-        statement = SyntaxFactory.ParseStatement(
+        var loopText =
             "foreach (" + iterationVariable + " in " + queryText + ")\n" +
-            rewrittenBody.ToFullString());
+            rewrittenBody.ToFullString();
+        if (entityIndexParameter is null)
+        {
+            statement = SyntaxFactory.ParseStatement(loopText);
+            return !statement.ContainsDiagnostics;
+        }
+
+        var counterName = CreateUniqueLocalName(entityIndexParameter.Name + "Counter");
+        rewrittenBody = rewrittenBody.WithStatements(
+            rewrittenBody.Statements.Insert(
+                0,
+                SyntaxFactory.ParseStatement(
+                    "var " + entityIndexParameter.Name + " = " + counterName + "++;")));
+        statement = SyntaxFactory.ParseStatement(
+            "{\n" +
+            "var " + counterName + " = 0;\n" +
+            "foreach (" + iterationVariable + " in " + queryText + ")\n" +
+            rewrittenBody.ToFullString() +
+            "\n}");
         return !statement.ContainsDiagnostics;
     }
 

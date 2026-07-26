@@ -43,8 +43,8 @@ public sealed class UBP0002Tests
                 """,
             ReferenceAssemblies = ReferenceAssemblies.Net.Net60,
         };
-        test.TestState.Sources.Add(TestSources.UnityEngine);
-        test.FixedState.Sources.Add(TestSources.UnityEngine);
+        test.TestState.Sources.Add(("UnityEngine.g.cs", TestSources.UnityEngine));
+        test.FixedState.Sources.Add(("UnityEngine.g.cs", TestSources.UnityEngine));
         test.ExpectedDiagnostics.Add(
             VerifyCS.Diagnostic(DiagnosticIds.YieldNull).WithLocation(0));
 

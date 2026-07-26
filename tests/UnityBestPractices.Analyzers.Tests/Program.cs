@@ -127,8 +127,15 @@ internal sealed partial class AnalyzerTests
         namespace Unity.Entities
         {
             public interface IComponentData { }
+            public interface IBufferElementData { }
             public interface IJobEntity { }
             public struct Entity { }
+
+            public struct DynamicBuffer<T> where T : struct, IBufferElementData
+            {
+                public int Length => 0;
+                public void Clear() { }
+            }
 
             public enum EntityQueryOptions { Default, IncludeDisabledEntities }
 
@@ -207,6 +214,19 @@ internal sealed partial class AnalyzerTests
                 int entityInQueryIndex,
                 in T value)
                 where T : struct, IComponentData;
+            public delegate void EntityIndexComponentsBufferAction<T1, T2, TBuffer, T3, T4>(
+                Entity entity,
+                int entityInQueryIndex,
+                ref T1 first,
+                ref T2 second,
+                ref DynamicBuffer<TBuffer> buffer,
+                in T3 third,
+                in T4 fourth)
+                where T1 : struct, IComponentData
+                where T2 : struct, IComponentData
+                where TBuffer : struct, IBufferElementData
+                where T3 : struct, IComponentData
+                where T4 : struct, IComponentData;
 
             public struct EntitiesBuilder
             {
@@ -228,6 +248,13 @@ internal sealed partial class AnalyzerTests
                     where T2 : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(EntityIndexInAction<T> action)
                     where T : struct, IComponentData => default;
+                public ForEachDescription ForEach<T1, T2, TBuffer, T3, T4>(
+                    EntityIndexComponentsBufferAction<T1, T2, TBuffer, T3, T4> action)
+                    where T1 : struct, IComponentData
+                    where T2 : struct, IComponentData
+                    where TBuffer : struct, IBufferElementData
+                    where T3 : struct, IComponentData
+                    where T4 : struct, IComponentData => default;
             }
 
             public struct ForEachDescription
@@ -249,6 +276,8 @@ internal sealed partial class AnalyzerTests
                 public static TimeData Time => default;
                 public static QueryEnumerable<T1> Query<T1>() => default;
                 public static QueryEnumerable<T1, T2> Query<T1, T2>() => default;
+                public static QueryEnumerable<T1, T2, T3, T4, T5> Query<T1, T2, T3, T4, T5>() =>
+                    default;
                 public static SystemAPIQueryBuilder QueryBuilder() => default;
             }
 
@@ -317,6 +346,33 @@ internal sealed partial class AnalyzerTests
                     public bool MoveNext() => false;
                 }
             }
+
+            public struct QueryEnumerable<T1, T2, T3, T4, T5>
+            {
+                public QueryEnumerable<T1, T2, T3, T4, T5> WithAll<T>() => this;
+                public QueryEnumerable<T1, T2, T3, T4, T5> WithAny<T>() => this;
+                public QueryEnumerable<T1, T2, T3, T4, T5> WithNone<T>() => this;
+                public QueryEnumerable<T1, T2, T3, T4, T5> WithChangeFilter<T>() => this;
+                public QueryEnumerable<T1, T2, T3, T4, T5> WithOptions(EntityQueryOptions options) =>
+                    this;
+                public QueryEnumerableWithEntity<T1, T2, T3, T4, T5> WithEntityAccess() => default;
+                public Enumerator GetEnumerator() => default;
+                public struct Enumerator
+                {
+                    public (T1, T2, T3, T4, T5) Current => default;
+                    public bool MoveNext() => false;
+                }
+            }
+
+            public struct QueryEnumerableWithEntity<T1, T2, T3, T4, T5>
+            {
+                public Enumerator GetEnumerator() => default;
+                public struct Enumerator
+                {
+                    public (T1, T2, T3, T4, T5, Entity) Current => default;
+                    public bool MoveNext() => false;
+                }
+            }
         }
 
         namespace Unity.Collections
@@ -348,6 +404,7 @@ internal sealed partial class AnalyzerTests
                     set => _items[index] = value;
                 }
 
+                public System.Span<T> AsSpan() => _items;
                 public void Dispose() { }
                 public Enumerator GetEnumerator() => default;
                 public struct Enumerator
@@ -391,6 +448,7 @@ internal sealed partial class AnalyzerTests
         await VerifyConfigurationAsync();
         await VerifyEncapsulationSafetyAsync();
         await VerifyFixAllScopesAsync();
+        await VerifyNamespaceConsistencyAsync();
 
         await VerifyFixAsync(
             """
@@ -672,6 +730,36 @@ internal sealed partial class AnalyzerTests
                 {
                     ref var particle = ref particles.ElementAt(0);
                     particle.Health -= 1;
+                }
+            }
+            """);
+
+        await VerifyFixAsync(
+            """
+            using Unity.Collections;
+            struct NetCodeConnectionEvent { public int ConnectionEntity; }
+            class ConnectionEvents
+            {
+                void Reset()
+                {
+                    NativeArray<NetCodeConnectionEvent> test = new();
+                    var item = test[2];
+                    item.ConnectionEntity = default;
+                    test[2] = item;
+                }
+            }
+            """,
+            DiagnosticIds.UseRefLocal,
+            """
+            using Unity.Collections;
+            struct NetCodeConnectionEvent { public int ConnectionEntity; }
+            class ConnectionEvents
+            {
+                void Reset()
+                {
+                    NativeArray<NetCodeConnectionEvent> test = new();
+                    ref var item = ref test.AsSpan()[2];
+                    item.ConnectionEntity = default;
                 }
             }
             """);
@@ -1238,17 +1326,17 @@ internal sealed partial class AnalyzerTests
     private void VerifyCatalogIntegrity()
     {
         var descriptors = _analyzer.SupportedDiagnostics;
-        if (descriptors.Length != 74)
+        if (descriptors.Length != 75)
         {
-            throw new InvalidOperationException($"Expected 74 diagnostics, got {descriptors.Length}.");
+            throw new InvalidOperationException($"Expected 75 diagnostics, got {descriptors.Length}.");
         }
 
-        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 74)
+        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 75)
         {
             throw new InvalidOperationException("Diagnostic IDs must be unique.");
         }
 
-        var expectedIds = Enumerable.Range(1, 74)
+        var expectedIds = Enumerable.Range(1, 75)
             .Select(number => $"UBP{number:0000}")
             .ToArray();
         var actualIds = descriptors
@@ -1904,9 +1992,17 @@ internal sealed partial class AnalyzerTests
             struct Position : IComponentData { public float Value; }
             """.Replace("TARGET_MODE", targetMode, StringComparison.Ordinal));
 
-    private async Task VerifyFixAsync(string source, string diagnosticId, string expected)
+    private async Task VerifyFixAsync(
+        string source,
+        string diagnosticId,
+        string expected,
+        string? additionalSource = null,
+        string? secondAdditionalSource = null)
     {
-        var document = CreateDocument(source);
+        var document = CreateDocument(
+            source,
+            additionalSource: additionalSource,
+            secondAdditionalSource: secondAdditionalSource);
         var diagnostics = await GetDiagnosticsAsync(document);
         var diagnostic = diagnostics.SingleOrDefault(item => item.Id == diagnosticId)
             ?? throw new InvalidOperationException($"Expected {diagnosticId}, got: {FormatDiagnostics(diagnostics)}");
@@ -2001,6 +2097,102 @@ internal sealed partial class AnalyzerTests
         if (!diagnostics.IsEmpty)
         {
             throw new InvalidOperationException($"Expected no analyzer diagnostics, got: {FormatDiagnostics(diagnostics)}");
+        }
+    }
+
+    private async Task VerifyNamespaceConsistencyAsync()
+    {
+        const string firstNeighbor = """
+            namespace Game.Player
+            {
+                class ExistingController { }
+            }
+            """;
+        const string secondNeighbor = """
+            namespace Game.Player
+            {
+                struct ExistingState { }
+            }
+            """;
+
+        await VerifyFixAsync(
+            "class PlayerController { }",
+            DiagnosticIds.MatchFolderNamespace,
+            """
+            namespace Game.Player
+            {
+                class PlayerController { }
+            }
+            """,
+            firstNeighbor);
+        await VerifyFixAsync(
+            "using System;\nclass PlayerClock { DateTime Value; }",
+            DiagnosticIds.MatchFolderNamespace,
+            """
+            using System;
+            namespace Game.Player
+            {
+                class PlayerClock { DateTime Value; }
+            }
+            """,
+            firstNeighbor,
+            secondNeighbor);
+        await VerifyFixAsync(
+            "class PlayerInput { }\nstruct PlayerCommand { }",
+            DiagnosticIds.MatchFolderNamespace,
+            """
+            namespace Game.Player
+            {
+                class PlayerInput { }
+                struct PlayerCommand { }
+            }
+            """,
+            firstNeighbor,
+            secondNeighbor);
+        await VerifyFixAsync(
+            "delegate void PlayerEvent();\nenum PlayerMode { Idle }",
+            DiagnosticIds.MatchFolderNamespace,
+            """
+            namespace Game.Player
+            {
+                delegate void PlayerEvent();
+                enum PlayerMode { Idle }
+            }
+            """,
+            firstNeighbor,
+            secondNeighbor);
+
+        var conflictingDocument = CreateDocument(
+            "class PlayerView { }",
+            additionalSource: "namespace Game.Player { class NeighborA { } }",
+            secondAdditionalSource: "namespace Game.UI { class NeighborB { } }");
+        var conflictingDiagnostics = await GetDiagnosticsAsync(conflictingDocument);
+        if (conflictingDiagnostics.Any(diagnostic =>
+                diagnostic.Id == DiagnosticIds.MatchFolderNamespace))
+        {
+            throw new InvalidOperationException(
+                "UBP0075 must remain silent when neighboring namespaces conflict.");
+        }
+
+        var noNeighborDocument = CreateDocument("class PlayerView { }");
+        var noNeighborDiagnostics = await GetDiagnosticsAsync(noNeighborDocument);
+        if (noNeighborDiagnostics.Any(diagnostic =>
+                diagnostic.Id == DiagnosticIds.MatchFolderNamespace))
+        {
+            throw new InvalidOperationException(
+                "UBP0075 must require at least one neighboring namespace example.");
+        }
+
+        var mixedNamespaceDocument = CreateDocument(
+            "namespace Other { class Nested { } }\nclass GlobalType { }",
+            additionalSource: firstNeighbor,
+            secondAdditionalSource: secondNeighbor);
+        var mixedNamespaceDiagnostics = await GetDiagnosticsAsync(mixedNamespaceDocument);
+        if (mixedNamespaceDiagnostics.Any(diagnostic =>
+                diagnostic.Id == DiagnosticIds.MatchFolderNamespace))
+        {
+            throw new InvalidOperationException(
+                "UBP0075 must remain silent for files that mix namespace and global declarations.");
         }
     }
 
@@ -2398,7 +2590,8 @@ internal sealed partial class AnalyzerTests
     private static Document CreateDocument(
         string source,
         string? editorConfig = null,
-        string? additionalSource = null)
+        string? additionalSource = null,
+        string? secondAdditionalSource = null)
     {
         var workspace = new AdhocWorkspace();
         var virtualProjectDirectory = Path.Combine(Path.GetTempPath(), "UnityBestPracticesAnalyzerTests");
@@ -2433,6 +2626,15 @@ internal sealed partial class AnalyzerTests
                 "Additional.cs",
                 SourceText.From(additionalSource),
                 filePath: Path.Combine(virtualProjectDirectory, "Additional.cs"));
+        }
+
+        if (secondAdditionalSource != null)
+        {
+            solution = solution.AddDocument(
+                DocumentId.CreateNewId(projectId),
+                "SecondAdditional.cs",
+                SourceText.From(secondAdditionalSource),
+                filePath: Path.Combine(virtualProjectDirectory, "SecondAdditional.cs"));
         }
 
         if (editorConfig != null)

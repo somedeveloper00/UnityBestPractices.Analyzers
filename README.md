@@ -29,6 +29,7 @@ The rationale for every review-required rule is recorded in [rule safety decisio
 - `Unity.Correctness` covers job dependencies and native-container lifetime.
 - `Unity.DOTS.Migration` covers Entities 1.x query and execution-mode migrations.
 - `Unity.API.Design` covers Unity-facing API and serialization design.
+- `CSharp.CodeStyle` covers project-consistency suggestions inferred from nearby source files.
 
 ## Quick fixes
 
@@ -127,6 +128,7 @@ These quick fixes use the current Entities 1.x query systems. `SystemAPI.Query` 
 | `UBP0072` | A narrowly provable, unused local `NativeArray<T>` allocated with `Allocator.Persistent` | Diagnostic only; disposal and ownership must be chosen by the developer |
 | `UBP0073` | A `Temp` or `TempJob` `NativeArray<T>` returned, stored in a field, or captured by an escaping delegate | Diagnostic only; the correct lifetime or ownership depends on the application |
 | `UBP0074` | Repeated constant `Shader.PropertyToID` calls in one type | Adds a uniquely named static readonly ID field and replaces repeated calls |
+| `UBP0075` | A namespace-less type file whose neighbors have a clear most-common namespace | Wraps the file's types in the neighboring namespace |
 
 The analyzer resolves Unity symbols semantically. It ignores unrelated types with similar member names, unsupported field types, non-Unity iterators, dynamic distance thresholds, generated code, and Unity/package versions where the required symbols are absent.
 
@@ -206,7 +208,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Rele
 dotnet pack src/UnityBestPractices.Analyzers -c Release --no-build -o artifacts/packages
 ```
 
-The dependency-light harness verifies the full 74-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
+The dependency-light harness verifies the full 75-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
 
 ## Release process
 

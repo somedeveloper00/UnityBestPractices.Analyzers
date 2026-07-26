@@ -19,6 +19,7 @@ public static class RuleCategories
     public const string UnityDotsMigration = "Unity.DOTS.Migration";
     public const string UnityApiDesign = "Unity.API.Design";
     public const string CSharpPerformance = "CSharp.Performance";
+    public const string CSharpCodeStyle = "CSharp.CodeStyle";
 }
 
 public sealed class RuleMetadata
@@ -163,7 +164,8 @@ internal static class RuleMetadataFactory
         DiagnosticIds.JobEntityScheduleToRun or
         DiagnosticIds.JobEntityScheduleToScheduleParallel or
         DiagnosticIds.JobEntityScheduleParallelToRun or
-        DiagnosticIds.JobEntityScheduleParallelToSchedule => RuleSafety.ReviewRequired,
+        DiagnosticIds.JobEntityScheduleParallelToSchedule or
+        DiagnosticIds.MatchFolderNamespace => RuleSafety.ReviewRequired,
         _ => RuleSafety.Safe,
     };
 
@@ -178,6 +180,11 @@ internal static class RuleMetadataFactory
         if (diagnosticId == DiagnosticIds.EncapsulateSerializedField)
         {
             return RuleCategories.UnityApiDesign;
+        }
+
+        if (diagnosticId == DiagnosticIds.MatchFolderNamespace)
+        {
+            return RuleCategories.CSharpCodeStyle;
         }
 
         if (diagnosticId is DiagnosticIds.YieldNull or

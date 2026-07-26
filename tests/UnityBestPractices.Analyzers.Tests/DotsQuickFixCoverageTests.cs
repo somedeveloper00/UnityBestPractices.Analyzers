@@ -118,6 +118,123 @@ internal sealed partial class AnalyzerTests
 
     private async Task VerifyEntitiesForEachRegressionCasesAsync()
     {
+        const string dynamicBufferAndIndexSource = """
+            using Unity.Entities;
+
+            partial class ThirdEyeSystem : SystemBase
+            {
+                void Update()
+                {
+                    var ecbParallelWriter = new EntityCommandBuffer().AsParallelWriter();
+                    Entities
+                        .WithAll<PlayerTag>()
+                        .ForEach(
+                            (Entity playerEntity, int entityInQueryIndex,
+                                ref CharacterStance characterStance,
+                                ref DetectionData detectionData,
+                                ref DynamicBuffer<DetectedElement> detectedBuffer,
+                                in PerceptionData perceptionData,
+                                in PlayerInputs input) =>
+                            {
+                                characterStance.Mode += input.Toggle;
+                                detectionData.Count += detectedBuffer.Length + perceptionData.Value;
+                                ecbParallelWriter.AddComponent(
+                                    entityInQueryIndex,
+                                    playerEntity,
+                                    new Result());
+                            }).Run();
+                }
+            }
+
+            struct PlayerTag : IComponentData { }
+            struct CharacterStance : IComponentData { public int Mode; }
+            struct DetectionData : IComponentData { public int Count; }
+            struct DetectedElement : IBufferElementData { }
+            struct PerceptionData : IComponentData { public int Value; }
+            struct PlayerInputs : IComponentData { public int Toggle; }
+            struct Result : IComponentData { }
+            """;
+
+        await VerifyFixAsync(
+            dynamicBufferAndIndexSource,
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            """
+            using Unity.Entities;
+
+            partial class ThirdEyeSystem : SystemBase
+            {
+                void Update()
+                {
+                    var ecbParallelWriter = new EntityCommandBuffer().AsParallelWriter();
+                    {
+                        var entityInQueryIndexCounter = 0;
+                        foreach (var (characterStance, detectionData, detectedBuffer, perceptionData, input, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<CharacterStance>, Unity.Entities.RefRW<DetectionData>, DynamicBuffer<DetectedElement>, Unity.Entities.RefRO<PerceptionData>, Unity.Entities.RefRO<PlayerInputs>>().WithAll<PlayerTag>().WithEntityAccess())
+                        {
+                            var entityInQueryIndex = entityInQueryIndexCounter++;
+                            characterStance.ValueRW.Mode += input.ValueRO.Toggle;
+                            detectionData.ValueRW.Count += detectedBuffer.Length + perceptionData.ValueRO.Value;
+                            ecbParallelWriter.AddComponent(
+                                entityInQueryIndex,
+                                playerEntity,
+                                new Result());
+                        }
+                    }
+                }
+            }
+
+            struct PlayerTag : IComponentData { }
+            struct CharacterStance : IComponentData { public int Mode; }
+            struct DetectionData : IComponentData { public int Count; }
+            struct DetectedElement : IBufferElementData { }
+            struct PerceptionData : IComponentData { public int Value; }
+            struct PlayerInputs : IComponentData { public int Toggle; }
+            struct Result : IComponentData { }
+            """);
+
+        await VerifyFixAsync(
+            dynamicBufferAndIndexSource,
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            """
+            using Unity.Entities;
+
+            partial class ThirdEyeSystem : SystemBase
+            {
+                void Update()
+                {
+                    var ecbParallelWriter = new EntityCommandBuffer().AsParallelWriter();
+                    new EntitiesForEachJob
+                    {
+                        EcbParallelWriter = ecbParallelWriter
+                    }.Run();
+                }
+
+                [Unity.Burst.BurstCompile]
+                [Unity.Entities.WithAll(typeof(PlayerTag))]
+                private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity
+                {
+                    public global::Unity.Entities.EntityCommandBuffer.ParallelWriter EcbParallelWriter;
+
+                    public void Execute(Entity playerEntity, [Unity.Entities.EntityIndexInQuery] int entityInQueryIndex, ref CharacterStance characterStance, ref DetectionData detectionData, ref DynamicBuffer<DetectedElement> detectedBuffer, in PerceptionData perceptionData, in PlayerInputs input)
+                    {
+                        characterStance.Mode += input.Toggle;
+                        detectionData.Count += detectedBuffer.Length + perceptionData.Value;
+                        EcbParallelWriter.AddComponent(
+                            entityInQueryIndex,
+                            playerEntity,
+                            new Result());
+                    }
+                }
+            }
+
+            struct PlayerTag : IComponentData { }
+            struct CharacterStance : IComponentData { public int Mode; }
+            struct DetectionData : IComponentData { public int Count; }
+            struct DetectedElement : IBufferElementData { }
+            struct PerceptionData : IComponentData { public int Value; }
+            struct PlayerInputs : IComponentData { public int Toggle; }
+            struct Result : IComponentData { }
+            """);
+
         await VerifyFixAsync(
             "using Unity.Entities; partial class CapturedSystem : SystemBase { void Update() { " +
             "var scale = 2f; Entities.ForEach((ref Position p) => { p.Value *= scale; }).Run(); } } " +

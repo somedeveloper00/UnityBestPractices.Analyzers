@@ -88,7 +88,13 @@ public static class DiagnosticCatalog
             "Skipping default memory clearing avoids redundant work when every NativeArray element is immediately assigned.",
             "Use uninitialized NativeArray memory",
             "Unity.Collections.NativeArray`1",
-            "Unity.Collections.NativeArrayOptions"));
+            "Unity.Collections.NativeArrayOptions"),
+        RuleMetadataFactory.Create(
+            DiagnosticIds.MatchFolderNamespace,
+            "Match the folder namespace",
+            "Place this file in namespace '{0}' to match neighboring files",
+            "A namespace-less type file should use the clear most-common namespace declared by neighboring files in the same folder.",
+            "Use the folder namespace"));
 
     private static readonly Lazy<ImmutableArray<RuleMetadata>> LazyAll =
         new(

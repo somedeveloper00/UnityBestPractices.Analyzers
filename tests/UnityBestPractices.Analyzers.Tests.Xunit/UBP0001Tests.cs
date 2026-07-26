@@ -37,8 +37,8 @@ public sealed class UBP0001Tests
             ReferenceAssemblies = ReferenceAssemblies.Net.Net60,
             CodeFixTestBehaviors = CodeFixTestBehaviors.SkipFixAllCheck,
         };
-        test.TestState.Sources.Add(TestSources.UnityEngine);
-        test.FixedState.Sources.Add(TestSources.UnityEngine);
+        test.TestState.Sources.Add(("UnityEngine.g.cs", TestSources.UnityEngine));
+        test.FixedState.Sources.Add(("UnityEngine.g.cs", TestSources.UnityEngine));
         test.ExpectedDiagnostics.Add(
             VerifyCS.Diagnostic(DiagnosticIds.EncapsulateSerializedField)
                 .WithLocation(0)
@@ -65,7 +65,7 @@ public sealed class UBP0001Tests
             ReferenceAssemblies = ReferenceAssemblies.Net.Net60,
             CodeFixTestBehaviors = CodeFixTestBehaviors.SkipFixAllCheck,
         };
-        test.TestState.Sources.Add(TestSources.UnityEngine);
+        test.TestState.Sources.Add(("UnityEngine.g.cs", TestSources.UnityEngine));
         test.TestState.Sources.Add(
             """
             class Consumer

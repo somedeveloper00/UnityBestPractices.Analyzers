@@ -209,12 +209,12 @@ internal static class RuleDocumentationGenerator
         {
             if (rule.DiagnosticId == DiagnosticIds.EntitiesForEachToSystemApiQuery)
             {
-                return "- Synchronous conversions support local and instance captures, `WithoutBurst()`, component parameters, and entity-only lambdas constrained by at least one `WithAll<T>()` filter. Entity-only queries use `SystemAPI.Query<RefRO<T>>().WithEntityAccess()`. For `WithStructuralChanges()`, entity IDs are first copied into a disposable `NativeList<Entity>` so structural edits cannot invalidate the query enumerator.";
+                return "- Synchronous conversions support local and instance captures, `WithoutBurst()`, component parameters, mutable `ref DynamicBuffer<T>` parameters, and entity-only lambdas constrained by at least one `WithAll<T>()` filter. Mutable buffers become bare `DynamicBuffer<T>` query parameters, and `entityInQueryIndex` becomes a packed loop counter. Entity-only queries use `SystemAPI.Query<RefRO<T>>().WithEntityAccess()`. For `WithStructuralChanges()`, entity IDs are first copied into a disposable `NativeList<Entity>` so structural edits cannot invalidate the query enumerator.";
             }
 
             if (IsEntitiesForEachJobConversion(rule))
             {
-                return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model. The special `entityInQueryIndex` parameter becomes `[EntityIndexInQuery]`; read-only unmanaged captures become initialized job fields; and `SystemAPI.Time.ElapsedTime` / `DeltaTime` are evaluated by the system and passed into the job.";
+                return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model. `DynamicBuffer<T>` parameters retain their `ref` or `in` modifier, the special `entityInQueryIndex` parameter becomes `[EntityIndexInQuery]`, read-only unmanaged captures become initialized job fields, and `SystemAPI.Time.ElapsedTime` / `DeltaTime` are evaluated by the system and passed into the job.";
             }
 
             return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model.";
@@ -230,6 +230,10 @@ internal static class RuleDocumentationGenerator
                 "- The allocation must be a semantically resolved `NativeArray<T>` using `Allocator.Temp` or `Allocator.TempJob`, and the escape must be a direct return, field/property assignment, or captured escaping delegate.",
             DiagnosticIds.CacheShaderPropertyId =>
                 "- At least two calls in the same non-nested type declaration must resolve to `UnityEngine.Shader.PropertyToID` with the same string literal.",
+            DiagnosticIds.UseRefLocal =>
+                "- The collection must expose a real ref-returning indexer or `ElementAt(int)`. A semantically resolved `NativeArray<T>` may instead expose a public `AsSpan()` returning the matching mutable `System.Span<T>`.",
+            DiagnosticIds.MatchFolderNamespace =>
+                "- The target must contain only global type or delegate declarations, and non-generated sibling files in the same folder must establish one uniquely most-common namespace.",
             _ => string.Empty,
         };
     }
@@ -245,7 +249,7 @@ internal static class RuleDocumentationGenerator
         {
             if (rule.DiagnosticId == DiagnosticIds.EntitiesForEachToSystemApiQuery)
             {
-                return "- Nested lambdas, unresolved or unsupported filters, entity-only loops without a usable query component, and structural-change loops that expose component references are excluded. Scheduled job conversions remain unavailable for managed or mutated captures, unsupported `SystemAPI` access, `WithoutBurst()`, or structural-change pipelines.";
+                return "- Nested lambdas, unresolved or unsupported filters, read-only `in DynamicBuffer<T>` parameters, entity-only loops without a usable query component, and structural-change loops that expose component references are excluded. Scheduled job conversions remain unavailable for managed or mutated captures, unsupported `SystemAPI` access, `WithoutBurst()`, or structural-change pipelines.";
             }
 
             if (IsEntitiesForEachJobConversion(rule))
@@ -266,6 +270,10 @@ internal static class RuleDocumentationGenerator
                 "- Reassigned locals, non-native look-alike containers, and uses that remain within the allocating method are excluded.",
             DiagnosticIds.CacheShaderPropertyId =>
                 "- Dynamic strings, a single call, nested-type calls, and same-named non-Unity APIs are excluded.",
+            DiagnosticIds.UseRefLocal =>
+                "- By-value-only indexers, read-only spans, async or iterator methods, jump statements before the write-back, lambda or local-function captures, and changed container or index values are excluded.",
+            DiagnosticIds.MatchFolderNamespace =>
+                "- Existing namespaces, top-level statements, generated files, missing file paths, no namespace examples, and ties between neighboring namespaces are excluded.",
             _ => string.Empty,
         };
     }

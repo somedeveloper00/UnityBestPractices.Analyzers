@@ -31,7 +31,8 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
         .AddRange(ExpressionQuickFixRegistry.DiagnosticIds)
         .AddRange(DotsQueryRules.FixableDiagnosticIds)
         .Add(DiagnosticIds.DiscardedScheduledJobHandle)
-        .Add(DiagnosticIds.CacheShaderPropertyId);
+        .Add(DiagnosticIds.CacheShaderPropertyId)
+        .Add(DiagnosticIds.MatchFolderNamespace);
 
     public override FixAllProvider GetFixAllProvider() => RuleAwareFixAllProvider.Instance;
 
@@ -59,6 +60,20 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                     CodeAction.Create(
                         DiagnosticCatalog.Get(diagnostic.Id).FixTitle,
                         cancellationToken => AdvancedUnityRules.CacheShaderPropertyIdAsync(
+                            context.Document,
+                            diagnostic,
+                            cancellationToken),
+                        diagnostic.Id),
+                    diagnostic);
+                continue;
+            }
+
+            if (diagnostic.Id == DiagnosticIds.MatchFolderNamespace)
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        DiagnosticCatalog.Get(diagnostic.Id).FixTitle,
+                        cancellationToken => NamespaceConsistencyRules.AddNamespaceAsync(
                             context.Document,
                             diagnostic,
                             cancellationToken),

@@ -7,6 +7,22 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-07-26
+
+### Added
+
+- Added UBP0075 to suggest the clear most-common namespace used by neighboring
+  C# files in the same folder, with a review-required quick fix that wraps
+  namespace-less type declarations.
+- Extended UBP0007 to replace `NativeArray<T>` copy-modify-write-back patterns
+  with a `ref` local through `AsSpan()` when that mutable API is available.
+
+### Fixed
+
+- UBP0058–UBP0061 now migrate `Entities.ForEach` lambdas with
+  `DynamicBuffer<T>` parameters. The synchronous UBP0058 fix also preserves
+  `entityInQueryIndex` as a packed loop counter.
+
 ## [0.4.7] - 2026-07-26
 
 ### Fixed
@@ -103,7 +119,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.3...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.8...HEAD
+[0.4.8]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.8
+[0.4.7]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.7
+[0.4.6]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.6
+[0.4.5]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.5
+[0.4.3]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.3
+[0.4.2]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.2
+[0.4.1]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.1
+[0.4.0]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.0
 [0.3.0]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.3
 [0.2.0]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.2
 [0.1.0]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.1

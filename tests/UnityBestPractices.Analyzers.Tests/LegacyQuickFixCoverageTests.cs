@@ -167,6 +167,12 @@ internal sealed partial class AnalyzerTests
             "struct CapturedItem { public int Value; } class CapturedMutator { void Change(CapturedItem[] items, int index) { var item = items[index]; System.Action mutate = () => item.Value++; mutate(); items[index] = item; } }",
             DiagnosticIds.UseRefLocal,
             expected: false);
+
+        // A by-value indexer alone does not establish a safe ref-return path.
+        await VerifyDiagnosticPresenceAsync(
+            "struct CopyOnly<T> where T : struct { public T this[int index] { get => default; set { } } } struct CopyOnlyItem { public int Value; } class CopyOnlyMutator { void Change(CopyOnly<CopyOnlyItem> items) { var item = items[2]; item.Value = 1; items[2] = item; } }",
+            DiagnosticIds.UseRefLocal,
+            expected: false);
     }
 
     private async Task VerifyCameraCacheCasesAsync()
