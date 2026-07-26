@@ -309,6 +309,11 @@ internal sealed partial class AnalyzerTests
                     _items = new T[length];
                 }
 
+                public NativeArray(T[] array, Allocator allocator)
+                {
+                    _items = array;
+                }
+
                 public int Length => _items.Length;
                 public T this[int index]
                 {
@@ -1571,6 +1576,22 @@ internal sealed partial class AnalyzerTests
         await VerifyExpressionFixAsync("using System.Linq;", "new[] { 1 }.Count()", DiagnosticIds.UseArrayLengthProperty, "new[] { 1 }.Length");
         await VerifyExpressionFixAsync("using System.Linq;", "new[] { 1 }.Any()", DiagnosticIds.UseArrayLengthForAny, "new[] { 1 }.Length != 0");
         await VerifyExpressionFixAsync("using System.Collections.Generic; using System.Linq;", "new List<int> { 1 }.Any()", DiagnosticIds.UseListCountForAny, "new List<int> { 1 }.Count != 0");
+        await VerifyFixAsync(
+            "using System.Linq;\nclass NegatedArrayAny { bool Run(int[] values) { return !values.Any(); } }",
+            DiagnosticIds.UseArrayLengthForAny,
+            "using System.Linq;\nclass NegatedArrayAny { bool Run(int[] values) { return !(values.Length != 0); } }");
+        await VerifyFixAsync(
+            "using System.Collections.Generic; using System.Linq;\nclass NegatedListAny { bool Run(List<int> values) { return !values.Any(); } }",
+            DiagnosticIds.UseListCountForAny,
+            "using System.Collections.Generic; using System.Linq;\nclass NegatedListAny { bool Run(List<int> values) { return !(values.Count != 0); } }");
+        await VerifyFixAsync(
+            "using System.Linq;\nclass ComparedArrayAny { bool Run(int[] values, bool expected) { return expected == values.Any(); } }",
+            DiagnosticIds.UseArrayLengthForAny,
+            "using System.Linq;\nclass ComparedArrayAny { bool Run(int[] values, bool expected) { return expected == (values.Length != 0); } }");
+        await VerifyFixAsync(
+            "using System.Collections.Generic; using System.Linq;\nclass ConditionalListAny { int Run(List<int> values) { return values.Any() && values[0] > 0 ? 1 : 0; } }",
+            DiagnosticIds.UseListCountForAny,
+            "using System.Collections.Generic; using System.Linq;\nclass ConditionalListAny { int Run(List<int> values) { return (values.Count != 0) && values[0] > 0 ? 1 : 0; } }");
         await VerifyExpressionFixAsync("using System.Text;", "new StringBuilder().Append(\"x\")", DiagnosticIds.AppendCharacter, "new StringBuilder().Append('x')");
         await VerifyExpressionFixAsync("using System.Text;", "new StringBuilder().AppendLine(\"\")", DiagnosticIds.AppendLineWithoutEmptyString, "new StringBuilder().AppendLine()");
         await VerifyExpressionFixAsync("using System.Threading;", "new CancellationToken()", DiagnosticIds.UseCancellationTokenNone, "System.Threading.CancellationToken.None");
@@ -1646,6 +1667,42 @@ internal sealed partial class AnalyzerTests
             struct Velocity : IComponentData { public float Value; }
             """);
 
+        const string expressionBodiedForEachSource = """
+            using Unity.Entities;
+
+            partial class ExpressionMovementSystem : SystemBase
+            {
+                void Update()
+                {
+                    Entities.ForEach((ref Position position, in Velocity velocity) => position.Value += velocity.Value).Run();
+                }
+            }
+
+            struct Position : IComponentData { public float Value; }
+            struct Velocity : IComponentData { public float Value; }
+            """;
+
+        await VerifyFixAsync(
+            expressionBodiedForEachSource,
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            """
+            using Unity.Entities;
+
+            partial class ExpressionMovementSystem : SystemBase
+            {
+                void Update()
+                {
+                    foreach (var (position, velocity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>, Unity.Entities.RefRO<Velocity>>())
+                    {
+                        position.ValueRW.Value += velocity.ValueRO.Value;
+                    }
+                }
+            }
+
+            struct Position : IComponentData { public float Value; }
+            struct Velocity : IComponentData { public float Value; }
+            """);
+
         await VerifyEntitiesForEachJobFixAsync(
             entitiesForEachSource,
             DiagnosticIds.EntitiesForEachToJobEntityRun,
@@ -1676,6 +1733,27 @@ internal sealed partial class AnalyzerTests
             struct Position : IComponentData { public float Value; }
             struct Velocity : IComponentData { public float Value; }
             """;
+
+        const string braceLessSystemApiQuerySource = """
+            using Unity.Entities;
+
+            partial class MovementSystem : SystemBase
+            {
+                void Update()
+                {
+                    foreach (var (position, velocity) in SystemAPI.Query<RefRW<Position>, RefRO<Velocity>>())
+                        position.ValueRW.Value += velocity.ValueRO.Value;
+                }
+            }
+
+            struct Position : IComponentData { public float Value; }
+            struct Velocity : IComponentData { public float Value; }
+            """;
+
+        await VerifySystemApiJobFixAsync(
+            braceLessSystemApiQuerySource,
+            DiagnosticIds.SystemApiQueryToJobEntityRun,
+            "Run");
 
         await VerifySystemApiJobFixAsync(
             systemApiQuerySource,
