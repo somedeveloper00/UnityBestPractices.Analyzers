@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- UBP0051 and UBP0052 fixes now parenthesize the `Length != 0` / `Count != 0` replacement when a parent expression binds tighter, so fixing `!list.Any()` no longer produces code that fails to compile.
+- UBP0011 now matches only the `(int length, Allocator allocator)` `NativeArray` constructor; the copy constructors take the same argument count but have no `NativeArrayOptions` overload, so the fix produced a call to a nonexistent constructor.
+- Expression-bodied `Entities.ForEach` lambdas and brace-less `SystemAPI.Query` `foreach` bodies no longer crash the analyzer (AD0001) during DOTS migration analysis.
+- UBP0006 no longer suggests `stackalloc` for `Span` locals that escape the method (returned as a span-typed value, stored into a `ref`/`out` parameter, or passed by reference), where the fix produced code that fails to compile.
+- UBP0007 no longer suggests a ref local when a jump statement between the copy and the write-back could discard the mutations, or when a lambda or local function would have to capture the ref local.
+
 ## [0.4.3] - 2026-07-23
 
 ### Changed

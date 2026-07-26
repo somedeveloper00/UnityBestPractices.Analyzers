@@ -336,27 +336,30 @@ internal sealed class EntitiesForEachQuery
             string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
             (entityParameter is null ? string.Empty : ".WithEntityAccess()");
 
-        var rewrittenBody = CreateJobBody();
-        var identifiers = rewrittenBody.DescendantNodes()
+        // Query and rewrite the original in-tree lambda body; wrapping an expression
+        // body through CreateBlock first would detach the nodes from the semantic
+        // model's tree and make GetSymbolInfo throw.
+        var identifiers = Lambda.Body.DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
             .Where(identifier => componentParameters.Any(parameter =>
                 SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
                     parameter.Symbol)))
             .ToImmutableArray();
-        rewrittenBody = rewrittenBody.ReplaceNodes(identifiers, (identifier, _) =>
-        {
-            var parameter = componentParameters.First(item =>
-                SymbolEqualityComparer.Default.Equals(
-                    semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
-                    item.Symbol));
-            var valueProperty = parameter.Access == DotsParameterAccess.ReadWrite ? "ValueRW" : "ValueRO";
-            return SyntaxFactory.MemberAccessExpression(
-                    SyntaxKind.SimpleMemberAccessExpression,
-                    SyntaxFactory.IdentifierName(identifier.Identifier.WithoutTrivia()),
-                    SyntaxFactory.IdentifierName(valueProperty))
-                .WithTriviaFrom(identifier);
-        });
+        var rewrittenBody = DotsQuerySemanticHelpers.CreateBlock(
+            Lambda.Body.ReplaceNodes(identifiers, (identifier, _) =>
+            {
+                var parameter = componentParameters.First(item =>
+                    SymbolEqualityComparer.Default.Equals(
+                        semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                        item.Symbol));
+                var valueProperty = parameter.Access == DotsParameterAccess.ReadWrite ? "ValueRW" : "ValueRO";
+                return SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName(identifier.Identifier.WithoutTrivia()),
+                        SyntaxFactory.IdentifierName(valueProperty))
+                    .WithTriviaFrom(identifier);
+            }));
 
         var variableNames = componentParameters.Select(parameter => parameter.Name).ToList();
         if (componentParameters.Length == 0)
@@ -679,8 +682,12 @@ internal sealed class SystemApiQueryLoop
             parameters.Add(new DotsQueryParameter(name, "Unity.Entities.Entity", DotsParameterAccess.Entity, symbol));
         }
 
-        var body = DotsQuerySemanticHelpers.CreateBlock(statement.Statement);
-        if (!TryRewriteSystemApiBody(body, parameters.ToImmutable(), semanticModel, cancellationToken, out var rewrittenBody) ||
+        if (!TryRewriteSystemApiBody(
+                statement.Statement,
+                parameters.ToImmutable(),
+                semanticModel,
+                cancellationToken,
+                out var rewrittenBody) ||
             DotsQuerySemanticHelpers.HasUnsupportedCaptures(
                 statement.Statement,
                 parameters.Select(item => item.Symbol).ToImmutableArray(),
@@ -778,16 +785,19 @@ internal sealed class SystemApiQueryLoop
     };
 
     private static bool TryRewriteSystemApiBody(
-        BlockSyntax body,
+        StatementSyntax body,
         ImmutableArray<DotsQueryParameter> parameters,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out BlockSyntax rewrittenBody)
     {
+        // Query and rewrite the original in-tree loop body; wrapping a brace-less
+        // body through CreateBlock first would detach the nodes from the semantic
+        // model's tree and make GetSymbolInfo throw.
         var replacements = new Dictionary<MemberAccessExpressionSyntax, IdentifierNameSyntax>();
         foreach (var parameter in parameters.Where(item => item.Access != DotsParameterAccess.Entity))
         {
-            var identifiers = body.DescendantNodes()
+            var identifiers = body.DescendantNodesAndSelf()
                 .OfType<IdentifierNameSyntax>()
                 .Where(identifier => SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
@@ -808,9 +818,10 @@ internal sealed class SystemApiQueryLoop
             }
         }
 
-        rewrittenBody = body.ReplaceNodes(
-            replacements.Keys,
-            (original, _) => replacements[original]);
+        rewrittenBody = DotsQuerySemanticHelpers.CreateBlock(
+            body.ReplaceNodes(
+                replacements.Keys,
+                (original, _) => replacements[original]));
         return true;
     }
 }

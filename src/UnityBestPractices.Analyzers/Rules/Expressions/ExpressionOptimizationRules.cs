@@ -607,14 +607,23 @@ internal sealed class CollectionQueryRule : ExpressionQuickFixRule
             SyntaxKind.SimpleMemberAccessExpression,
             access.Expression,
             SyntaxFactory.IdentifierName(propertyName));
-        replacement = methodName == "Count"
-            ? property
-            : SyntaxFactory.BinaryExpression(
-                SyntaxKind.NotEqualsExpression,
-                property,
-                SyntaxFactory.LiteralExpression(
-                    SyntaxKind.NumericLiteralExpression,
-                    SyntaxFactory.Literal(0)));
+        if (methodName == "Count")
+        {
+            replacement = property;
+            return true;
+        }
+
+        ExpressionSyntax comparison = SyntaxFactory.BinaryExpression(
+            SyntaxKind.NotEqualsExpression,
+            property,
+            SyntaxFactory.LiteralExpression(
+                SyntaxKind.NumericLiteralExpression,
+                SyntaxFactory.Literal(0)));
+        // A binary comparison does not bind like the invocation it replaces, so a
+        // parent expression (!x.Any(), flag == x.Any(), ...) needs parentheses.
+        replacement = expression.Parent is ExpressionSyntax and not ParenthesizedExpressionSyntax
+            ? SyntaxFactory.ParenthesizedExpression(comparison)
+            : comparison;
         return true;
     }
 

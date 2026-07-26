@@ -106,6 +106,25 @@ internal sealed partial class AnalyzerTests
                 DiagnosticIds.UseStackalloc,
                 "using System; class " + className + " { object Run() { Span<" + item.Type + "> buffer = stackalloc " + item.Type + "[" + item.Size + "]; buffer.Clear(); return buffer[0]; } }");
         }
+
+        // A stackalloc span cannot leave the method, so spans that escape must keep
+        // their heap-backed array.
+        await VerifyDiagnosticPresenceAsync(
+            "using System; class SpanProvider { Span<int> Rent() { Span<int> buffer = new int[8]; return buffer; } }",
+            DiagnosticIds.UseStackalloc,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            "using System; class SpanSlicer { Span<byte> Prefix() { Span<byte> buffer = new byte[16]; return buffer.Slice(0, 4); } }",
+            DiagnosticIds.UseStackalloc,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            "using System; class SpanOutParameter { void Rent(out Span<int> result) { Span<int> buffer = new int[8]; result = buffer; } }",
+            DiagnosticIds.UseStackalloc,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            "using System; class SpanByReference { static void Swap(ref Span<int> value) { } void Run() { Span<int> buffer = new int[8]; Swap(ref buffer); } }",
+            DiagnosticIds.UseStackalloc,
+            expected: false);
     }
 
     private async Task VerifyRefLocalCasesAsync()
@@ -130,6 +149,24 @@ internal sealed partial class AnalyzerTests
                 DiagnosticIds.UseRefLocal,
                 "struct " + typeName + " { public int Value; } class " + className + " { void Change(" + typeName + "[] items, int index) { ref var item = ref items[index]; " + mutations[index] + " } }");
         }
+
+        // An early exit between the mutation and the write-back means the ref local
+        // would persist changes the original code discarded.
+        await VerifyDiagnosticPresenceAsync(
+            "struct GuardedItem { public int Value; } class GuardedMutator { void Change(GuardedItem[] items, int index, bool skip) { var item = items[index]; item.Value++; if (skip) { return; } items[index] = item; } }",
+            DiagnosticIds.UseRefLocal,
+            expected: false);
+        await VerifyDiagnosticPresenceAsync(
+            "struct LoopItem { public int Value; } class LoopMutator { void Change(LoopItem[] items, int index, bool skip) { while (true) { var item = items[index]; item.Value++; if (skip) { continue; } items[index] = item; break; } } }",
+            DiagnosticIds.UseRefLocal,
+            expected: false);
+
+        // A ref local cannot be captured, so lambdas between the copy and the
+        // write-back must keep the plain local.
+        await VerifyDiagnosticPresenceAsync(
+            "struct CapturedItem { public int Value; } class CapturedMutator { void Change(CapturedItem[] items, int index) { var item = items[index]; System.Action mutate = () => item.Value++; mutate(); items[index] = item; } }",
+            DiagnosticIds.UseRefLocal,
+            expected: false);
     }
 
     private async Task VerifyCameraCacheCasesAsync()
@@ -189,5 +226,12 @@ internal sealed partial class AnalyzerTests
                 DiagnosticIds.UseUninitializedNativeArray,
                 "using Unity.Collections; class NativeCase" + offset + " { object Build(int length) { var values = new NativeArray<int>(length, Allocator.Temp, Unity.Collections.NativeArrayOptions.UninitializedMemory); for (var i = 0; i < values.Length; i++) { values[i] = i + " + offset + "; } return values; } }");
         }
+
+        // The copy constructor has no NativeArrayOptions overload, so appending an
+        // options argument would not compile.
+        await VerifyDiagnosticPresenceAsync(
+            "using Unity.Collections; class NativeCopyCase { void Build(int[] source) { var values = new NativeArray<int>(source, Allocator.Persistent); for (var i = 0; i < values.Length; i++) { values[i] = i; } values.Dispose(); } }",
+            DiagnosticIds.UseUninitializedNativeArray,
+            expected: false);
     }
 }

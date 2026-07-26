@@ -407,8 +407,82 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
+        if (SpanEscapesDeclaringMethod(local, localDeclaration, semanticModel, cancellationToken))
+        {
+            return false;
+        }
+
         arrayCreation = candidate;
         return true;
+    }
+
+    private static bool SpanEscapesDeclaringMethod(
+        ILocalSymbol local,
+        LocalDeclarationStatementSyntax declaration,
+        SemanticModel semanticModel,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        var scope = declaration.Ancestors().FirstOrDefault(node =>
+            node is BaseMethodDeclarationSyntax ||
+            node is LocalFunctionStatementSyntax ||
+            node is AnonymousFunctionExpressionSyntax ||
+            node is AccessorDeclarationSyntax) ?? declaration.Parent;
+        if (scope is null)
+        {
+            return true;
+        }
+
+        return scope.DescendantNodes()
+            .OfType<IdentifierNameSyntax>()
+            .Where(identifier => SymbolEqualityComparer.Default.Equals(
+                semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                local))
+            .Any(reference => IsSpanEscape(reference, semanticModel, cancellationToken));
+    }
+
+    private static bool IsSpanEscape(
+        IdentifierNameSyntax reference,
+        SemanticModel semanticModel,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        // A stackalloc span cannot leave its method: returning a span-typed value
+        // derived from the local, handing the local out by ref, or storing it into a
+        // ref or out parameter would no longer compile.
+        var returnStatement = reference.FirstAncestorOrSelf<ReturnStatementSyntax>();
+        if (returnStatement?.Expression is not null &&
+            semanticModel.GetTypeInfo(returnStatement.Expression, cancellationToken).Type?.IsRefLikeType == true)
+        {
+            return true;
+        }
+
+        var argument = reference.FirstAncestorOrSelf<ArgumentSyntax>();
+        if (argument is not null &&
+            argument.Expression.Span.Contains(reference.Span) &&
+            !argument.RefKindKeyword.IsKind(SyntaxKind.None))
+        {
+            return true;
+        }
+
+        for (SyntaxNode? current = reference; current is ExpressionSyntax; current = current.Parent)
+        {
+            if (current.Parent is RefExpressionSyntax)
+            {
+                return true;
+            }
+
+            if (current.Parent is AssignmentExpressionSyntax assignment &&
+                assignment.Right == current &&
+                semanticModel.GetTypeInfo(assignment.Right, cancellationToken).Type?.IsRefLikeType == true &&
+                semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is IParameterSymbol
+                {
+                    RefKind: not RefKind.None,
+                })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal static bool TryGetCopyBackPattern(
@@ -491,6 +565,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             .Take(writeBackIndex - declarationIndex - 1)
             .ToArray();
         if (container is null ||
+            intermediateStatements.Any(PreventsRefLocalRewrite) ||
             ReferencesSymbol(intermediateStatements, container, semanticModel, cancellationToken) ||
             indexSymbol is not null && ReferencesSymbol(intermediateStatements, indexSymbol, semanticModel, cancellationToken) ||
             !MutatesLocal(intermediateStatements, local, semanticModel, cancellationToken))
@@ -681,11 +756,16 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             semanticModel.Compilation,
             "Unity.Collections.NativeArrayOptions");
         var constructor = semanticModel.GetSymbolInfo(creation, cancellationToken).Symbol as IMethodSymbol;
+        // Only the (int length, Allocator allocator) constructor clears memory that a
+        // NativeArrayOptions argument can skip; the copy constructors take the same
+        // argument count but have no options overload.
         if (local?.Type is not INamedTypeSymbol localType ||
             nativeArray is null ||
             options is null ||
             !SymbolEqualityComparer.Default.Equals(localType.OriginalDefinition, nativeArray) ||
             constructor is null ||
+            constructor.Parameters.Length < 2 ||
+            constructor.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
             !HasNativeArrayOptionsOverload(localType, options))
         {
             return false;
@@ -1063,6 +1143,21 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         writeBack = expressionStatement;
         return true;
     }
+
+    private static bool PreventsRefLocalRewrite(StatementSyntax statement) =>
+        // A jump can leave the block before the write-back runs, so removing the
+        // write-back would persist mutations the original code discarded; lambdas
+        // and local functions cannot capture the ref local the fix introduces.
+        statement.DescendantNodesAndSelf().Any(node =>
+            node is ReturnStatementSyntax ||
+            node is BreakStatementSyntax ||
+            node is ContinueStatementSyntax ||
+            node is GotoStatementSyntax ||
+            node is ThrowStatementSyntax ||
+            node is ThrowExpressionSyntax ||
+            node is YieldStatementSyntax ||
+            node is AnonymousFunctionExpressionSyntax ||
+            node is LocalFunctionStatementSyntax);
 
     private static bool ReferencesSymbol(
         StatementSyntax[] statements,
