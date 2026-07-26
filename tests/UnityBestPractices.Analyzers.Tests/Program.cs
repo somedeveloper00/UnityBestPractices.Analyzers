@@ -157,6 +157,25 @@ internal sealed partial class AnalyzerTests
                 public WithOptionsAttribute(EntityQueryOptions options) { }
             }
 
+            public sealed class EntityIndexInQueryAttribute : System.Attribute { }
+
+            public struct TimeData
+            {
+                public double ElapsedTime => 0d;
+                public float DeltaTime => 0f;
+            }
+
+            public struct EntityCommandBuffer
+            {
+                public ParallelWriter AsParallelWriter() => default;
+
+                public struct ParallelWriter
+                {
+                    public void AddComponent<T>(int sortKey, Entity entity, T component)
+                        where T : struct, IComponentData { }
+                }
+            }
+
             public sealed class RefRW<T> where T : struct, IComponentData
             {
                 private T _value;
@@ -183,6 +202,11 @@ internal sealed partial class AnalyzerTests
             public delegate void EntityRefInAction<T1, T2>(Entity entity, ref T1 first, in T2 second)
                 where T1 : struct, IComponentData
                 where T2 : struct, IComponentData;
+            public delegate void EntityIndexInAction<T>(
+                Entity entity,
+                int entityInQueryIndex,
+                in T value)
+                where T : struct, IComponentData;
 
             public struct EntitiesBuilder
             {
@@ -202,6 +226,8 @@ internal sealed partial class AnalyzerTests
                 public ForEachDescription ForEach<T1, T2>(EntityRefInAction<T1, T2> action)
                     where T1 : struct, IComponentData
                     where T2 : struct, IComponentData => default;
+                public ForEachDescription ForEach<T>(EntityIndexInAction<T> action)
+                    where T : struct, IComponentData => default;
             }
 
             public struct ForEachDescription
@@ -220,6 +246,7 @@ internal sealed partial class AnalyzerTests
 
             public static class SystemAPI
             {
+                public static TimeData Time => default;
                 public static QueryEnumerable<T1> Query<T1>() => default;
                 public static QueryEnumerable<T1, T2> Query<T1, T2>() => default;
                 public static SystemAPIQueryBuilder QueryBuilder() => default;

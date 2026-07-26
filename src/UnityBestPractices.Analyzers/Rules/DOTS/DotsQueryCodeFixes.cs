@@ -1,4 +1,5 @@
 // DOTS query transformations and job extraction.
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -49,6 +50,7 @@ internal static class DotsQueryCodeFixes
                     query.CreateJobBody(),
                     query.CreateJobParameters(),
                     query.CreateJobAttributes(),
+                    query.JobFields,
                     GetTargetExecutionMode(rule.Kind),
                     semanticModel.Compilation)
                     : document;
@@ -77,6 +79,7 @@ internal static class DotsQueryCodeFixes
                 query.CreateJobBody(),
                 query.CreateJobParameters(),
                 query.CreateJobAttributes(),
+                System.Collections.Immutable.ImmutableArray<DotsJobField>.Empty,
                 GetTargetExecutionMode(rule.Kind),
                 semanticModel.Compilation);
         }
@@ -132,6 +135,7 @@ internal static class DotsQueryCodeFixes
         BlockSyntax jobBody,
         string jobParameters,
         string jobAttributes,
+        System.Collections.Immutable.ImmutableArray<DotsJobField> jobFields,
         string executionMode,
         Compilation compilation)
     {
@@ -145,6 +149,8 @@ internal static class DotsQueryCodeFixes
             jobAttributes +
             "private partial struct " + jobName + " : Unity.Entities.IJobEntity\n" +
             "{\n" +
+            string.Concat(jobFields.Select(field =>
+                "    public " + field.TypeName + " " + field.Name + ";\n")) +
             "    public void Execute(" + jobParameters + ")\n" +
             jobBody.WithoutTrivia().ToFullString() + "\n" +
             "}";
@@ -154,8 +160,14 @@ internal static class DotsQueryCodeFixes
             return document;
         }
 
+        var initialization = jobFields.IsEmpty
+            ? "()"
+            : "\n{\n" +
+              string.Join(",\n", jobFields.Select(field =>
+                  "    " + field.Name + " = " + field.Initializer)) +
+              "\n}";
         var executionStatement = SyntaxFactory.ParseStatement(
-                "new " + jobName + "()." + executionMode + "();")
+                "new " + jobName + initialization + "." + executionMode + "();")
             .WithTriviaFrom(sourceStatement)
             .WithAdditionalAnnotations(Formatter.Annotation);
         var updatedType = containingType

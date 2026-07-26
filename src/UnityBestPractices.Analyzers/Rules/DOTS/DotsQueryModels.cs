@@ -15,6 +15,7 @@ internal enum DotsParameterAccess
     ReadOnly,
     ReadWrite,
     Entity,
+    EntityIndexInQuery,
 }
 
 internal sealed class DotsQueryParameter
@@ -43,6 +44,8 @@ internal sealed class DotsQueryParameter
     {
         DotsParameterAccess.ReadWrite => "ref " + TypeName + " " + Name,
         DotsParameterAccess.ReadOnly => "in " + TypeName + " " + Name,
+        DotsParameterAccess.EntityIndexInQuery =>
+            "[Unity.Entities.EntityIndexInQuery] int " + Name,
         _ => TypeName + " " + Name,
     };
 
@@ -52,6 +55,22 @@ internal sealed class DotsQueryParameter
         DotsParameterAccess.ReadOnly => "Unity.Entities.RefRO<" + TypeName + ">",
         _ => string.Empty,
     };
+}
+
+internal sealed class DotsJobField
+{
+    internal DotsJobField(string name, string typeName, string initializer)
+    {
+        Name = name;
+        TypeName = typeName;
+        Initializer = initializer;
+    }
+
+    internal string Name { get; }
+
+    internal string TypeName { get; }
+
+    internal string Initializer { get; }
 }
 
 internal sealed class DotsQueryFilter
@@ -103,6 +122,8 @@ internal sealed class EntitiesForEachQuery
         bool hasStructuralChanges,
         bool hasWithoutBurst,
         bool hasUnsupportedCaptures,
+        BlockSyntax jobBody,
+        ImmutableArray<DotsJobField> jobFields,
         string executionMode,
         string jobName)
     {
@@ -114,6 +135,8 @@ internal sealed class EntitiesForEachQuery
         HasStructuralChanges = hasStructuralChanges;
         HasWithoutBurst = hasWithoutBurst;
         HasUnsupportedCaptures = hasUnsupportedCaptures;
+        JobBody = jobBody;
+        JobFields = jobFields;
         ExecutionMode = executionMode;
         JobName = jobName;
     }
@@ -133,6 +156,10 @@ internal sealed class EntitiesForEachQuery
     internal bool HasWithoutBurst { get; }
 
     internal bool HasUnsupportedCaptures { get; }
+
+    internal BlockSyntax JobBody { get; }
+
+    internal ImmutableArray<DotsJobField> JobFields { get; }
 
     internal bool SupportsJobConversion =>
         !HasStructuralChanges && !HasWithoutBurst && !HasUnsupportedCaptures;
@@ -213,6 +240,7 @@ internal sealed class EntitiesForEachQuery
         var entityType = UnitySymbolCache.GetTypeByMetadataName(
             semanticModel.Compilation,
             "Unity.Entities.Entity");
+        var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
         if (componentData is null || entityType is null)
         {
             return false;
@@ -236,6 +264,12 @@ internal sealed class EntitiesForEachQuery
 
                 access = DotsParameterAccess.Entity;
             }
+            else if (SymbolEqualityComparer.Default.Equals(symbol.Type, intType) &&
+                     symbol.RefKind == RefKind.None &&
+                     parameter.Identifier.ValueText == "entityInQueryIndex")
+            {
+                access = DotsParameterAccess.EntityIndexInQuery;
+            }
             else if (symbol.Type is INamedTypeSymbol namedType &&
                      namedType.AllInterfaces.Any(@interface =>
                          SymbolEqualityComparer.Default.Equals(@interface, componentData)))
@@ -257,7 +291,10 @@ internal sealed class EntitiesForEachQuery
         }
 
         if (parameters.Count(item => item.Access == DotsParameterAccess.Entity) > 1 ||
-            parameters.Count(item => item.Access != DotsParameterAccess.Entity) > 7)
+            parameters.Count(item => item.Access == DotsParameterAccess.EntityIndexInQuery) > 1 ||
+            parameters.Count(item =>
+                item.Access != DotsParameterAccess.Entity &&
+                item.Access != DotsParameterAccess.EntityIndexInQuery) > 7)
         {
             return false;
         }
@@ -268,6 +305,13 @@ internal sealed class EntitiesForEachQuery
             return false;
         }
 
+        var hasUnsupportedCaptures = !DotsQuerySemanticHelpers.TryCreateJobData(
+            lambda.Body,
+            parameters.Select(item => item.Symbol).ToImmutableArray(),
+            semanticModel,
+            cancellationToken,
+            out var jobBody,
+            out var jobFields);
         query = new EntitiesForEachQuery(
             statement,
             containingType,
@@ -276,11 +320,9 @@ internal sealed class EntitiesForEachQuery
             filters,
             hasStructuralChanges,
             hasWithoutBurst,
-            DotsQuerySemanticHelpers.HasUnsupportedCaptures(
-                lambda.Body,
-                parameters.Select(item => item.Symbol).ToImmutableArray(),
-                semanticModel,
-                cancellationToken),
+            hasUnsupportedCaptures,
+            jobBody,
+            jobFields,
             executionMode,
             DotsQuerySemanticHelpers.CreateUniqueNestedTypeName(containingType, "EntitiesForEachJob"));
         return true;
@@ -306,9 +348,15 @@ internal sealed class EntitiesForEachQuery
         }
 
         var componentParameters = Parameters
-            .Where(parameter => parameter.Access != DotsParameterAccess.Entity)
+            .Where(parameter =>
+                parameter.Access != DotsParameterAccess.Entity &&
+                parameter.Access != DotsParameterAccess.EntityIndexInQuery)
             .ToImmutableArray();
         var entityParameter = Parameters.FirstOrDefault(parameter => parameter.Access == DotsParameterAccess.Entity);
+        if (Parameters.Any(parameter => parameter.Access == DotsParameterAccess.EntityIndexInQuery))
+        {
+            return false;
+        }
         if (HasStructuralChanges)
         {
             return componentParameters.Length == 0 &&
@@ -443,8 +491,7 @@ internal sealed class EntitiesForEachQuery
         return candidate;
     }
 
-    internal BlockSyntax CreateJobBody() =>
-        DotsQuerySemanticHelpers.CreateBlock(Lambda.Body);
+    internal BlockSyntax CreateJobBody() => JobBody;
 
     internal string CreateJobParameters() =>
         string.Join(", ", Parameters.Select(parameter => parameter.JobParameter));
@@ -896,6 +943,152 @@ internal static class DotsQuerySemanticHelpers
         return true;
     }
 
+    internal static bool TryCreateJobData(
+        CSharpSyntaxNode body,
+        ImmutableArray<ISymbol> allowedParameters,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out BlockSyntax jobBody,
+        out ImmutableArray<DotsJobField> jobFields)
+    {
+        jobBody = CreateBlock(body);
+        jobFields = ImmutableArray<DotsJobField>.Empty;
+        if (body.DescendantNodesAndSelf().Any(node =>
+                node is AnonymousFunctionExpressionSyntax ||
+                node is LocalFunctionStatementSyntax ||
+                node is ThisExpressionSyntax ||
+                node is BaseExpressionSyntax))
+        {
+            return false;
+        }
+
+        var usedNames = body.DescendantTokens()
+            .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
+            .Select(token => token.ValueText)
+            .Concat(allowedParameters.Select(parameter => parameter.Name))
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        var fields = ImmutableArray.CreateBuilder<DotsJobField>();
+        var capturedFieldNames = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
+        var replacements = new Dictionary<SyntaxNode, string>();
+        var bodySpan = body.Span;
+
+        foreach (var identifier in body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+        {
+            var symbol = semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol;
+            if (symbol is ILocalSymbol or IParameterSymbol)
+            {
+                if (allowedParameters.Any(parameter =>
+                        SymbolEqualityComparer.Default.Equals(parameter, symbol)) ||
+                    symbol.Locations.Any(location =>
+                        location.IsInSource && bodySpan.Contains(location.SourceSpan)))
+                {
+                    continue;
+                }
+
+                var captureType = symbol switch
+                {
+                    ILocalSymbol local => local.Type,
+                    IParameterSymbol parameter => parameter.Type,
+                    _ => null,
+                };
+                if (captureType is null ||
+                    !captureType.IsUnmanagedType ||
+                    symbol is IParameterSymbol { RefKind: not RefKind.None } ||
+                    IsWrittenByReference(identifier))
+                {
+                    return false;
+                }
+
+                if (!capturedFieldNames.TryGetValue(symbol, out var fieldName))
+                {
+                    fieldName = CreateUniqueJobFieldName(symbol.Name, usedNames);
+                    usedNames = usedNames.Add(fieldName);
+                    capturedFieldNames.Add(symbol, fieldName);
+                    fields.Add(new DotsJobField(
+                        fieldName,
+                        captureType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                        EscapeIdentifier(symbol.Name)));
+                }
+
+                replacements.Add(identifier, fieldName);
+                continue;
+            }
+
+            if (symbol is IFieldSymbol { IsStatic: false } or
+                IPropertySymbol { IsStatic: false } or
+                IMethodSymbol { IsStatic: false })
+            {
+                var isMemberAccessName =
+                    identifier.Parent is MemberAccessExpressionSyntax memberAccess &&
+                    memberAccess.Name == identifier;
+                var isObjectInitializerMember =
+                    identifier.Parent is AssignmentExpressionSyntax assignment &&
+                    assignment.Left == identifier &&
+                    assignment.Parent is InitializerExpressionSyntax;
+                if (!isMemberAccessName && !isObjectInitializerMember)
+                {
+                    return false;
+                }
+            }
+        }
+
+        foreach (var access in body.DescendantNodesAndSelf()
+                     .OfType<MemberAccessExpressionSyntax>()
+                     .Where(access => TryGetSystemTimeMember(
+                         access,
+                         semanticModel,
+                         cancellationToken,
+                         out _)))
+        {
+            TryGetSystemTimeMember(
+                access,
+                semanticModel,
+                cancellationToken,
+                out var timeMember);
+            var existingField = fields.FirstOrDefault(field =>
+                field.Initializer == "Unity.Entities.SystemAPI.Time." + timeMember);
+            var fieldName = existingField?.Name;
+            if (fieldName is null)
+            {
+                fieldName = CreateUniqueJobFieldName(timeMember, usedNames);
+                usedNames = usedNames.Add(fieldName);
+                fields.Add(new DotsJobField(
+                    fieldName,
+                    timeMember == "ElapsedTime" ? "double" : "float",
+                    "Unity.Entities.SystemAPI.Time." + timeMember));
+            }
+
+            replacements.Add(access, fieldName);
+        }
+
+        var unsupportedSystemApiAccess = body.DescendantNodesAndSelf()
+            .OfType<IdentifierNameSyntax>()
+            .Any(identifier =>
+            {
+                var symbol = semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol;
+                if (symbol?.ContainingType?.ToDisplayString() != "Unity.Entities.SystemAPI")
+                {
+                    return false;
+                }
+
+                return !identifier.AncestorsAndSelf()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Any(access => replacements.ContainsKey(access));
+            });
+        if (unsupportedSystemApiAccess)
+        {
+            return false;
+        }
+
+        jobBody = CreateBlock(
+            body.ReplaceNodes(
+                replacements.Keys,
+                (original, _) => SyntaxFactory.IdentifierName(replacements[original])
+                    .WithTriviaFrom(original)));
+        jobFields = fields.ToImmutable();
+        return true;
+    }
+
     internal static bool HasUnsupportedCaptures(
         CSharpSyntaxNode body,
         ImmutableArray<ISymbol> allowedParameters,
@@ -931,8 +1124,14 @@ internal static class DotsQuerySemanticHelpers
 
             if (symbol is IFieldSymbol { IsStatic: false } or IPropertySymbol { IsStatic: false } or IMethodSymbol { IsStatic: false })
             {
-                if (identifier.Parent is not MemberAccessExpressionSyntax memberAccess ||
-                    memberAccess.Name != identifier)
+                var isMemberAccessName =
+                    identifier.Parent is MemberAccessExpressionSyntax memberAccess &&
+                    memberAccess.Name == identifier;
+                var isObjectInitializerMember =
+                    identifier.Parent is AssignmentExpressionSyntax assignment &&
+                    assignment.Left == identifier &&
+                    assignment.Parent is InitializerExpressionSyntax;
+                if (!isMemberAccessName && !isObjectInitializerMember)
                 {
                     return true;
                 }
@@ -941,6 +1140,84 @@ internal static class DotsQuerySemanticHelpers
 
         return false;
     }
+
+    private static bool TryGetSystemTimeMember(
+        MemberAccessExpressionSyntax access,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out string member)
+    {
+        member = access.Name.Identifier.ValueText;
+        if ((member != "ElapsedTime" && member != "DeltaTime") ||
+            access.Expression is not MemberAccessExpressionSyntax timeAccess ||
+            timeAccess.Name.Identifier.ValueText != "Time")
+        {
+            return false;
+        }
+
+        var receiver = semanticModel.GetSymbolInfo(
+            timeAccess.Expression,
+            cancellationToken).Symbol as INamedTypeSymbol;
+        return receiver?.ToDisplayString() == "Unity.Entities.SystemAPI";
+    }
+
+    private static bool IsWrittenByReference(IdentifierNameSyntax identifier)
+    {
+        for (SyntaxNode? current = identifier; current is ExpressionSyntax; current = current.Parent)
+        {
+            if (current.Parent is AssignmentExpressionSyntax assignment &&
+                assignment.Left == current)
+            {
+                return true;
+            }
+
+            if (current.Parent is PrefixUnaryExpressionSyntax prefix &&
+                (prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
+                 prefix.IsKind(SyntaxKind.PreDecrementExpression)))
+            {
+                return true;
+            }
+
+            if (current.Parent is PostfixUnaryExpressionSyntax postfix &&
+                (postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
+                 postfix.IsKind(SyntaxKind.PostDecrementExpression)))
+            {
+                return true;
+            }
+
+            if (current.Parent is ArgumentSyntax argument &&
+                !argument.RefKindKeyword.IsKind(SyntaxKind.None))
+            {
+                return true;
+            }
+
+            if (current.Parent is RefExpressionSyntax)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string CreateUniqueJobFieldName(
+        string sourceName,
+        ImmutableHashSet<string> usedNames)
+    {
+        var baseName = sourceName.Length == 0
+            ? "Value"
+            : char.ToUpperInvariant(sourceName[0]) + sourceName.Substring(1);
+        var candidate = baseName;
+        for (var suffix = 2; usedNames.Contains(candidate); suffix++)
+        {
+            candidate = baseName + suffix;
+        }
+
+        return candidate;
+    }
+
+    private static string EscapeIdentifier(string name) =>
+        SyntaxFacts.GetKeywordKind(name) == SyntaxKind.None ? name : "@" + name;
 
     internal static BlockSyntax CreateBlock(CSharpSyntaxNode body) => body switch
     {

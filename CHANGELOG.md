@@ -7,6 +7,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-07-26
+
+### Fixed
+
+- DOTS `Entities.ForEach` job migrations now support the special
+  `entityInQueryIndex` parameter, read-only unmanaged captures such as
+  `EntityCommandBuffer.ParallelWriter`, and `SystemAPI.Time.ElapsedTime` /
+  `DeltaTime` by generating initialized `IJobEntity` fields.
+
 ## [0.4.5] - 2026-07-26
 
 ### Fixed

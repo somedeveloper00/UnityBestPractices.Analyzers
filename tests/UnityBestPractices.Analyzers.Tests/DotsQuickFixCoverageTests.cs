@@ -148,6 +148,27 @@ internal sealed partial class AnalyzerTests
             ".Query<Unity.Entities.RefRO<Tag>>().WithAll<Tag>().WithEntityAccess()) " +
             "{ entitiesSnapshot.Add(entity); } foreach (var entity in entitiesSnapshot) " +
             "{ var hash = entity.GetHashCode(); } } } } } struct Tag : IComponentData { }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class EcbSystem : SystemBase { void Update() { " +
+            "var ecb = new EntityCommandBuffer().AsParallelWriter(); Entities.WithAll<Tag>().ForEach(" +
+            "(Entity entity, int entityInQueryIndex, in Health health) => { if (health.Value <= 0) { " +
+            "ecb.AddComponent(entityInQueryIndex, entity, new Finish { StartTime = " +
+            "SystemAPI.Time.ElapsedTime }); } }).ScheduleParallel(); } } " +
+            "struct Tag : IComponentData { } struct Health : IComponentData { public int Value; } " +
+            "struct Finish : IComponentData { public double StartTime; }",
+            DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel,
+            "using Unity.Entities; partial class EcbSystem : SystemBase { void Update() { " +
+            "var ecb = new EntityCommandBuffer().AsParallelWriter(); new EntitiesForEachJob { Ecb = ecb, " +
+            "ElapsedTime = Unity.Entities.SystemAPI.Time.ElapsedTime }.ScheduleParallel(); } " +
+            "[Unity.Burst.BurstCompile] [Unity.Entities.WithAll(typeof(Tag))] private partial struct " +
+            "EntitiesForEachJob : Unity.Entities.IJobEntity { public EntityCommandBuffer.ParallelWriter Ecb; " +
+            "public double ElapsedTime; public void Execute(Entity entity, " +
+            "[Unity.Entities.EntityIndexInQuery] int entityInQueryIndex, in Health health) { " +
+            "if (health.Value <= 0) { Ecb.AddComponent(entityInQueryIndex, entity, new Finish { " +
+            "StartTime = ElapsedTime }); } } } } struct Tag : IComponentData { } " +
+            "struct Health : IComponentData { public int Value; } " +
+            "struct Finish : IComponentData { public double StartTime; }");
     }
 
     private async Task VerifyEntitiesMigrationCaseAsync(DotsMigrationCase item)
@@ -296,12 +317,21 @@ internal sealed partial class AnalyzerTests
             "using Unity.Entities; partial class CapturedEntitiesSystem : SystemBase { void Update() { " +
             "var scale = 2f; Entities.ForEach((ref Position p) => { p.Value *= scale; }).Run(); } } " +
             "struct Position : IComponentData { public float Value; }",
-            DiagnosticIds.EntitiesForEachToSystemApiQuery);
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel);
 
         await VerifyExactDotsDiagnosticsAsync(
             "using Unity.Entities; partial class CapturedQuerySystem : SystemBase { void Update() { " +
             "var scale = 2f; foreach (var p in SystemAPI.Query<RefRW<Position>>()) " +
             "{ p.ValueRW.Value *= scale; } } } struct Position : IComponentData { public float Value; }");
+
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; partial class MutatingCaptureSystem : SystemBase { void Update() { " +
+            "var total = 0; Entities.ForEach((in Position p) => { total++; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery);
 
         await VerifyExactDotsDiagnosticsAsync(
             "using Unity.Entities; partial class RawWrapperSystem : SystemBase { void Update() { " +
