@@ -425,23 +425,46 @@ internal sealed class EntitiesForEachQuery
         var identifiers = Lambda.Body.DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
             .Where(identifier => componentParameters.Any(parameter =>
+                parameter.Access != DotsParameterAccess.BufferReadOnly &&
+                parameter.Access != DotsParameterAccess.BufferReadWrite &&
                 SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
                     parameter.Symbol)))
             .ToImmutableArray();
+        var writableBufferElements = Lambda.Body.DescendantNodesAndSelf()
+            .OfType<ElementAccessExpressionSyntax>()
+            .Where(element =>
+                IsWrittenBufferElement(element) &&
+                componentParameters.Any(parameter =>
+                    parameter.Access == DotsParameterAccess.BufferReadWrite &&
+                    SymbolEqualityComparer.Default.Equals(
+                        semanticModel.GetSymbolInfo(element.Expression, cancellationToken).Symbol,
+                        parameter.Symbol)))
+            .ToImmutableArray();
+        var nodesToRewrite = identifiers
+            .Cast<SyntaxNode>()
+            .Concat(writableBufferElements)
+            .ToImmutableArray();
         var rewrittenBody = DotsQuerySemanticHelpers.CreateBlock(
-            Lambda.Body.ReplaceNodes(identifiers, (identifier, _) =>
+            Lambda.Body.ReplaceNodes(nodesToRewrite, (original, rewritten) =>
             {
+                if (original is ElementAccessExpressionSyntax)
+                {
+                    var element = (ElementAccessExpressionSyntax)rewritten;
+                    return SyntaxFactory.InvocationExpression(
+                            SyntaxFactory.MemberAccessExpression(
+                                SyntaxKind.SimpleMemberAccessExpression,
+                                element.Expression.WithoutTrailingTrivia(),
+                                SyntaxFactory.IdentifierName("ElementAt")),
+                            SyntaxFactory.ArgumentList(element.ArgumentList.Arguments))
+                        .WithTriviaFrom(element);
+                }
+
+                var identifier = (IdentifierNameSyntax)original;
                 var parameter = componentParameters.First(item =>
                     SymbolEqualityComparer.Default.Equals(
                         semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
                         item.Symbol));
-                if (parameter.Access == DotsParameterAccess.BufferReadOnly ||
-                    parameter.Access == DotsParameterAccess.BufferReadWrite)
-                {
-                    return identifier;
-                }
-
                 var valueProperty = parameter.Access == DotsParameterAccess.ReadWrite ? "ValueRW" : "ValueRO";
                 return SyntaxFactory.MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
@@ -486,6 +509,36 @@ internal sealed class EntitiesForEachQuery
             rewrittenBody.ToFullString() +
             "\n}");
         return !statement.ContainsDiagnostics;
+    }
+
+    private static bool IsWrittenBufferElement(ElementAccessExpressionSyntax element)
+    {
+        if (element.Parent is AssignmentExpressionSyntax assignment &&
+            assignment.Left == element)
+        {
+            return true;
+        }
+
+        if (element.Parent is PrefixUnaryExpressionSyntax prefix &&
+            prefix.Operand == element &&
+            (prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
+             prefix.IsKind(SyntaxKind.PreDecrementExpression)))
+        {
+            return true;
+        }
+
+        if (element.Parent is PostfixUnaryExpressionSyntax postfix &&
+            postfix.Operand == element &&
+            (postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
+             postfix.IsKind(SyntaxKind.PostDecrementExpression)))
+        {
+            return true;
+        }
+
+        return element.Parent is ArgumentSyntax argument &&
+               argument.Expression == element &&
+               (argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
+                argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword));
     }
 
     private bool TryCreateStructuralEntitySnapshot(

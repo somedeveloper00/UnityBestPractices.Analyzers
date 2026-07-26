@@ -133,8 +133,16 @@ internal sealed partial class AnalyzerTests
 
             public struct DynamicBuffer<T> where T : struct, IBufferElementData
             {
+                private T[] _items;
                 public int Length => 0;
                 public void Clear() { }
+                public T this[int index]
+                {
+                    get => _items[index];
+                    set => _items[index] = value;
+                }
+
+                public ref T ElementAt(int index) => ref _items[index];
             }
 
             public enum EntityQueryOptions { Default, IncludeDisabledEntities }

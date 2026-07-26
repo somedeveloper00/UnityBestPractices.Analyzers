@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-07-26
+
+### Fixed
+
+- UBP0058 now rewrites indexed writes to migrated `DynamicBuffer<T>` query
+  values through `ElementAt`, while leaving indexed reads unchanged.
+
 ## [0.4.8] - 2026-07-26
 
 ### Added

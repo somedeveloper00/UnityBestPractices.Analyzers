@@ -236,6 +236,80 @@ internal sealed partial class AnalyzerTests
             """);
 
         await VerifyFixAsync(
+            """
+            using Unity.Entities;
+
+            partial class WritableBufferSystem : SystemBase
+            {
+                void Update()
+                {
+                    Entities
+                        .WithoutBurst()
+                        .WithAll<PlayerTag>()
+                        .ForEach(
+                            (Entity playerEntity, int entityInQueryIndex,
+                                ref CharacterStance characterStance,
+                                ref DetectionData detectionData,
+                                ref DynamicBuffer<DetectedElement> detectedBuffer,
+                                in PerceptionData perceptionData,
+                                in PlayerInputs input) =>
+                            {
+                                for (var i = 0; i < detectedBuffer.Length; i++)
+                                {
+                                    if (detectedBuffer[i].Value == 0)
+                                        continue;
+
+                                    var element = detectedBuffer[i];
+                                    element.Value += input.Toggle;
+                                    detectedBuffer[i] = element;
+                                }
+                            }).Run();
+                }
+            }
+
+            struct PlayerTag : IComponentData { }
+            struct CharacterStance : IComponentData { public int Mode; }
+            struct DetectionData : IComponentData { public int Count; }
+            struct DetectedElement : IBufferElementData { public int Value; }
+            struct PerceptionData : IComponentData { public int Value; }
+            struct PlayerInputs : IComponentData { public int Toggle; }
+            """,
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            """
+            using Unity.Entities;
+
+            partial class WritableBufferSystem : SystemBase
+            {
+                void Update()
+                {
+                    {
+                        var entityInQueryIndexCounter = 0;
+                        foreach (var (characterStance, detectionData, detectedBuffer, perceptionData, input, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<CharacterStance>, Unity.Entities.RefRW<DetectionData>, DynamicBuffer<DetectedElement>, Unity.Entities.RefRO<PerceptionData>, Unity.Entities.RefRO<PlayerInputs>>().WithAll<PlayerTag>().WithEntityAccess())
+                        {
+                            var entityInQueryIndex = entityInQueryIndexCounter++;
+                            for (var i = 0; i < detectedBuffer.Length; i++)
+                            {
+                                if (detectedBuffer[i].Value == 0)
+                                    continue;
+
+                                var element = detectedBuffer[i];
+                                element.Value += input.ValueRO.Toggle;
+                                detectedBuffer.ElementAt(i) = element;
+                            }
+                        }
+                    }
+                }
+            }
+
+            struct PlayerTag : IComponentData { }
+            struct CharacterStance : IComponentData { public int Mode; }
+            struct DetectionData : IComponentData { public int Count; }
+            struct DetectedElement : IBufferElementData { public int Value; }
+            struct PerceptionData : IComponentData { public int Value; }
+            struct PlayerInputs : IComponentData { public int Toggle; }
+            """);
+
+        await VerifyFixAsync(
             "using Unity.Entities; partial class CapturedSystem : SystemBase { void Update() { " +
             "var scale = 2f; Entities.ForEach((ref Position p) => { p.Value *= scale; }).Run(); } } " +
             "struct Position : IComponentData { public float Value; }",
