@@ -212,6 +212,11 @@ internal static class RuleDocumentationGenerator
                 return "- Synchronous conversions support local and instance captures, `WithoutBurst()`, component parameters, and entity-only lambdas constrained by at least one `WithAll<T>()` filter. Entity-only queries use `SystemAPI.Query<RefRO<T>>().WithEntityAccess()`. For `WithStructuralChanges()`, entity IDs are first copied into a disposable `NativeList<Entity>` so structural edits cannot invalidate the query enumerator.";
             }
 
+            if (IsEntitiesForEachJobConversion(rule))
+            {
+                return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model. The special `entityInQueryIndex` parameter becomes `[EntityIndexInQuery]`; read-only unmanaged captures become initialized job fields; and `SystemAPI.Time.ElapsedTime` / `DeltaTime` are evaluated by the system and passed into the job.";
+            }
+
             return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model.";
         }
 
@@ -240,7 +245,12 @@ internal static class RuleDocumentationGenerator
         {
             if (rule.DiagnosticId == DiagnosticIds.EntitiesForEachToSystemApiQuery)
             {
-                return "- Nested lambdas, unresolved or unsupported filters, entity-only loops without a usable query component, and structural-change loops that expose component references are excluded. Scheduled job conversions remain unavailable for captured, `WithoutBurst()`, or structural-change pipelines.";
+                return "- Nested lambdas, unresolved or unsupported filters, entity-only loops without a usable query component, and structural-change loops that expose component references are excluded. Scheduled job conversions remain unavailable for managed or mutated captures, unsupported `SystemAPI` access, `WithoutBurst()`, or structural-change pipelines.";
+            }
+
+            if (IsEntitiesForEachJobConversion(rule))
+            {
+                return "- Managed or mutated captures, nested lambdas, structural-change pipelines, unsupported `SystemAPI` access, unsupported filters, system-instance access, and ambiguous package symbols are excluded.";
             }
 
             return "- Captured locals, nested lambdas, structural-change pipelines, unsupported filters, system-instance access, and ambiguous package symbols are excluded.";
@@ -259,6 +269,11 @@ internal static class RuleDocumentationGenerator
             _ => string.Empty,
         };
     }
+
+    private static bool IsEntitiesForEachJobConversion(RuleMetadata rule) =>
+        rule.DiagnosticId == DiagnosticIds.EntitiesForEachToJobEntityRun ||
+        rule.DiagnosticId == DiagnosticIds.EntitiesForEachToJobEntitySchedule ||
+        rule.DiagnosticId == DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel;
 
     private static string EscapeInline(string value) => value.Replace("`", "\\`");
 
