@@ -962,8 +962,20 @@ internal static class DotsQuerySemanticHelpers
             return false;
         }
 
+        var systemTimeAccesses = body.DescendantNodesAndSelf()
+            .OfType<MemberAccessExpressionSyntax>()
+            .Where(access => TryGetSystemTimeMember(
+                access,
+                semanticModel,
+                cancellationToken,
+                out _))
+            .ToImmutableArray();
+        var replacedTimeMemberTokens = systemTimeAccesses
+            .Select(access => access.Name.Identifier)
+            .ToImmutableHashSet();
         var usedNames = body.DescendantTokens()
             .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
+            .Where(token => !replacedTimeMemberTokens.Contains(token))
             .Select(token => token.ValueText)
             .Concat(allowedParameters.Select(parameter => parameter.Name))
             .ToImmutableHashSet(StringComparer.Ordinal);
@@ -1006,7 +1018,7 @@ internal static class DotsQuerySemanticHelpers
                     capturedFieldNames.Add(symbol, fieldName);
                     fields.Add(new DotsJobField(
                         fieldName,
-                        captureType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                        captureType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                         EscapeIdentifier(symbol.Name)));
                 }
 
@@ -1032,13 +1044,7 @@ internal static class DotsQuerySemanticHelpers
             }
         }
 
-        foreach (var access in body.DescendantNodesAndSelf()
-                     .OfType<MemberAccessExpressionSyntax>()
-                     .Where(access => TryGetSystemTimeMember(
-                         access,
-                         semanticModel,
-                         cancellationToken,
-                         out _)))
+        foreach (var access in systemTimeAccesses)
         {
             TryGetSystemTimeMember(
                 access,

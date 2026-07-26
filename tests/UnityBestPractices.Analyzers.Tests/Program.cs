@@ -1526,7 +1526,10 @@ internal sealed partial class AnalyzerTests
                 }
             }
             """,
-            DiagnosticIds.EntitiesForEachToSystemApiQuery);
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel);
     }
 
     private Task VerifyJobEntityModeFixAsync(string sourceMode, string targetMode, string diagnosticId)

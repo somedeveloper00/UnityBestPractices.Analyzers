@@ -162,7 +162,7 @@ internal sealed partial class AnalyzerTests
             "var ecb = new EntityCommandBuffer().AsParallelWriter(); new EntitiesForEachJob { Ecb = ecb, " +
             "ElapsedTime = Unity.Entities.SystemAPI.Time.ElapsedTime }.ScheduleParallel(); } " +
             "[Unity.Burst.BurstCompile] [Unity.Entities.WithAll(typeof(Tag))] private partial struct " +
-            "EntitiesForEachJob : Unity.Entities.IJobEntity { public EntityCommandBuffer.ParallelWriter Ecb; " +
+            "EntitiesForEachJob : Unity.Entities.IJobEntity { public global::Unity.Entities.EntityCommandBuffer.ParallelWriter Ecb; " +
             "public double ElapsedTime; public void Execute(Entity entity, " +
             "[Unity.Entities.EntityIndexInQuery] int entityInQueryIndex, in Health health) { " +
             "if (health.Value <= 0) { Ecb.AddComponent(entityInQueryIndex, entity, new Finish { " +

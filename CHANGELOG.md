@@ -7,6 +7,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-07-26
+
+### Fixed
+
+- UBP0059–UBP0061 job extraction now fully qualifies captured field types, so
+  nested unmanaged types such as `EntityCommandBuffer.ParallelWriter` compile
+  after being moved into the generated `IJobEntity`.
+- Generated `SystemAPI.Time` fields no longer receive an unnecessary numeric
+  suffix when the replaced time member is their only name collision.
+
 ## [0.4.6] - 2026-07-26
 
 ### Fixed
