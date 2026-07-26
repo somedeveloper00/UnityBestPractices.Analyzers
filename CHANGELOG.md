@@ -7,6 +7,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-07-26
+
 ### Fixed
 
 - UBP0051 and UBP0052 fixes now parenthesize the `Length != 0` / `Count != 0` replacement when a parent expression binds tighter, so fixing `!list.Any()` no longer produces code that fails to compile.
