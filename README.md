@@ -136,11 +136,13 @@ Performance transformations have conservative safety limits. Stack allocation is
 
 DOTS extraction is offered only for semantic Unity Entities calls using direct `IComponentData` parameters, supported `WithAll`/`WithAny`/`WithNone`/`WithChangeFilter`/query-option filters, and bodies without captured locals, nested lambdas, or system-instance access. `ref` parameters become `RefRW<T>`, `in` or value parameters become `RefRO<T>`, entity parameters become `WithEntityAccess()`, and query filters become the equivalent IJobEntity attributes. Existing `SystemAPI.Query` loops must access wrappers through `ValueRW` or `ValueRO` so extraction can preserve access intent.
 
-## Parameter reordering refactoring
+## Parameter refactorings
 
 Put the caret on a method, constructor, local-function, or indexer parameter and invoke the IDE quick-action command to use **Move parameter left** or **Move parameter right**. The refactoring updates related interface/implementation declarations and all semantically matched C# call sites in the solution, including named arguments, optional arguments, constructor initializers, and reduced extension-method calls.
 
 Call sites are discovered with Roslyn's solution-wide `SymbolFinder.FindReferencesAsync` API, and each argument is associated with its parameter through Roslyn `IOperation` bindings. The refactoring therefore distinguishes overloads and does not use textual name matching. Moves that would displace an extension `this` parameter, a `params` parameter, or place a required parameter after a parameter with a default are not offered.
+
+Use **Remove parameter** from the same caret position to remove the parameter from related declarations and remove every bound argument from matching call sites. This also handles named, optional, and expanded `params` arguments. Extension receivers and the sole parameter of an indexer cannot be removed because doing so would produce an invalid declaration or call shape.
 
 ## Deliberately out of scope
 

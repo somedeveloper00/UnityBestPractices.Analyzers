@@ -14,6 +14,108 @@ using Xunit;
 public sealed class MoveParameterCodeRefactoringProviderTests
 {
     [Fact]
+    public async Task RemoveParameterUpdatesRelatedDeclarationsAndCallSites()
+    {
+        var declaration = """
+            public interface IHandler
+            {
+                string Handle(string text, int cou$$nt, bool enabled);
+            }
+
+            public sealed class Handler : IHandler
+            {
+                public string Handle(string text, int count, bool enabled) => text + enabled;
+            }
+            """;
+        var calls = """
+            public sealed class Caller
+            {
+                public string Run(IHandler abstraction, Handler concrete)
+                {
+                    return abstraction.Handle("interface", 1, true) +
+                           concrete.Handle(text: "concrete", count: 2, enabled: false);
+                }
+            }
+            """;
+
+        var changed = await ApplyRefactoringAsync(
+            declaration,
+            calls,
+            RemoveParameterCodeRefactoringProvider.Title,
+            new RemoveParameterCodeRefactoringProvider());
+
+        AssertDocument(
+            changed,
+            "Declaration.cs",
+            """
+            public interface IHandler
+            {
+                string Handle(string text, bool enabled);
+            }
+
+            public sealed class Handler : IHandler
+            {
+                public string Handle(string text, bool enabled) => text + enabled;
+            }
+            """);
+        AssertDocument(
+            changed,
+            "Calls.cs",
+            """
+            public sealed class Caller
+            {
+                public string Run(IHandler abstraction, Handler concrete)
+                {
+                    return abstraction.Handle("interface", true) +
+                           concrete.Handle(text: "concrete", enabled: false);
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public async Task RemoveParamsParameterRemovesEveryExpandedArgument()
+    {
+        var declaration = """
+            public static class Logger
+            {
+                public static void Write(string message, params object[] ar$$gs) { }
+            }
+            """;
+        var calls = """
+            public sealed class Caller
+            {
+                public void Run() => Logger.Write("message", 1, "two", true);
+            }
+            """;
+
+        var changed = await ApplyRefactoringAsync(
+            declaration,
+            calls,
+            RemoveParameterCodeRefactoringProvider.Title,
+            new RemoveParameterCodeRefactoringProvider());
+
+        AssertDocument(
+            changed,
+            "Declaration.cs",
+            """
+            public static class Logger
+            {
+                public static void Write(string message) { }
+            }
+            """);
+        AssertDocument(
+            changed,
+            "Calls.cs",
+            """
+            public sealed class Caller
+            {
+                public void Run() => Logger.Write("message");
+            }
+            """);
+    }
+
+    [Fact]
     public async Task MoveRightUpdatesOnlySemanticallyMatchingCallsAcrossDocuments()
     {
         var declaration = """
@@ -285,7 +387,8 @@ public sealed class MoveParameterCodeRefactoringProviderTests
     private static async Task<Solution> ApplyRefactoringAsync(
         string declarationWithCursor,
         string calls,
-        string title)
+        string title,
+        CodeRefactoringProvider? provider = null)
     {
         var cursor = declarationWithCursor.IndexOf("$$", StringComparison.Ordinal);
         Assert.True(cursor >= 0, "The declaration source must contain a $$ cursor marker.");
@@ -319,7 +422,7 @@ public sealed class MoveParameterCodeRefactoringProviderTests
             actions.Add,
             CancellationToken.None);
 
-        await new MoveParameterCodeRefactoringProvider().ComputeRefactoringsAsync(context);
+        await (provider ?? new MoveParameterCodeRefactoringProvider()).ComputeRefactoringsAsync(context);
         var action = Assert.Single(actions, candidate => candidate.Title == title);
         var operations = await action.GetOperationsAsync(CancellationToken.None);
         var changedSolution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
