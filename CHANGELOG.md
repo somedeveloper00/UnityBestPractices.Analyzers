@@ -7,6 +7,19 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.15] - 2026-07-27
+
+### Changed
+
+- **Remove parameter** now performs the requested declaration and call-site
+  edits even when the removed parameter is still referenced in the declaration
+  body, leaving any resulting compiler errors for the user to resolve.
+
+### Fixed
+
+- **Move statement up** and **Move statement down** now reorder complete
+  `if`/`else if` branches, including their conditions and bodies.
+
 ## [0.4.14] - 2026-07-27
 
 ### Added
@@ -178,7 +191,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.14...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.15...HEAD
+[0.4.15]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.15
 [0.4.14]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.14
 [0.4.13]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.13
 [0.4.12]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.12

@@ -147,6 +147,75 @@ public sealed class MoveStatementCodeRefactoringProviderTests
         Assert.DoesNotContain(lastActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveDownTitle);
     }
 
+    [Theory]
+    [InlineData(
+        MoveStatementCodeRefactoringProvider.MoveUpTitle,
+        """
+        class Example
+        {
+            void Update()
+            {
+                if ((time -= secondDuration) < 0)
+                    state = State.Second;
+                else if ((time -= firstDuration) < 0)
+                    state = State.First;
+                else if ((time -= thirdDuration) < 0)
+                    state = State.Third;
+            }
+        }
+        """)]
+    [InlineData(
+        MoveStatementCodeRefactoringProvider.MoveDownTitle,
+        """
+        class Example
+        {
+            void Update()
+            {
+                if ((time -= firstDuration) < 0)
+                    state = State.First;
+                else if ((time -= thirdDuration) < 0)
+                    state = State.Third;
+                else if ((time -= secondDuration) < 0)
+                    state = State.Second;
+            }
+        }
+        """)]
+    public async Task MovesElseIfBranchesInEitherDirection(string title, string expected)
+    {
+        var changed = await ApplyAsync(
+            """
+            class Example
+            {
+                void Update()
+                {
+                    if ((time -= firstDuration) < 0)
+                        state = State.First;
+                    else if ((time -= secondDuration) < 0)
+                        $$state = State.Second;
+                    else if ((time -= thirdDuration) < 0)
+                        state = State.Third;
+                }
+            }
+            """,
+            title);
+
+        Assert.Equal(expected, changed);
+    }
+
+    [Fact]
+    public async Task ElseIfBranchActionsRespectLadderBounds()
+    {
+        var firstActions = await GetActionsAsync(
+            "class C { void M() { $$if (First()) A(); else if (Second()) B(); else Fallback(); } }");
+        Assert.DoesNotContain(firstActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveUpTitle);
+        Assert.Contains(firstActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveDownTitle);
+
+        var lastActions = await GetActionsAsync(
+            "class C { void M() { if (First()) A(); $$else if (Second()) B(); else Fallback(); } }");
+        Assert.Contains(lastActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveUpTitle);
+        Assert.DoesNotContain(lastActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveDownTitle);
+    }
+
     [Fact]
     public async Task DoesNotOfferARefactoringForAnEmbeddedStatement()
     {

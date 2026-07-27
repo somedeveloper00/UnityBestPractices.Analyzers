@@ -57,6 +57,14 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         var position = Math.Min(span.Start, root.FullSpan.End);
         var token = root.FindToken(position);
 
+        if (token.Parent is ElseClauseSyntax elseClause &&
+            token == elseClause.ElseKeyword &&
+            elseClause.Statement is IfStatementSyntax elseIfBranch &&
+            TryGetPosition(elseIfBranch, out _, out _))
+        {
+            return elseIfBranch;
+        }
+
         return token.Parent?
             .AncestorsAndSelf()
             .FirstOrDefault(node =>
@@ -68,6 +76,12 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
     {
         index = -1;
         count = 0;
+
+        if (node is IfStatementSyntax ifStatement &&
+            TryGetIfBranchPosition(ifStatement, out index, out count))
+        {
+            return true;
+        }
 
         switch (node)
         {
@@ -108,6 +122,54 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         return index >= 0;
     }
 
+    private static bool TryGetIfBranchPosition(
+        IfStatementSyntax statement,
+        out int index,
+        out int count)
+    {
+        var first = GetFirstIfBranch(statement);
+        var branches = GetIfBranches(first);
+        index = Array.IndexOf(branches, statement);
+        count = branches.Length;
+        return index >= 0 && count > 1;
+    }
+
+    private static IfStatementSyntax GetFirstIfBranch(IfStatementSyntax statement)
+    {
+        var first = statement;
+        while (first.Parent is ElseClauseSyntax elseClause &&
+               elseClause.Parent is IfStatementSyntax precedingStatement)
+        {
+            first = precedingStatement;
+        }
+
+        return first;
+    }
+
+    private static IfStatementSyntax[] GetIfBranches(IfStatementSyntax first)
+    {
+        var count = 1;
+        var current = first;
+        while (current.Else?.Statement is IfStatementSyntax next)
+        {
+            count++;
+            current = next;
+        }
+
+        var branches = new IfStatementSyntax[count];
+        current = first;
+        for (var index = 0; index < count; index++)
+        {
+            branches[index] = current;
+            if (current.Else?.Statement is IfStatementSyntax next)
+            {
+                current = next;
+            }
+        }
+
+        return branches;
+    }
+
     private static async Task<Document> MoveAsync(
         Document document,
         TextSpan originalSpan,
@@ -131,6 +193,41 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         if (node?.Parent is null || destinationIndex < 0 || destinationIndex >= count)
         {
             return document;
+        }
+
+        if (node is IfStatementSyntax ifBranch &&
+            TryGetIfBranchPosition(ifBranch, out _, out _))
+        {
+            var first = GetFirstIfBranch(ifBranch);
+            var branchDestination = GetIfBranches(first)[destinationIndex];
+            var branchChangedRoot = root.ReplaceNodes(
+                new SyntaxNode[]
+                {
+                    ifBranch.Condition,
+                    ifBranch.Statement,
+                    branchDestination.Condition,
+                    branchDestination.Statement,
+                },
+                (original, _) =>
+                {
+                    if (original == ifBranch.Condition)
+                    {
+                        return branchDestination.Condition;
+                    }
+
+                    if (original == ifBranch.Statement)
+                    {
+                        return branchDestination.Statement;
+                    }
+
+                    if (original == branchDestination.Condition)
+                    {
+                        return ifBranch.Condition;
+                    }
+
+                    return ifBranch.Statement;
+                });
+            return document.WithSyntaxRoot(branchChangedRoot);
         }
 
         var siblings = node.Parent.ChildNodes().Where(candidate => TryGetPosition(candidate, out _, out _)).ToArray();

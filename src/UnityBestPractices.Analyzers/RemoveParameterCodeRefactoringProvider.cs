@@ -85,11 +85,7 @@ public sealed class RemoveParameterCodeRefactoringProvider : CodeRefactoringProv
             var parameters = MoveParameterCodeRefactoringProvider.GetParameters(definition);
             if (parameterIndex >= parameters.Length ||
                 parameters[parameterIndex].IsThis ||
-                definition is IPropertySymbol && parameters.Length == 1 ||
-                await IsUsedInDeclarationAsync(
-                    parameters[parameterIndex],
-                    solution,
-                    cancellationToken).ConfigureAwait(false))
+                definition is IPropertySymbol && parameters.Length == 1)
             {
                 return solution;
             }
@@ -181,36 +177,6 @@ public sealed class RemoveParameterCodeRefactoringProvider : CodeRefactoringProv
         }
 
         return changedSolution;
-    }
-
-    private static async Task<bool> IsUsedInDeclarationAsync(
-        IParameterSymbol parameter,
-        Solution solution,
-        CancellationToken cancellationToken)
-    {
-        foreach (var syntaxReference in parameter.DeclaringSyntaxReferences)
-        {
-            var document = solution.GetDocument(syntaxReference.SyntaxTree);
-            var parameterSyntax = syntaxReference.GetSyntax(cancellationToken) as ParameterSyntax;
-            var declaration = parameterSyntax?.Parent?.Parent;
-            var semanticModel = document is null
-                ? null
-                : await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-            if (declaration is null || semanticModel is null)
-            {
-                return true;
-            }
-
-            if (declaration.DescendantNodes().OfType<IdentifierNameSyntax>().Any(
-                    identifier => SymbolEqualityComparer.Default.Equals(
-                        semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
-                        parameter)))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static Dictionary<SyntaxNode, ImmutableArray<int>>? CreateCallEdits(

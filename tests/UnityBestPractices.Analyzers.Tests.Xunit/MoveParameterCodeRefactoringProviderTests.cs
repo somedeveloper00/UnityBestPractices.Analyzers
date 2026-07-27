@@ -116,18 +116,35 @@ public sealed class MoveParameterCodeRefactoringProviderTests
     }
 
     [Fact]
-    public async Task RemoveParameterLeavesSolutionUnchangedWhenParameterIsUsed()
+    public async Task RemoveParameterAllowsUsedBurstMethodParameter()
     {
         var declaration = """
-            public static class Calculator
+            using System;
+
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class BurstCompileAttribute : Attribute { }
+
+            public struct Random
             {
-                public static int Add(int left, int ri$$ght) => left + right;
+                public float NextFloat(float min, float max) => min;
+            }
+
+            public sealed class Spawner
+            {
+                private float nextSpawnTime;
+                private float spawnRateMin;
+                private float spawnRateMax;
+
+                [BurstCompile]
+                public void UpdateNextSpawnTime(float ti$$me, ref Random random) =>
+                    nextSpawnTime = time + random.NextFloat(spawnRateMin, spawnRateMax);
             }
             """;
         var calls = """
             public sealed class Caller
             {
-                public int Run() => Calculator.Add(1, 2);
+                public void Run(Spawner spawner, ref Random random) =>
+                    spawner.UpdateNextSpawnTime(1f, ref random);
             }
             """;
 
@@ -135,18 +152,44 @@ public sealed class MoveParameterCodeRefactoringProviderTests
             declaration,
             calls,
             RemoveParameterCodeRefactoringProvider.Title,
-            new RemoveParameterCodeRefactoringProvider());
+            new RemoveParameterCodeRefactoringProvider(),
+            expectedErrorId: "CS0103");
 
         AssertDocument(
             changed,
             "Declaration.cs",
             """
-            public static class Calculator
+            using System;
+
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class BurstCompileAttribute : Attribute { }
+
+            public struct Random
             {
-                public static int Add(int left, int right) => left + right;
+                public float NextFloat(float min, float max) => min;
+            }
+
+            public sealed class Spawner
+            {
+                private float nextSpawnTime;
+                private float spawnRateMin;
+                private float spawnRateMax;
+
+                [BurstCompile]
+                public void UpdateNextSpawnTime(ref Random random) =>
+                    nextSpawnTime = time + random.NextFloat(spawnRateMin, spawnRateMax);
             }
             """);
-        AssertDocument(changed, "Calls.cs", calls);
+        AssertDocument(
+            changed,
+            "Calls.cs",
+            """
+            public sealed class Caller
+            {
+                public void Run(Spawner spawner, ref Random random) =>
+                    spawner.UpdateNextSpawnTime(ref random);
+            }
+            """);
     }
 
     [Fact]
@@ -458,7 +501,8 @@ public sealed class MoveParameterCodeRefactoringProviderTests
         string declarationWithCursor,
         string calls,
         string title,
-        CodeRefactoringProvider? provider = null)
+        CodeRefactoringProvider? provider = null,
+        string? expectedErrorId = null)
     {
         var cursor = declarationWithCursor.IndexOf("$$", StringComparison.Ordinal);
         Assert.True(cursor >= 0, "The declaration source must contain a $$ cursor marker.");
@@ -500,7 +544,17 @@ public sealed class MoveParameterCodeRefactoringProviderTests
         var errors = compilation!.GetDiagnostics()
             .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
-        Assert.True(errors.Length == 0, string.Join(Environment.NewLine, errors.Select(error => error.ToString())));
+        if (expectedErrorId is null)
+        {
+            Assert.True(
+                errors.Length == 0,
+                string.Join(Environment.NewLine, errors.Select(error => error.ToString())));
+        }
+        else
+        {
+            Assert.Contains(errors, error => error.Id == expectedErrorId);
+        }
+
         return changedSolution;
     }
 
