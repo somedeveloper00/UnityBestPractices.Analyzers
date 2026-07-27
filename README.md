@@ -140,6 +140,8 @@ DOTS extraction is offered only for semantic Unity Entities calls using direct `
 
 Put the caret on a method, constructor, local-function, or indexer parameter and invoke the IDE quick-action command to use **Move parameter left** or **Move parameter right**. The refactoring updates related interface/implementation declarations and all semantically matched C# call sites in the solution, including named arguments, optional arguments, constructor initializers, and reduced extension-method calls.
 
+Put the caret on a call to a simple static method and invoke **Inline method** to replace the call with the method's expression. The refactoring is offered only when every argument is used exactly once and in evaluation order, so inlining does not duplicate, discard, or reorder side effects.
+
 Call sites are discovered with Roslyn's solution-wide `SymbolFinder.FindReferencesAsync` API, and each argument is associated with its parameter through Roslyn `IOperation` bindings. The refactoring therefore distinguishes overloads and does not use textual name matching. Moves that would displace an extension `this` parameter, a `params` parameter, or place a required parameter after a parameter with a default are not offered.
 
 ## Deliberately out of scope

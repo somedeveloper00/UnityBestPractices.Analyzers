@@ -7,6 +7,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added a conservative **Inline method** refactoring for expression-bodied methods
+  and methods consisting of a single return statement.
+
 ## [0.4.13] - 2026-07-27
 
 ### Fixed
