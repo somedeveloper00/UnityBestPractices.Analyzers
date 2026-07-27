@@ -144,6 +144,15 @@ Call sites are discovered with Roslyn's solution-wide `SymbolFinder.FindReferenc
 
 Use **Remove parameter** from the same caret position to remove the parameter from related declarations and remove every bound argument from matching call sites. This also handles named, optional, and expanded `params` arguments. Extension receivers and the sole parameter of an indexer cannot be removed because doing so would produce an invalid declaration or call shape.
 
+## Statement and declaration movement refactoring
+
+Put the caret anywhere on a statement or declaration and use **Move statement up**
+or **Move statement down** to exchange it with its adjacent sibling. The actions
+support one-line statements, braced blocks, switch sections, accessors, enum
+members, methods, properties, fields, nested types, namespaces, and top-level
+type declarations. Comments and other trivia attached to the moved syntax travel
+with it, and an action is omitted when there is no sibling in that direction.
+
 ## Deliberately out of scope
 
 This package was checked against the current [`Microsoft.Unity.Analyzers` catalog](https://github.com/microsoft/Microsoft.Unity.Analyzers/tree/main/doc) (`UNT0001` through `UNT0043`). It intentionally does not duplicate existing rules such as empty Unity messages, `CompareTag`, `TryGetComponent`, non-allocating physics APIs, cached yield instructions, transform position/rotation APIs, mesh-array loop access, or `Animator.StringToHash`.
