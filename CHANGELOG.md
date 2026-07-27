@@ -9,6 +9,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added a solution-wide **Remove parameter** refactoring that uses Roslyn's
+  parameter bindings and reference finder to update related declarations and
+  remove corresponding call-site arguments, including expanded `params`
+  arguments.
+- Added **Move statement up** and **Move statement down** refactorings for
+  statements, braced blocks, declarations, accessors, switch sections, and enum
+  members, preserving attached comments and trivia.
 - Added a conservative **Inline method** refactoring for expression-bodied methods
   and methods consisting of a single return statement.
 
