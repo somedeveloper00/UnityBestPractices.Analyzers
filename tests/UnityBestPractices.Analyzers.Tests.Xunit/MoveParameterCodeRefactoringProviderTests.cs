@@ -229,6 +229,62 @@ public sealed class MoveParameterCodeRefactoringProviderTests
     }
 
     [Fact]
+    public async Task RemoveParameterAllowsEventSubscriptionMethodGroupReference()
+    {
+        var declaration = """
+            using System;
+
+            public sealed class RiddleOfTheSphinx
+            {
+                public event Action<bool> onClose = delegate { };
+            }
+
+            public sealed class Page
+            {
+                private readonly RiddleOfTheSphinx riddleOfTheSphinx = new RiddleOfTheSphinx();
+
+                public void Attach() => riddleOfTheSphinx.onClose += OnRiddleClosed;
+
+                private void OnRiddleClosed(bool clicked$$No) => NextPage();
+
+                private void NextPage() { }
+            }
+            """;
+        var calls = "public sealed class Other { }";
+
+        var changed = await ApplyRefactoringAsync(
+            declaration,
+            calls,
+            RemoveParameterCodeRefactoringProvider.Title,
+            new RemoveParameterCodeRefactoringProvider(),
+            expectedErrorId: "CS0123");
+
+        AssertDocument(
+            changed,
+            "Declaration.cs",
+            """
+            using System;
+
+            public sealed class RiddleOfTheSphinx
+            {
+                public event Action<bool> onClose = delegate { };
+            }
+
+            public sealed class Page
+            {
+                private readonly RiddleOfTheSphinx riddleOfTheSphinx = new RiddleOfTheSphinx();
+
+                public void Attach() => riddleOfTheSphinx.onClose += OnRiddleClosed;
+
+                private void OnRiddleClosed() => NextPage();
+
+                private void NextPage() { }
+            }
+            """);
+        AssertDocument(changed, "Calls.cs", calls);
+    }
+
+    [Fact]
     public async Task MoveRightUpdatesOnlySemanticallyMatchingCallsAcrossDocuments()
     {
         var declaration = """

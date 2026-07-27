@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.16] - 2026-07-27
+
+### Fixed
+
+- **Remove parameter** now tolerates method-group references in event
+  subscriptions and unsubscriptions, leaving those references unchanged while
+  removing the declaration parameter.
+
 ## [0.4.15] - 2026-07-27
 
 ### Changed
@@ -191,7 +199,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.15...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.16...HEAD
+[0.4.16]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.16
 [0.4.15]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.15
 [0.4.14]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.14
 [0.4.13]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.13

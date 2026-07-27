@@ -198,7 +198,8 @@ public sealed class RemoveParameterCodeRefactoringProvider : CodeRefactoringProv
                         invocation =>
                             invocation.Expression is IdentifierNameSyntax name &&
                             name.Identifier.ValueText == "nameof" &&
-                            invocation.ArgumentList.Span.Contains(span)))
+                            invocation.ArgumentList.Span.Contains(span)) &&
+                    !IsEventAssignmentReference(node, span))
                 {
                     return null;
                 }
@@ -233,6 +234,12 @@ public sealed class RemoveParameterCodeRefactoringProvider : CodeRefactoringProv
 
         return edits;
     }
+
+    private static bool IsEventAssignmentReference(SyntaxNode node, TextSpan span) =>
+        node.AncestorsAndSelf().OfType<AssignmentExpressionSyntax>().Any(
+            assignment =>
+                assignment.Right.Span.Contains(span) &&
+                assignment.OperatorToken.ValueText is "+=" or "-=");
 
     private static SyntaxNode RemoveDeclarationParameter(SyntaxNode declaration, int parameterIndex) =>
         declaration switch
