@@ -136,4 +136,37 @@ public sealed class UBP0071Tests
                 """;
         await VerifyCS.VerifyAnalyzerAsync(source);
     }
+
+    [Fact]
+    public async Task IgnoresInstanceMethodDeclaredInUnityJobsNamespace()
+    {
+        var source = """
+                namespace Unity.Jobs
+                {
+                    public struct JobHandle { }
+                    public sealed class Work { public JobHandle Schedule() => default; }
+                    public sealed class Runner { void Update() { new Work().Schedule(); } }
+                }
+                """;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresLookalikeUnityJobsNamespace()
+    {
+        var source = """
+                using Unity.JobsFake;
+                namespace Unity.Jobs { public struct JobHandle { } }
+                namespace Unity.JobsFake
+                {
+                    public struct Work { }
+                    public static class Extensions
+                    {
+                        public static Unity.Jobs.JobHandle Schedule(this Work job) => default;
+                    }
+                }
+                class Runner { void Update() { new Work().Schedule(); } }
+                """;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
 }
