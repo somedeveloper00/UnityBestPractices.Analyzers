@@ -88,8 +88,10 @@ public sealed class UBP0071Tests
     public async Task IgnoresHandleStoredInLocal()
     {
         var source = """
+                using Unity.Burst;
                 using Unity.Jobs;
                 class Runner { void Update() { var handle = new WorkJob().Schedule(); } }
+                [BurstCompile]
                 struct WorkJob : IJob { public void Execute() { } }
                 """ + "\n" + TestSources.Jobs;
         await VerifyCS.VerifyAnalyzerAsync(source);
@@ -99,8 +101,10 @@ public sealed class UBP0071Tests
     public async Task IgnoresHandleReturnedToCaller()
     {
         var source = """
+                using Unity.Burst;
                 using Unity.Jobs;
                 class Runner { JobHandle Start() { return new WorkJob().Schedule(); } }
+                [BurstCompile]
                 struct WorkJob : IJob { public void Execute() { } }
                 """ + "\n" + TestSources.Jobs;
         await VerifyCS.VerifyAnalyzerAsync(source);

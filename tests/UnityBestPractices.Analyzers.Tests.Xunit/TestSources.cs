@@ -31,7 +31,7 @@ internal static class TestSources
         namespace Unity.Collections
         {
             public enum Allocator { Temp, TempJob, Persistent }
-            public struct NativeArray<T> where T : struct
+            public struct NativeArray<T> : System.IDisposable where T : struct
             {
                 public NativeArray(int length, Allocator allocator) { }
                 public int Length => 0;
