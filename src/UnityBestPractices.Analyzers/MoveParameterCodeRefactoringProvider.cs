@@ -458,8 +458,17 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
             {
                 if (!bySpan.TryGetValue(argument.Span, out var binding))
                 {
-                    callEdit = null!;
-                    return false;
+                    // Expanded params arguments may be represented by an
+                    // implicit array in IOperation rather than one operation
+                    // per ArgumentSyntax. Fall back to the target symbol so
+                    // callers can still associate every explicit argument
+                    // with the params parameter.
+                    return TryGetCallEditFromSymbol(
+                        call,
+                        arguments.Value,
+                        semanticModel,
+                        cancellationToken,
+                        out callEdit);
                 }
 
                 builder.Add(binding);
