@@ -136,6 +136,12 @@ Performance transformations have conservative safety limits. Stack allocation is
 
 DOTS extraction is offered only for semantic Unity Entities calls using direct `IComponentData` parameters, supported `WithAll`/`WithAny`/`WithNone`/`WithChangeFilter`/query-option filters, and bodies without captured locals, nested lambdas, or system-instance access. `ref` parameters become `RefRW<T>`, `in` or value parameters become `RefRO<T>`, entity parameters become `WithEntityAccess()`, and query filters become the equivalent IJobEntity attributes. Existing `SystemAPI.Query` loops must access wrappers through `ValueRW` or `ValueRO` so extraction can preserve access intent.
 
+## Parameter reordering refactoring
+
+Put the caret on a method, constructor, local-function, or indexer parameter and invoke the IDE quick-action command to use **Move parameter left** or **Move parameter right**. The refactoring updates related interface/implementation declarations and all semantically matched C# call sites in the solution, including named arguments, optional arguments, constructor initializers, and reduced extension-method calls.
+
+Call sites are discovered with Roslyn's solution-wide `SymbolFinder.FindReferencesAsync` API, and each argument is associated with its parameter through Roslyn `IOperation` bindings. The refactoring therefore distinguishes overloads and does not use textual name matching. Moves that would displace an extension `this` parameter, a `params` parameter, or place a required parameter after a parameter with a default are not offered.
+
 ## Deliberately out of scope
 
 This package was checked against the current [`Microsoft.Unity.Analyzers` catalog](https://github.com/microsoft/Microsoft.Unity.Analyzers/tree/main/doc) (`UNT0001` through `UNT0043`). It intentionally does not duplicate existing rules such as empty Unity messages, `CompareTag`, `TryGetComponent`, non-allocating physics APIs, cached yield instructions, transform position/rotation APIs, mesh-array loop access, or `Animator.StringToHash`.

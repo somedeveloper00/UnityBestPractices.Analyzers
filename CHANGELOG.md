@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.12] - 2026-07-27
+
+### Added
+
+- Added **Move parameter left** and **Move parameter right** refactorings. They
+  use Roslyn's semantic reference finder and operation bindings to update
+  related declarations and C# call sites across the solution.
+
 ## [0.4.11] - 2026-07-27
 
 ### Fixed
@@ -143,7 +151,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.8...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.12...HEAD
+[0.4.12]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.12
+[0.4.11]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.11
+[0.4.10]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.10
+[0.4.9]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.9
 [0.4.8]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.8
 [0.4.7]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.7
 [0.4.6]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.6
