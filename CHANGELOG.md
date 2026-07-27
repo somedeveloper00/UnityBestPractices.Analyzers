@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.13] - 2026-07-27
+
+### Fixed
+
+- UBP0071 now recognizes only scheduling extension methods declared in the
+  `Unity.Jobs` namespace hierarchy or by `Unity.Entities.IJobEntityExtensions`,
+  avoiding false positives for instance methods and lookalike namespaces.
+
 ## [0.4.12] - 2026-07-27
 
 ### Added
@@ -151,7 +159,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.12...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.13...HEAD
+[0.4.13]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.13
 [0.4.12]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.12
 [0.4.11]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.11
 [0.4.10]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.10
