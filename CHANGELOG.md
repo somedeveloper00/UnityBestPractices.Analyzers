@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added a solution-wide **Remove parameter** refactoring that uses Roslyn's
+  parameter bindings and reference finder to update related declarations and
+  remove corresponding call-site arguments, including expanded `params`
+  arguments.
+
 ## [0.4.13] - 2026-07-27
 
 ### Fixed

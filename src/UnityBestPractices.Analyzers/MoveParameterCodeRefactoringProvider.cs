@@ -76,7 +76,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         }
     }
 
-    private static ParameterSyntax? FindParameter(SyntaxNode root, TextSpan span)
+    internal static ParameterSyntax? FindParameter(SyntaxNode root, TextSpan span)
     {
         var position = Math.Min(span.Start, root.FullSpan.End);
         var token = root.FindToken(position);
@@ -95,7 +95,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
                 : null;
     }
 
-    private static bool TryGetDeclaration(
+    internal static bool TryGetDeclaration(
         ParameterSyntax parameter,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -126,7 +126,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         return symbol is IMethodSymbol or IPropertySymbol;
     }
 
-    private static ImmutableArray<IParameterSymbol> GetParameters(ISymbol symbol) =>
+    internal static ImmutableArray<IParameterSymbol> GetParameters(ISymbol symbol) =>
         symbol switch
         {
             IMethodSymbol method => method.Parameters,
@@ -296,7 +296,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         return changedSolution;
     }
 
-    private static void AddSpan(
+    internal static void AddSpan(
         IDictionary<DocumentId, HashSet<TextSpan>> spans,
         DocumentId documentId,
         TextSpan span)
@@ -310,7 +310,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         documentSpans.Add(span);
     }
 
-    private static ImmutableArray<SyntaxNode> FindDeclarationNodes(
+    internal static ImmutableArray<SyntaxNode> FindDeclarationNodes(
         SyntaxNode root,
         IEnumerable<TextSpan> spans)
     {
@@ -372,7 +372,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         return edits;
     }
 
-    private static SyntaxNode? FindCall(SyntaxNode root, TextSpan referenceSpan)
+    internal static SyntaxNode? FindCall(SyntaxNode root, TextSpan referenceSpan)
     {
         for (var node = root.FindNode(referenceSpan, getInnermostNodeForTie: true);
              node is not null;
@@ -399,7 +399,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         return null;
     }
 
-    private static bool TryGetCallEdit(
+    internal static bool TryGetCallEdit(
         SyntaxNode call,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -477,7 +477,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
             out callEdit);
     }
 
-    private static SeparatedSyntaxList<ArgumentSyntax>? GetArguments(SyntaxNode call) =>
+    internal static SeparatedSyntaxList<ArgumentSyntax>? GetArguments(SyntaxNode call) =>
         call switch
         {
             InvocationExpressionSyntax invocation => invocation.ArgumentList.Arguments,
@@ -654,7 +654,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         return SyntaxFactory.SeparatedList(items, list.GetSeparators());
     }
 
-    private sealed class CallEdit
+    internal sealed class CallEdit
     {
         internal CallEdit(
             ImmutableArray<ArgumentBinding> bindings,
@@ -673,7 +673,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         internal int ParameterCount { get; }
     }
 
-    private readonly struct ArgumentBinding
+    internal readonly struct ArgumentBinding
     {
         internal ArgumentBinding(int ordinal, string name)
         {
