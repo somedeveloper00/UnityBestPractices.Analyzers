@@ -88,8 +88,10 @@ public sealed class UBP0071Tests
     public async Task IgnoresHandleStoredInLocal()
     {
         var source = """
+                using Unity.Burst;
                 using Unity.Jobs;
                 class Runner { void Update() { var handle = new WorkJob().Schedule(); } }
+                [BurstCompile]
                 struct WorkJob : IJob { public void Execute() { } }
                 """ + "\n" + TestSources.Jobs;
         await VerifyCS.VerifyAnalyzerAsync(source);
@@ -99,8 +101,10 @@ public sealed class UBP0071Tests
     public async Task IgnoresHandleReturnedToCaller()
     {
         var source = """
+                using Unity.Burst;
                 using Unity.Jobs;
                 class Runner { JobHandle Start() { return new WorkJob().Schedule(); } }
+                [BurstCompile]
                 struct WorkJob : IJob { public void Execute() { } }
                 """ + "\n" + TestSources.Jobs;
         await VerifyCS.VerifyAnalyzerAsync(source);
@@ -128,6 +132,39 @@ public sealed class UBP0071Tests
                     public static class Extensions { public static void Schedule(this Work job) { } }
                 }
                 public struct Work { }
+                class Runner { void Update() { new Work().Schedule(); } }
+                """;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresInstanceMethodDeclaredInUnityJobsNamespace()
+    {
+        var source = """
+                namespace Unity.Jobs
+                {
+                    public struct JobHandle { }
+                    public sealed class Work { public JobHandle Schedule() => default; }
+                    public sealed class Runner { void Update() { new Work().Schedule(); } }
+                }
+                """;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresLookalikeUnityJobsNamespace()
+    {
+        var source = """
+                using Unity.JobsFake;
+                namespace Unity.Jobs { public struct JobHandle { } }
+                namespace Unity.JobsFake
+                {
+                    public struct Work { }
+                    public static class Extensions
+                    {
+                        public static Unity.Jobs.JobHandle Schedule(this Work job) => default;
+                    }
+                }
                 class Runner { void Update() { new Work().Schedule(); } }
                 """;
         await VerifyCS.VerifyAnalyzerAsync(source);

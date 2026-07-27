@@ -367,10 +367,15 @@ internal static class AdvancedUnityRules
     private static bool IsSupportedSchedulingMethod(IMethodSymbol method)
     {
         var containingNamespace = method.ContainingNamespace.ToDisplayString();
-        return containingNamespace.StartsWith("Unity.Jobs", StringComparison.Ordinal) ||
+        return method.IsExtensionMethod &&
+               (IsNamespaceOrChild(containingNamespace, "Unity.Jobs") ||
                containingNamespace == "Unity.Entities" &&
-               method.ContainingType.Name == "IJobEntityExtensions";
+               method.ContainingType.Name == "IJobEntityExtensions");
     }
+
+    private static bool IsNamespaceOrChild(string candidate, string expected) =>
+        string.Equals(candidate, expected, StringComparison.Ordinal) ||
+        candidate.StartsWith(expected + ".", StringComparison.Ordinal);
 
     private static bool TryGetTemporaryEscape(
         ExpressionSyntax expression,
