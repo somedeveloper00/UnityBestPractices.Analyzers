@@ -104,10 +104,14 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
             return false;
         }
 
-        var argumentByParameter = arguments.ToDictionary(
-            argument => argument.Parameter!,
-            argument => ((ArgumentSyntax)argument.Syntax).Expression,
+        var argumentByParameter = new Dictionary<IParameterSymbol, ExpressionSyntax>(
             SymbolEqualityComparer.Default);
+        foreach (var argument in arguments)
+        {
+            argumentByParameter.Add(
+                argument.Parameter!,
+                ((ArgumentSyntax)argument.Syntax).Expression);
+        }
 
         // Substitution must not reorder evaluation of argument expressions.
         var useOrdinals = parameterUses.Select(use => use.Symbol.Ordinal).ToImmutableArray();

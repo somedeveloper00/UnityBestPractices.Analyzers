@@ -107,12 +107,14 @@ public sealed class InlineMethodCodeRefactoringProviderTests
             .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
             .WithParseOptions(new CSharpParseOptions(LanguageVersion.CSharp9));
         foreach (var reference in GetPlatformReferences()) project = project.AddMetadataReference(reference);
+        Assert.True(workspace.TryApplyChanges(project.Solution));
         return (workspace, workspace.AddDocument(project.Id, "Test.cs", SourceText.From(sourceWithCursor.Remove(cursor, 2))), cursor);
     }
 
     private static IEnumerable<MetadataReference> GetPlatformReferences() =>
         ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(System.IO.Path.PathSeparator)
-            .Distinct(StringComparer.OrdinalIgnoreCase).Select(MetadataReference.CreateFromFile);
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(path => MetadataReference.CreateFromFile(path));
 
     private static string Normalize(string source) =>
         CSharpSyntaxTree.ParseText(source).GetRoot().NormalizeWhitespace().ToFullString();
