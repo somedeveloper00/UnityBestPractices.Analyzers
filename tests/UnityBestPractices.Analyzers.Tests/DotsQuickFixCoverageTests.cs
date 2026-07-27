@@ -341,6 +341,113 @@ internal sealed partial class AnalyzerTests
             "{ var hash = entity.GetHashCode(); } } } } } struct Tag : IComponentData { }");
 
         await VerifyFixAsync(
+            """
+            using Unity.Entities;
+
+            partial class StructuralComponentSystem : SystemBase
+            {
+                void Update()
+                {
+                    Entities.WithoutBurst().WithStructuralChanges().ForEach(
+                        (Entity entity, ref RemovalRequest request) =>
+                        {
+                            if (!request.IsSubmitted)
+                            {
+                                request.IsSubmitted = true;
+                                RequestService.Submit(request.TargetId.ToString(), EntityManager, entity);
+                            }
+                            else if (request.IsComplete && request.StatusCode <= 0)
+                            {
+                                if (!request.IsRemovalScheduled)
+                                {
+                                    request.IsRemovalScheduled = true;
+                                    request.RemoveAfterSeconds = 15;
+                                }
+                                else
+                                {
+                                    request.RemoveAfterSeconds -= World.Time.DeltaTime;
+                                    if (request.RemoveAfterSeconds <= 0)
+                                    {
+                                        EntityManager.RemoveComponent<RemovalRequest>(entity);
+                                    }
+                                }
+                            }
+                        }).Run();
+                }
+            }
+
+            static class RequestService
+            {
+                public static void Submit(string targetId, EntityManager entityManager, Entity entity) { }
+            }
+
+            struct RemovalRequest : IComponentData
+            {
+                public bool IsSubmitted;
+                public bool IsComplete;
+                public bool IsRemovalScheduled;
+                public int StatusCode;
+                public int TargetId;
+                public float RemoveAfterSeconds;
+            }
+            """,
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            """
+            using Unity.Entities;
+
+            partial class StructuralComponentSystem : SystemBase
+            {
+                void Update()
+                {
+                    var ecb = new Unity.Entities.EntityCommandBuffer(Unity.Collections.Allocator.Temp);
+                    foreach (var (requestRef, entity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<RemovalRequest>>().WithEntityAccess())
+                    {
+                        ref RemovalRequest request = ref requestRef.ValueRW;
+                        if (!request.IsSubmitted)
+                        {
+                            request.IsSubmitted = true;
+                            RequestService.Submit(request.TargetId.ToString(), EntityManager, entity);
+                        }
+                        else if (request.IsComplete && request.StatusCode <= 0)
+                        {
+                            if (!request.IsRemovalScheduled)
+                            {
+                                request.IsRemovalScheduled = true;
+                                request.RemoveAfterSeconds = 15;
+                            }
+                            else
+                            {
+                                request.RemoveAfterSeconds -= Unity.Entities.SystemAPI.Time.DeltaTime;
+                                if (request.RemoveAfterSeconds <= 0)
+                                {
+                                    ecb.RemoveComponent<RemovalRequest>(entity);
+                                }
+                            }
+                        }
+                    }
+
+                    ecb.Playback(EntityManager);
+                    ecb.Dispose();
+                }
+            }
+
+            static class RequestService
+            {
+                public static void Submit(string targetId, EntityManager entityManager, Entity entity) { }
+            }
+
+            struct RemovalRequest : IComponentData
+            {
+                public bool IsSubmitted;
+                public bool IsComplete;
+                public bool IsRemovalScheduled;
+                public int StatusCode;
+                public int TargetId;
+                public float RemoveAfterSeconds;
+            }
+            """);
+
+        await VerifyFixAsync(
             "using Unity.Entities; partial class EcbSystem : SystemBase { void Update() { " +
             "var ecb = new EntityCommandBuffer().AsParallelWriter(); Entities.WithAll<Tag>().ForEach(" +
             "(Entity entity, int entityInQueryIndex, in Health health) => { if (health.Value <= 0) { " +
@@ -532,7 +639,8 @@ internal sealed partial class AnalyzerTests
         await VerifyExactDotsDiagnosticsAsync(
             "using Unity.Entities; partial class StructuralSystem : SystemBase { void Update() { " +
             "Entities.WithStructuralChanges().ForEach((ref Position p) => { p.Value++; }).Run(); } } " +
-            "struct Position : IComponentData { public float Value; }");
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery);
 
         await VerifyExactDotsDiagnosticsAsync(
             "using Unity.Entities; partial class UnsupportedWrapperSystem : SystemBase { void Update() { " +

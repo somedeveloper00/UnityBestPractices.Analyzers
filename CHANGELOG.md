@@ -7,6 +7,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.11] - 2026-07-27
+
+### Fixed
+
+- UBP0058 now converts synchronous `WithStructuralChanges()` component loops
+  by preserving component access through `RefRW<T>`/`RefRO<T>` aliases and
+  deferring `EntityManager.RemoveComponent` calls through a temporary
+  `EntityCommandBuffer`.
+
 ## [0.4.10] - 2026-07-26
 
 ### Fixed

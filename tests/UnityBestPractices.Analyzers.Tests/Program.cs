@@ -180,9 +180,25 @@ internal sealed partial class AnalyzerTests
                 public float DeltaTime => 0f;
             }
 
-            public struct EntityCommandBuffer
+            public struct EntityManager
             {
+                public void RemoveComponent<T>(Entity entity)
+                    where T : struct, IComponentData { }
+            }
+
+            public sealed class World
+            {
+                public TimeData Time => default;
+            }
+
+            public struct EntityCommandBuffer : System.IDisposable
+            {
+                public EntityCommandBuffer(Unity.Collections.Allocator allocator) { }
                 public ParallelWriter AsParallelWriter() => default;
+                public void RemoveComponent<T>(Entity entity)
+                    where T : struct, IComponentData { }
+                public void Playback(EntityManager entityManager) { }
+                public void Dispose() { }
 
                 public struct ParallelWriter
                 {
@@ -206,11 +222,15 @@ internal sealed partial class AnalyzerTests
             public abstract class SystemBase
             {
                 protected EntitiesBuilder Entities => default;
+                protected EntityManager EntityManager => default;
+                protected World World => default;
             }
 
             public delegate void RefAction<T>(ref T value) where T : struct, IComponentData;
             public delegate void InAction<T>(in T value) where T : struct, IComponentData;
             public delegate void EntityAction(Entity entity);
+            public delegate void EntityRefAction<T>(Entity entity, ref T value)
+                where T : struct, IComponentData;
             public delegate void RefInAction<T1, T2>(ref T1 first, in T2 second)
                 where T1 : struct, IComponentData
                 where T2 : struct, IComponentData;
@@ -248,6 +268,8 @@ internal sealed partial class AnalyzerTests
                 public ForEachDescription ForEach(EntityAction action) => default;
                 public ForEachDescription ForEach<T>(RefAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(InAction<T> action) where T : struct, IComponentData => default;
+                public ForEachDescription ForEach<T>(EntityRefAction<T> action)
+                    where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T1, T2>(RefInAction<T1, T2> action)
                     where T1 : struct, IComponentData
                     where T2 : struct, IComponentData => default;

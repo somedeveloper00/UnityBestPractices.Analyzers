@@ -173,6 +173,12 @@ internal sealed class EntitiesForEachQuery
 
     internal string JobName { get; }
 
+    internal bool InlineSystemApiReplacementBlock =>
+        HasStructuralChanges &&
+        Parameters.Any(parameter =>
+            parameter.Access != DotsParameterAccess.Entity &&
+            parameter.Access != DotsParameterAccess.EntityIndexInQuery);
+
     internal static bool TryCreate(
         ExpressionStatementSyntax statement,
         SemanticModel semanticModel,
@@ -394,9 +400,18 @@ internal sealed class EntitiesForEachQuery
                 return false;
             }
 
-            return componentParameters.Length == 0 &&
-                   entityParameter is not null &&
-                   TryCreateStructuralEntitySnapshot(semanticModel, out statement);
+            if (componentParameters.Length == 0)
+            {
+                return entityParameter is not null &&
+                       TryCreateStructuralEntitySnapshot(semanticModel, out statement);
+            }
+
+            return TryCreateStructuralComponentLoop(
+                semanticModel,
+                cancellationToken,
+                componentParameters,
+                entityParameter,
+                out statement);
         }
 
         var entityOnlyQueryType = componentParameters.Length == 0
@@ -539,6 +554,156 @@ internal sealed class EntitiesForEachQuery
                argument.Expression == element &&
                (argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
                 argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword));
+    }
+
+    private bool TryCreateStructuralComponentLoop(
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        ImmutableArray<DotsQueryParameter> componentParameters,
+        DotsQueryParameter? entityParameter,
+        out StatementSyntax statement)
+    {
+        statement = null!;
+        var compilation = semanticModel.Compilation;
+        var entityCommandBufferType = UnitySymbolCache.GetTypeByMetadataName(
+            compilation,
+            "Unity.Entities.EntityCommandBuffer");
+        var entityManagerType = UnitySymbolCache.GetTypeByMetadataName(
+            compilation,
+            "Unity.Entities.EntityManager");
+        if (entityCommandBufferType is null ||
+            entityManagerType is null ||
+            UnitySymbolCache.GetTypeByMetadataName(
+                compilation,
+                "Unity.Collections.Allocator") is null)
+        {
+            return false;
+        }
+
+        var entityManagerInvocations = Lambda.Body.DescendantNodesAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .Where(invocation =>
+            {
+                var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+                return method is not null &&
+                       SymbolEqualityComparer.Default.Equals(method.ContainingType, entityManagerType);
+            })
+            .ToImmutableArray();
+        if (entityManagerInvocations.Any(invocation =>
+                ((IMethodSymbol)semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol!)
+                    .Name != "RemoveComponent"))
+        {
+            // Only EntityManager.RemoveComponent has the same call shape on an ECB.
+            // Leave other EntityManager operations untouched rather than guessing at
+            // an overload or changing a return-value dependency.
+            return false;
+        }
+
+        var ecbName = CreateUniqueLocalName("ecb");
+        var wrapperNames = new Dictionary<DotsQueryParameter, string>();
+        foreach (var parameter in componentParameters)
+        {
+            if (parameter.Access == DotsParameterAccess.ReadWrite ||
+                parameter.Access == DotsParameterAccess.ReadOnly)
+            {
+                wrapperNames.Add(parameter, CreateUniqueLocalName(parameter.Name + "Ref"));
+            }
+        }
+
+        var replacements = new Dictionary<SyntaxNode, SyntaxNode>();
+        foreach (var invocation in entityManagerInvocations)
+        {
+            if (invocation.Expression is not MemberAccessExpressionSyntax access)
+            {
+                return false;
+            }
+
+            replacements.Add(
+                invocation,
+                invocation.WithExpression(
+                    access.WithExpression(
+                        SyntaxFactory.IdentifierName(ecbName)
+                            .WithTriviaFrom(access.Expression))));
+        }
+
+        foreach (var access in Lambda.Body.DescendantNodesAndSelf()
+                     .OfType<MemberAccessExpressionSyntax>()
+                     .Where(access => IsLegacyWorldTimeAccess(
+                         access,
+                         semanticModel,
+                         cancellationToken)))
+        {
+            replacements.Add(
+                access,
+                SyntaxFactory.ParseExpression(
+                        "Unity.Entities.SystemAPI.Time." + access.Name.Identifier.ValueText)
+                    .WithTriviaFrom(access));
+        }
+
+        var rewrittenBodyNode = Lambda.Body.ReplaceNodes(
+            replacements.Keys,
+            (original, _) => replacements[original]);
+        var rewrittenBody = DotsQuerySemanticHelpers.CreateBlock(rewrittenBodyNode);
+        var aliasStatements = componentParameters
+            .Where(wrapperNames.ContainsKey)
+            .Select(parameter => SyntaxFactory.ParseStatement(
+                parameter.Access == DotsParameterAccess.ReadWrite
+                    ? "ref " + parameter.TypeName + " " + parameter.Name +
+                      " = ref " + wrapperNames[parameter] + ".ValueRW;"
+                    : "ref readonly " + parameter.TypeName + " " + parameter.Name +
+                      " = ref " + wrapperNames[parameter] + ".ValueRO;"))
+            .ToImmutableArray();
+        rewrittenBody = rewrittenBody.WithStatements(
+            rewrittenBody.Statements.InsertRange(0, aliasStatements));
+
+        var iterationNames = componentParameters
+            .Select(parameter => wrapperNames.TryGetValue(parameter, out var wrapperName)
+                ? wrapperName
+                : parameter.Name)
+            .ToList();
+        if (entityParameter is not null)
+        {
+            iterationNames.Add(entityParameter.Name);
+        }
+
+        var iterationVariable = iterationNames.Count == 1
+            ? "var " + iterationNames[0]
+            : "var (" + string.Join(", ", iterationNames) + ")";
+        var query =
+            "Unity.Entities.SystemAPI.Query<" +
+            string.Join(", ", componentParameters.Select(parameter => parameter.SystemApiType)) +
+            ">()" +
+            string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
+            (entityParameter is null ? string.Empty : ".WithEntityAccess()");
+        statement = SyntaxFactory.ParseStatement(
+            "{\n" +
+            "var " + ecbName +
+            " = new Unity.Entities.EntityCommandBuffer(Unity.Collections.Allocator.Temp);\n" +
+            "foreach (" + iterationVariable + " in " + query + ")\n" +
+            rewrittenBody.ToFullString() + "\n" +
+            ecbName + ".Playback(EntityManager);\n" +
+            ecbName + ".Dispose();\n" +
+            "}");
+        return !statement.ContainsDiagnostics;
+    }
+
+    private static bool IsLegacyWorldTimeAccess(
+        MemberAccessExpressionSyntax access,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var member = access.Name.Identifier.ValueText;
+        if ((member != "ElapsedTime" && member != "DeltaTime") ||
+            access.Expression is not MemberAccessExpressionSyntax timeAccess ||
+            timeAccess.Name.Identifier.ValueText != "Time")
+        {
+            return false;
+        }
+
+        var worldType = semanticModel.GetTypeInfo(
+            timeAccess.Expression,
+            cancellationToken).Type;
+        return worldType?.ToDisplayString() == "Unity.Entities.World";
     }
 
     private bool TryCreateStructuralEntitySnapshot(

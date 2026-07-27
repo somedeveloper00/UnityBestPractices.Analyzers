@@ -120,6 +120,36 @@ internal static class DotsQueryCodeFixes
             return document;
         }
 
+        if (query.InlineSystemApiReplacementBlock &&
+            replacement is BlockSyntax replacementBlock &&
+            query.Statement.Parent is BlockSyntax parentBlock)
+        {
+            var statementIndex = parentBlock.Statements.IndexOf(query.Statement);
+            if (statementIndex >= 0)
+            {
+                var statements = replacementBlock.Statements;
+                if (statements.Count != 0)
+                {
+                    statements = statements.Replace(
+                        statements[0],
+                        statements[0].WithLeadingTrivia(query.Statement.GetLeadingTrivia()));
+                    var lastStatementIndex = statements.Count - 1;
+                    statements = statements.Replace(
+                        statements[lastStatementIndex],
+                        statements[lastStatementIndex]
+                            .WithTrailingTrivia(query.Statement.GetTrailingTrivia()));
+                }
+
+                var updatedStatements = parentBlock.Statements
+                    .RemoveAt(statementIndex)
+                    .InsertRange(statementIndex, statements);
+                var updatedBlock = parentBlock
+                    .WithStatements(updatedStatements)
+                    .WithAdditionalAnnotations(Formatter.Annotation);
+                return document.WithSyntaxRoot(root.ReplaceNode(parentBlock, updatedBlock));
+            }
+        }
+
         replacement = replacement
             .WithTriviaFrom(query.Statement)
             .WithAdditionalAnnotations(Formatter.Annotation);

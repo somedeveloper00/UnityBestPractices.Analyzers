@@ -209,7 +209,7 @@ internal static class RuleDocumentationGenerator
         {
             if (rule.DiagnosticId == DiagnosticIds.EntitiesForEachToSystemApiQuery)
             {
-                return "- Synchronous conversions support local and instance captures, `WithoutBurst()`, component parameters, mutable `ref DynamicBuffer<T>` parameters, and entity-only lambdas constrained by at least one `WithAll<T>()` filter. Mutable buffers become bare `DynamicBuffer<T>` query parameters, and `entityInQueryIndex` becomes a packed loop counter. Entity-only queries use `SystemAPI.Query<RefRO<T>>().WithEntityAccess()`. For `WithStructuralChanges()`, entity IDs are first copied into a disposable `NativeList<Entity>` so structural edits cannot invalidate the query enumerator.";
+                return "- Synchronous conversions support local and instance captures, `WithoutBurst()`, component parameters, mutable `ref DynamicBuffer<T>` parameters, and entity-only lambdas constrained by at least one `WithAll<T>()` filter. Mutable buffers become bare `DynamicBuffer<T>` query parameters, and `entityInQueryIndex` becomes a packed loop counter. Entity-only queries use `SystemAPI.Query<RefRO<T>>().WithEntityAccess()`. For entity-only `WithStructuralChanges()` loops, entity IDs are first copied into a disposable `NativeList<Entity>`. Component loops using `EntityManager.RemoveComponent` defer those removals through a temporary `EntityCommandBuffer`, then play it back and dispose it after iteration.";
             }
 
             if (IsEntitiesForEachJobConversion(rule))
@@ -249,7 +249,7 @@ internal static class RuleDocumentationGenerator
         {
             if (rule.DiagnosticId == DiagnosticIds.EntitiesForEachToSystemApiQuery)
             {
-                return "- Nested lambdas, unresolved or unsupported filters, read-only `in DynamicBuffer<T>` parameters, entity-only loops without a usable query component, and structural-change loops that expose component references are excluded. Scheduled job conversions remain unavailable for managed or mutated captures, unsupported `SystemAPI` access, `WithoutBurst()`, or structural-change pipelines.";
+                return "- Nested lambdas, unresolved or unsupported filters, read-only `in DynamicBuffer<T>` parameters, entity-only loops without a usable query component, and structural-change component loops that directly invoke unsupported `EntityManager` methods are excluded. Scheduled job conversions remain unavailable for managed or mutated captures, unsupported `SystemAPI` access, `WithoutBurst()`, or structural-change pipelines.";
             }
 
             if (IsEntitiesForEachJobConversion(rule))
