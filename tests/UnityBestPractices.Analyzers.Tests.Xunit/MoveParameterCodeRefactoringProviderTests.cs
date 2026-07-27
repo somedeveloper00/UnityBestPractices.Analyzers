@@ -116,6 +116,76 @@ public sealed class MoveParameterCodeRefactoringProviderTests
     }
 
     [Fact]
+    public async Task RemoveParameterLeavesSolutionUnchangedWhenParameterIsUsed()
+    {
+        var declaration = """
+            public static class Calculator
+            {
+                public static int Add(int left, int ri$$ght) => left + right;
+            }
+            """;
+        var calls = """
+            public sealed class Caller
+            {
+                public int Run() => Calculator.Add(1, 2);
+            }
+            """;
+
+        var changed = await ApplyRefactoringAsync(
+            declaration,
+            calls,
+            RemoveParameterCodeRefactoringProvider.Title,
+            new RemoveParameterCodeRefactoringProvider());
+
+        AssertDocument(
+            changed,
+            "Declaration.cs",
+            """
+            public static class Calculator
+            {
+                public static int Add(int left, int right) => left + right;
+            }
+            """);
+        AssertDocument(changed, "Calls.cs", calls);
+    }
+
+    [Fact]
+    public async Task RemoveParameterLeavesSolutionUnchangedForMethodGroupReference()
+    {
+        var declaration = """
+            public static class Formatter
+            {
+                public static string Format(string text, int cou$$nt) => text;
+            }
+            """;
+        var calls = """
+            using System;
+
+            public sealed class Caller
+            {
+                public Func<string, int, string> GetFormatter() => Formatter.Format;
+            }
+            """;
+
+        var changed = await ApplyRefactoringAsync(
+            declaration,
+            calls,
+            RemoveParameterCodeRefactoringProvider.Title,
+            new RemoveParameterCodeRefactoringProvider());
+
+        AssertDocument(
+            changed,
+            "Declaration.cs",
+            """
+            public static class Formatter
+            {
+                public static string Format(string text, int count) => text;
+            }
+            """);
+        AssertDocument(changed, "Calls.cs", calls);
+    }
+
+    [Fact]
     public async Task MoveRightUpdatesOnlySemanticallyMatchingCallsAcrossDocuments()
     {
         var declaration = """

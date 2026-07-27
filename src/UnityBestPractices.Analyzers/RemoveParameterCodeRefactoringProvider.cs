@@ -85,7 +85,11 @@ public sealed class RemoveParameterCodeRefactoringProvider : CodeRefactoringProv
             var parameters = MoveParameterCodeRefactoringProvider.GetParameters(definition);
             if (parameterIndex >= parameters.Length ||
                 parameters[parameterIndex].IsThis ||
-                definition is IPropertySymbol && parameters.Length == 1)
+                definition is IPropertySymbol && parameters.Length == 1 ||
+                await IsUsedInDeclarationAsync(
+                    parameters[parameterIndex],
+                    solution,
+                    cancellationToken).ConfigureAwait(false))
             {
                 return solution;
             }
@@ -179,6 +183,36 @@ public sealed class RemoveParameterCodeRefactoringProvider : CodeRefactoringProv
         return changedSolution;
     }
 
+    private static async Task<bool> IsUsedInDeclarationAsync(
+        IParameterSymbol parameter,
+        Solution solution,
+        CancellationToken cancellationToken)
+    {
+        foreach (var syntaxReference in parameter.DeclaringSyntaxReferences)
+        {
+            var document = solution.GetDocument(syntaxReference.SyntaxTree);
+            var parameterSyntax = syntaxReference.GetSyntax(cancellationToken) as ParameterSyntax;
+            var declaration = parameterSyntax?.Parent?.Parent;
+            var semanticModel = document is null
+                ? null
+                : await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            if (declaration is null || semanticModel is null)
+            {
+                return true;
+            }
+
+            if (declaration.DescendantNodes().OfType<IdentifierNameSyntax>().Any(
+                    identifier => SymbolEqualityComparer.Default.Equals(
+                        semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                        parameter)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static Dictionary<SyntaxNode, ImmutableArray<int>>? CreateCallEdits(
         SyntaxNode root,
         SemanticModel semanticModel,
@@ -190,7 +224,23 @@ public sealed class RemoveParameterCodeRefactoringProvider : CodeRefactoringProv
         foreach (var span in spans)
         {
             var call = MoveParameterCodeRefactoringProvider.FindCall(root, span);
-            if (call is null || edits.ContainsKey(call))
+            if (call is null)
+            {
+                var node = root.FindNode(span, getInnermostNodeForTie: true);
+                if (node.FirstAncestorOrSelf<CrefSyntax>() is null &&
+                    !node.AncestorsAndSelf().OfType<InvocationExpressionSyntax>().Any(
+                        invocation =>
+                            invocation.Expression is IdentifierNameSyntax name &&
+                            name.Identifier.ValueText == "nameof" &&
+                            invocation.ArgumentList.Span.Contains(span)))
+                {
+                    return null;
+                }
+
+                continue;
+            }
+
+            if (edits.ContainsKey(call))
             {
                 continue;
             }

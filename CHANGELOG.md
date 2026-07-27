@@ -7,6 +7,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.14] - 2026-07-27
+
 ### Added
 
 - Added a solution-wide **Remove parameter** refactoring that uses Roslyn's
@@ -18,6 +20,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   members, preserving attached comments and trivia.
 - Added a conservative **Inline method** refactoring for expression-bodied methods
   and methods consisting of a single return statement.
+
+### Fixed
+
+- **Remove parameter** now avoids transformations when the selected parameter is
+  still used by a declaration body or the target has a method-group reference.
 
 ## [0.4.13] - 2026-07-27
 
@@ -171,7 +178,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.13...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.14...HEAD
+[0.4.14]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.14
 [0.4.13]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.13
 [0.4.12]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.12
 [0.4.11]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.11
