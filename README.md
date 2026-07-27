@@ -142,6 +142,15 @@ Put the caret on a method, constructor, local-function, or indexer parameter and
 
 Call sites are discovered with Roslyn's solution-wide `SymbolFinder.FindReferencesAsync` API, and each argument is associated with its parameter through Roslyn `IOperation` bindings. The refactoring therefore distinguishes overloads and does not use textual name matching. Moves that would displace an extension `this` parameter, a `params` parameter, or place a required parameter after a parameter with a default are not offered.
 
+## Statement and declaration movement refactoring
+
+Put the caret anywhere on a statement or declaration and use **Move statement up**
+or **Move statement down** to exchange it with its adjacent sibling. The actions
+support one-line statements, braced blocks, switch sections, accessors, enum
+members, methods, properties, fields, nested types, namespaces, and top-level
+type declarations. Comments and other trivia attached to the moved syntax travel
+with it, and an action is omitted when there is no sibling in that direction.
+
 ## Deliberately out of scope
 
 This package was checked against the current [`Microsoft.Unity.Analyzers` catalog](https://github.com/microsoft/Microsoft.Unity.Analyzers/tree/main/doc) (`UNT0001` through `UNT0043`). It intentionally does not duplicate existing rules such as empty Unity messages, `CompareTag`, `TryGetComponent`, non-allocating physics APIs, cached yield instructions, transform position/rotation APIs, mesh-array loop access, or `Animator.StringToHash`.
