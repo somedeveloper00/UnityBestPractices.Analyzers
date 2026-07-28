@@ -1,17 +1,57 @@
-# Unity Best Practices Analyzer for Unity, Rider, and Visual Studio
+<div align="center">
+
+# Unity Best Practices Analyzer
+
+**Actionable Unity C# performance guidance, directly in Rider and Visual Studio.**
+
+Roslyn diagnostics · conservative quick fixes · Burst, Jobs, DOTS/ECS · Unity 2021.3+
+
+</div>
 
 [![Build](https://img.shields.io/github/actions/workflow/status/somedeveloper00/UnityBestPractices.Analyzers/ci.yml?branch=master&label=build)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/github/actions/workflow/status/somedeveloper00/UnityBestPractices.Analyzers/ci.yml?branch=master&label=tests)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/somedeveloper00/UnityBestPractices.Analyzers)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md) | [Русский](README.ru.md)
+<div align="center">
+
+[English](README.md) · [日本語](README.ja.md) · [فارسی](README.fa.md) · [Русский](README.ru.md)
+
+</div>
 
 **Find Unity C# performance problems before play mode.** Unity Best Practices Analyzer is a Roslyn analyzer and code-fix package for Unity 2021.3+, JetBrains Rider, and Visual Studio. It provides 74 low-noise diagnostics and 72 opt-in quick fixes for Unity, Burst, Jobs, DOTS/ECS, and high-performance C# practices that are not already covered by `Microsoft.Unity.Analyzers`.
 
 Every diagnostic defaults to `Info`: your IDE can show a useful suggestion without introducing build warnings, errors, or Unity Console noise. Quick-fix labels follow the IDE's system UI language, including English, Japanese, Persian, and Russian.
 
 **Start here:** [install with Unity Package Manager](#unity-package-manager) · [configure rules](#configuration) · [browse all quick fixes](#quick-fixes) · [check Unity compatibility](#compatibility)
+
+> [!TIP]
+> **New here?** Download the latest `.tgz`, add it in Unity with **Window > Package Manager > + > Add package from tarball**, regenerate project files, and restart your IDE. See the [full installation guide](#installation) if Unity does not retain the analyzer label.
+
+## At a glance
+
+| What you need | Where to go |
+| --- | --- |
+| Install the analyzer | [Unity Package Manager](#unity-package-manager), [NuGet](#nuget), or [manual DLL](#manual-dll) |
+| See every diagnostic | [Generated rule index](docs/rules/index.md) (`UBP0001`–`UBP0075`) |
+| Choose a safe preset | [`config/ubp-safe.editorconfig`](config/ubp-safe.editorconfig) and the [configuration guide](docs/configuration.md) |
+| Understand fix safety | [Safety model](#safety-model) and [rule safety decisions](docs/safety.md) |
+| Use IDE refactorings | [Parameter and inline-method refactorings](#parameter-refactorings) |
+| Build or contribute | [Build and test](#build-and-test), [contributing guide](CONTRIBUTING.md), and [integration fixtures](tests/UnityIntegration/README.md) |
+
+<details>
+<summary><strong>Documentation map</strong> — useful for readers, search engines, and coding assistants</summary>
+
+- **Product overview:** this README
+- **Rules:** [`docs/rules/index.md`](docs/rules/index.md), with one stable page per diagnostic ID
+- **Configuration:** [`docs/configuration.md`](docs/configuration.md) and ready-to-copy [`config/`](config) presets
+- **Safety guarantees:** [`docs/safety.md`](docs/safety.md)
+- **Release history:** [`CHANGELOG.md`](CHANGELOG.md)
+- **Development:** [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`tests/UnityIntegration/README.md`](tests/UnityIntegration/README.md)
+- **Package-specific help:** [`packaging/upm/README.md`](packaging/upm/README.md)
+- **Machine-readable entry point:** [`llms.txt`](llms.txt)
+
+</details>
 
 ## Why use this analyzer?
 

@@ -1,8 +1,22 @@
+<div align="center">
+
 # Unity Best Practices Analyzer
 
-[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md) | [Русский](README.ru.md)
+**Play Mode に入る前に Unity C# のパフォーマンス問題を発見。**
+
+Roslyn 診断 · 控えめなクイックフィックス · Burst、Jobs、DOTS/ECS · Unity 2021.3+
+
+</div>
+
+<div align="center">
+
+[English](README.md) · [日本語](README.ja.md) · [فارسی](README.fa.md) · [Русский](README.ru.md)
+
+</div>
 
 `Microsoft.Unity.Analyzers` ではまだ扱われていない Unity および高性能 C# のベストプラクティスを対象に、74 個の低ノイズ診断と 72 個の任意適用クイックフィックスを提供する Roslyn アナライザーです。すべての診断の既定重大度は `Info` です。Rider と Visual Studio はアクションを提示できますが、ビルドエラーや警告は発生せず、Unity Console に余計なメッセージも表示されません。
+
+> **クイックリンク:** [インストール](README.md#installation) · [ルール一覧](docs/rules/index.md) · [設定](docs/configuration.md) · [安全性](docs/safety.md) · [ドキュメント案内](docs/README.md)
 
 ## クイックフィックス
 
