@@ -91,6 +91,59 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProviderTests
         Assert.Contains(expected, Normalize(changed), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(
+        """using CollectionNamespace = System.Collections.Generic; class Example { string Name => "$$CollectionNamespace"; }""",
+        "nameof(CollectionNamespace)")]
+    [InlineData(
+        """class Example { event System.Action Saved; string Name => "$$Saved"; }""",
+        "nameof(Saved)")]
+    [InlineData(
+        """class Example { string Run() { void Reset() { } return "$$Reset"; } }""",
+        "nameof(Reset)")]
+    [InlineData(
+        """using System.Linq; class Example { string[] values; object Query => from entry in values select "$$entry"; }""",
+        "nameof(entry)")]
+    [InlineData(
+        """using static Shade; enum Shade { Blue } class Example { string Name => "$$Blue"; }""",
+        "nameof(Blue)")]
+    [InlineData(
+        """class Example { void Run(int @yield) { Use("$$yield"); } void Use(string value) { } }""",
+        "nameof(yield)")]
+    [InlineData(
+        """class Example { int value; static string Name => "$$value"; }""",
+        "nameof(value)")]
+    public async Task HandlesLessCommonAccessibleSymbols(
+        string source,
+        string expected)
+    {
+        var changed = await ApplyAsync(source);
+
+        Assert.Contains(expected, Normalize(changed), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReplacesALiteralNestedInsideAnInterpolation()
+    {
+        var changed = await ApplyAsync(
+            """class Example { int value; string Name => $"{Choose("$$value")}"; string Choose(string text) => text; }""");
+
+        Assert.Contains(
+            "$\"{Choose(nameof(value))}\"",
+            Normalize(changed),
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""class Example { int value; string Name => $$"value"; }""")]
+    [InlineData("""class Example { int value; string Name => "[|value|]"; }""")]
+    public async Task SupportsCaretAndSelectionAtDifferentPartsOfTheLiteral(string source)
+    {
+        var changed = await ApplyAsync(source);
+
+        Assert.Contains("nameof(value)", Normalize(changed), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task PreservesCommentsFollowingTheLiteral()
     {
@@ -128,6 +181,10 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProviderTests
     [InlineData("""class Example { int value; string Name => $"{nameof(value)}$$"; }""")]
     [InlineData("""class Box<T> { } class Example { string Name => "$$Box"; }""")]
     [InlineData("""class Hidden { private int secret; } class Example { string Name => "$$secret"; }""")]
+    [InlineData("""class Example { string Run() { var text = "$$later"; int later = 0; return text; } }""")]
+    [InlineData("""class Example { int value; string Name => "$$Example.value"; }""")]
+    [InlineData("""class Example { int value; string Name => "$$"; }""")]
+    [InlineData("""class Example { int value; string Name => "$$val" + "ue"; }""")]
     [InlineData("""class Example { int value; string Name => [|"value";|] }""")]
     [InlineData("""class Example { int value; }$$""")]
     public async Task DoesNotOfferForTextThatIsNotAnAccessibleSymbolName(string source)

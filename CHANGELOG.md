@@ -7,6 +7,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.18] - 2026-07-28
+
+### Changed
+
+- Expanded **Replace string literal with nameof** regression coverage for aliases,
+  events, local functions, query range variables, enum members, contextual
+  keywords, static contexts, nested interpolations, selection positions, and
+  unavailable refactoring scenarios.
+
 ## [0.4.17] - 2026-07-28
 
 ### Added
@@ -215,7 +224,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.17...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.18...HEAD
+[0.4.18]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.18
 [0.4.17]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.17
 [0.4.16]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.16
 [0.4.15]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.15
