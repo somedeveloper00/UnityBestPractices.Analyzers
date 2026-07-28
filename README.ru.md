@@ -77,7 +77,7 @@
 
 ```powershell
 dotnet nuget add source C:\path\to\downloaded-packages -n UnityBestPracticesLocal
-dotnet add package UnityBestPractices.Analyzers --version 0.4.19 --source UnityBestPracticesLocal
+dotnet add package UnityBestPractices.Analyzers --version 0.4.20 --source UnityBestPracticesLocal
 ```
 
 ### Ручная установка DLL

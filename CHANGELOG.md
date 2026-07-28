@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.20] - 2026-07-28
+
+### Added
+
+- Added a Russian README and included it in the NuGet release package.
+
 ## [0.4.19] - 2026-07-28
 
 ### Added
@@ -237,7 +243,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.19...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.20...HEAD
+[0.4.20]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.20
 [0.4.19]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.19
 [0.4.18]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.18
 [0.4.17]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.17
