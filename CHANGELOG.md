@@ -7,6 +7,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.22] - 2026-07-28
+
 ### Fixed
 
 - Allowed **Inline method** to replace simple parameterless `void` method calls
@@ -257,7 +259,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.21...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.22...HEAD
+[0.4.22]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.22
 [0.4.21]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.21
 [0.4.20]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.20
 [0.4.19]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.19
