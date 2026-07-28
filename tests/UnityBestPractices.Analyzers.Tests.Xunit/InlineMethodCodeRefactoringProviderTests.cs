@@ -77,6 +77,48 @@ public sealed class InlineMethodCodeRefactoringProviderTests
     }
 
     [Fact]
+    public async Task InlinesParameterlessVoidInstanceMethodStatement()
+    {
+        var changed = await ApplyAsync("""
+            using System.Collections.Generic;
+
+            public sealed class Garage
+            {
+                private readonly List<int> _cars = new List<int>();
+
+                public void Reset()
+                {
+                    Test$$();
+                }
+
+                private void Test()
+                {
+                    _cars.Clear();
+                }
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.Contains("_cars.Clear();", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Test();", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DoesNotInlineVoidInstanceMethodThroughExplicitReceiver()
+    {
+        const string source = """
+            public sealed class Example
+            {
+                public void Run(Example other) { other.Test$$(); }
+                private void Test() { Notify(); }
+                private void Notify() { }
+            }
+            """;
+
+        Assert.Empty(await GetActionsAsync(source));
+    }
+
+    [Fact]
     public async Task PreservesCommentsAttachedToAnArgument()
     {
         var changed = await ApplyAsync("""

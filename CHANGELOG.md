@@ -7,6 +7,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Allowed **Inline method** to replace simple parameterless `void` method calls
+  with their single expression statement, including implicit instance calls.
+
 ## [0.4.21] - 2026-07-28
 
 ### Fixed
