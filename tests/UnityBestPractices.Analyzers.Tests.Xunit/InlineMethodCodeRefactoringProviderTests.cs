@@ -63,6 +63,20 @@ public sealed class InlineMethodCodeRefactoringProviderTests
     }
 
     [Fact]
+    public async Task InlinesImplicitInstanceExpressionMethod()
+    {
+        var changed = await ApplyAsync("""
+            public sealed class Calculator
+            {
+                private int Identity(int value) => value;
+                public int Calculate(int value) => Identity$$(value);
+            }
+            """);
+
+        Assert.Contains("Calculate(int value) => ((value));", Normalize(changed), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task InlinesCheckedExpression()
     {
         var changed = await ApplyAsync("""
@@ -101,6 +115,210 @@ public sealed class InlineMethodCodeRefactoringProviderTests
         var normalized = Normalize(changed);
         Assert.Contains("_cars.Clear();", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("Test();", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesVoidMethodWithParametersLocalsStatementsAndEarlyReturn()
+    {
+        var changed = await ApplyAsync("""
+            using System;
+
+            public sealed class Example
+            {
+                public void Run()
+                {
+                    Write$$(GetValue());
+                }
+
+                private static short GetValue() => 2;
+
+                private void Write(long value)
+                {
+                    var doubled = value * 2;
+                    if (doubled == 0)
+                    {
+                        return;
+                    }
+
+                    Console.WriteLine(doubled);
+                }
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.DoesNotContain("Write(GetValue())", normalized, StringComparison.Ordinal);
+        Assert.Contains("long __inlineValue = GetValue();", normalized, StringComparison.Ordinal);
+        Assert.Contains("goto __inlineReturn;", normalized, StringComparison.Ordinal);
+        Assert.Contains("Console.WriteLine(__inlineDoubled);", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesConstructedGenericVoidMethod()
+    {
+        var changed = await ApplyAsync("""
+            public sealed class Example
+            {
+                public void Run()
+                {
+                    Write$$(42);
+                }
+
+                private void Write<T>(T value)
+                {
+                    T copy = value;
+                    System.Console.WriteLine(copy);
+                }
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.Contains("int __inlineValue = 42;", normalized, StringComparison.Ordinal);
+        Assert.Contains("int __inlineCopy = __inlineValue;", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesExpressionBodiedVoidMethodWithParameter()
+    {
+        var changed = await ApplyAsync("""
+            public sealed class Example
+            {
+                public void Run() { Write$$(42); }
+                private void Write(int value) => System.Console.WriteLine(value);
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.Contains("int __inlineValue = 42;", normalized, StringComparison.Ordinal);
+        Assert.Contains("System.Console.WriteLine(__inlineValue);", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesEventHandlerMethodGroupAsLambda()
+    {
+        var changed = await ApplyAsync("""
+            using System;
+
+            public sealed class Example
+            {
+                private event Action<int> Changed;
+
+                public void Subscribe()
+                {
+                    Changed += Handle$$;
+                }
+
+                private void Handle(int value)
+                {
+                    var text = value.ToString();
+                    Console.WriteLine(text);
+                }
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.DoesNotContain("Changed += Handle", normalized, StringComparison.Ordinal);
+        Assert.Contains("Changed += (__inlineValue) =>", normalized, StringComparison.Ordinal);
+        Assert.Contains("Console.WriteLine(__inlineText);", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesListenerArgumentAsLambda()
+    {
+        var changed = await ApplyAsync("""
+            using System;
+
+            public sealed class Example
+            {
+                public void Register()
+                {
+                    Subscribe(Handle$$);
+                }
+
+                private static void Subscribe(Action listener) { }
+                private void Handle()
+                {
+                    Console.WriteLine("handled");
+                }
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.Contains("Subscribe(() =>", normalized, StringComparison.Ordinal);
+        Assert.Contains("Console.WriteLine(\"handled\");", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesAsyncEventHandlerMethodGroupAsAsyncLambda()
+    {
+        var changed = await ApplyAsync("""
+            using System;
+            using System.Threading.Tasks;
+
+            public sealed class Example
+            {
+                private event Func<Task> Changed;
+
+                public void Subscribe()
+                {
+                    Changed += Handle$$;
+                }
+
+                private async Task Handle()
+                {
+                    await Task.Yield();
+                }
+            }
+            """);
+
+        Assert.Contains(
+            "Changed += async () =>",
+            Normalize(changed),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesConstructedGenericEventHandlerAsLambda()
+    {
+        var changed = await ApplyAsync("""
+            using System;
+
+            public sealed class Example
+            {
+                private event Action<int> Changed;
+
+                public void Subscribe()
+                {
+                    Changed += Handle<int>$$;
+                }
+
+                private void Handle<T>(T value)
+                {
+                    T copy = value;
+                    Console.WriteLine(copy);
+                }
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.Contains("int __inlineCopy = __inlineValue;", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Changed += Handle<int>", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DoesNotInlineEventUnsubscriptionAsANewLambda()
+    {
+        const string source = """
+            using System;
+
+            public sealed class Example
+            {
+                private event Action Changed;
+                public void Unsubscribe() { Changed -= Handle$$; }
+                private void Handle() { }
+            }
+            """;
+
+        Assert.Empty(await GetActionsAsync(source));
     }
 
     [Fact]

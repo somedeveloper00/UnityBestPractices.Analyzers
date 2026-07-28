@@ -191,7 +191,9 @@ DOTS extraction is offered only for semantic Unity Entities calls using direct `
 
 Put the caret on a method, constructor, local-function, or indexer parameter and invoke the IDE quick-action command to use **Move parameter left** or **Move parameter right**. The refactoring updates related interface/implementation declarations and all semantically matched C# call sites in the solution, including named arguments, optional arguments, constructor initializers, and reduced extension-method calls.
 
-Put the caret on a call to a simple static method and invoke **Inline method** to replace the call with the method's expression. The refactoring is offered only when every argument is used exactly once and in evaluation order, and when parameter and return boundaries perform no implicit conversions, so inlining does not duplicate, discard, reorder, or reinterpret values. Comments attached to substituted arguments are preserved.
+Put the caret on a method call and invoke **Inline method** to replace it with the method implementation. Expression calls preserve precedence and are offered when substituting their arguments cannot duplicate, discard, reorder, or reinterpret values. Standalone `void` calls can inline complete block bodies, including parameters, locals, multiple statements, and early returns; generated parameter locals preserve argument evaluation and conversions. Implicit instance calls are supported inside the declaring type.
+
+Putting the caret on a method group used as a delegate replaces it with a lambda containing the method implementation. This supports common event and listener subscriptions, including parameterized, generic, and async handlers. Event unsubscriptions are intentionally left unchanged because a newly created lambda would not identify the originally subscribed delegate.
 
 Put the caret on a string literal whose value exactly matches an accessible
 field, property, method, type, parameter, or local name and use

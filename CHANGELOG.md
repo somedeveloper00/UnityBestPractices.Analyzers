@@ -7,6 +7,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.23] - 2026-07-28
+
+### Fixed
+
+- Expanded **Inline method** to handle complete `void` method bodies with
+  parameters, locals, multiple statements, and early returns.
+- Made delegate and event-handler method groups inline as lambda expressions,
+  including parameterized, constructed-generic, and async handlers, while
+  avoiding incorrect lambda replacement during event unsubscription.
+
 ## [0.4.22] - 2026-07-28
 
 ### Fixed
@@ -259,7 +269,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.22...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.23...HEAD
+[0.4.23]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.23
 [0.4.22]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.22
 [0.4.21]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.21
 [0.4.20]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.20
