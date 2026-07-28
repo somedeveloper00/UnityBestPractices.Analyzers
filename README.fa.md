@@ -1,8 +1,22 @@
+<div align="center">
+
 # Unity Best Practices Analyzer
 
-[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md) | [Русский](README.ru.md)
+**مشکلات کارایی Unity C# را پیش از ورود به Play Mode پیدا کنید.**
+
+تشخیص Roslyn · اصلاح‌های سریع محافظه‌کارانه · Burst، Jobs و DOTS/ECS · Unity 2021.3+
+
+</div>
+
+<div align="center">
+
+[English](README.md) · [日本語](README.ja.md) · [فارسی](README.fa.md) · [Русский](README.ru.md)
+
+</div>
 
 یک تحلیل‌گر تکمیلی Roslyn با ۷۴ تشخیص کم‌مزاحمت و ۷۲ اصلاح سریع اختیاری برای بهترین روش‌های Unity و C# پربازده که هنوز توسط `Microsoft.Unity.Analyzers` پوشش داده نشده‌اند. شدت پیش‌فرض همهٔ تشخیص‌ها `Info` است تا Rider و Visual Studio اکشن‌ها را نمایش دهند، بدون آن‌که Build خطا یا هشدار تولید کند یا Unity Console شلوغ شود.
+
+> **پیوندهای سریع:** [نصب](README.md#installation) · [فهرست قواعد](docs/rules/index.md) · [پیکربندی](docs/configuration.md) · [ایمنی](docs/safety.md) · [راهنمای مستندات](docs/README.md)
 
 ## اصلاح‌های سریع
 

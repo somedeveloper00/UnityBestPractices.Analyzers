@@ -1,12 +1,26 @@
-# Unity Best Practices Analyzer для Unity, Rider и Visual Studio
+<div align="center">
 
-[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md) | [Русский](README.ru.md)
+# Unity Best Practices Analyzer
+
+**Находите проблемы производительности Unity C# ещё до запуска игры.**
+
+Диагностики Roslyn · консервативные исправления · Burst, Jobs и DOTS/ECS · Unity 2021.3+
+
+</div>
+
+<div align="center">
+
+[English](README.md) · [日本語](README.ja.md) · [فارسی](README.fa.md) · [Русский](README.ru.md)
+
+</div>
 
 **Находите проблемы производительности Unity C# ещё до запуска игры.** Unity Best Practices Analyzer — это пакет Roslyn-анализаторов и исправлений кода для Unity 2021.3+, JetBrains Rider и Visual Studio. Он содержит 74 малошумных диагностики и 72 необязательных быстрых исправления для Unity, Burst, Jobs, DOTS/ECS и высокопроизводительного C#, которые не покрывает `Microsoft.Unity.Analyzers`.
 
 Все диагностики по умолчанию имеют уровень `Info`: IDE показывает полезную подсказку без предупреждений и ошибок сборки и без лишних сообщений в Unity Console. Названия быстрых исправлений используют язык интерфейса IDE, включая русский, японский и персидский.
 
 **Начните здесь:** [установить через Unity Package Manager](#unity-package-manager) · [настроить правила](#настройка) · [посмотреть быстрые исправления](#быстрые-исправления) · [проверить совместимость](#совместимость)
+
+> **Документация:** [индекс правил](docs/rules/index.md) · [настройка](docs/configuration.md) · [безопасность](docs/safety.md) · [карта документации](docs/README.md)
 
 ## Зачем нужен этот анализатор?
 

@@ -1,5 +1,9 @@
 # Unity integration fixtures
 
+> Reproducible smoke-test projects for every claimed Unity compatibility family.
+
+[← Project overview](../../README.md) · [Compatibility matrix](../../README.md#compatibility) · [Contributing](../../CONTRIBUTING.md)
+
 These package manifests prepare local smoke tests without redistributing Unity assemblies or requiring a public-CI Unity license.
 
 | Fixture | Purpose | Coverage status |
@@ -10,7 +14,7 @@ These package manifests prepare local smoke tests without redistributing Unity a
 
 Unity identifies Unity 6.3 as the current LTS release on its [release support page](https://unity.com/releases/unity-6/support). Unity's 2022.3 documentation lists Entities 1.0.11 as released for that editor, and the Unity 6.0 documentation lists Entities 1.4.3 and Collections 2.6.3 as released. The current-LTS fixture intentionally does not pin DOTS packages until Unity publishes an equivalent verified 6000.3 package matrix.
 
-## Local process
+## Run a local smoke test
 
 1. Copy the chosen fixture to a temporary directory.
 2. Add the assembled UPM package to `Packages/manifest.json` as a local `file:` dependency.
@@ -21,4 +25,5 @@ Unity identifies Unity 6.3 as the current LTS release on its [release support pa
 
 Public CI validates the manifests and package layout. An optional Unity job may be enabled by configuring the Unity license secrets documented in the CI workflow.
 
-No compatibility is claimed for DOTS package shapes that fail the analyzer's documented symbol guards.
+> [!IMPORTANT]
+> No compatibility is claimed for DOTS package shapes that fail the analyzer's documented symbol guards.

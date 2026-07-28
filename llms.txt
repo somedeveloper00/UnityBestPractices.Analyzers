@@ -1,0 +1,32 @@
+# Unity Best Practices Analyzer
+
+> Roslyn analyzer and code-fix package for Unity 2021.3+, Rider, and Visual Studio. Covers Unity performance, Burst, Jobs, DOTS/ECS, correctness, API design, and high-performance C#.
+
+## Start here
+
+- [Project overview and installation](README.md): Canonical English README, feature overview, installation, compatibility, build, and release instructions.
+- [Documentation hub](docs/README.md): Task-oriented map of all project documentation.
+- [Rule index](docs/rules/index.md): Source of truth for diagnostic IDs UBP0001 through UBP0075, categories, severity, safety, and Fix All support.
+- [Configuration](docs/configuration.md): Analyzer severity settings, options, defaults, and editorconfig examples.
+- [Safety decisions](docs/safety.md): Reasons rules are Safe, ReviewRequired, or Experimental.
+- [Contributing](CONTRIBUTING.md): Architecture, tests, generated documentation, and contribution requirements.
+- [Unity integration fixtures](tests/UnityIntegration/README.md): Supported Unity/DOTS fixture matrix and local Editor smoke-test process.
+- [UPM package notes](packaging/upm/README.md): Unity package import behavior and troubleshooting.
+- [Changelog](CHANGELOG.md): Release history and notable behavior changes.
+
+## Localized overviews
+
+- [Japanese](README.ja.md)
+- [Persian](README.fa.md)
+- [Russian](README.ru.md)
+
+## Repository landmarks
+
+- `src/UnityBestPractices.Analyzers/`: analyzer, code-fix, and refactoring implementation.
+- `tests/UnityBestPractices.Analyzers.Tests/`: dependency-light regression harness.
+- `tests/UnityBestPractices.Analyzers.Tests.Xunit/`: Roslyn integration tests.
+- `tests/UnityBestPractices.Analyzers.PerformanceTests/`: performance and allocation checks.
+- `config/`: ready-to-copy analyzer configuration presets.
+- `eng/`: package and release validation scripts.
+
+Prefer the stable diagnostic ID when searching for a rule. Do not infer safety from a rule title; consult the rule index and safety decisions.
