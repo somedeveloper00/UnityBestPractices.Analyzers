@@ -1,4 +1,4 @@
-# Unity Best Practices Analyzer
+# Unity Best Practices Analyzer for Unity, Rider, and Visual Studio
 
 [![Build](https://img.shields.io/github/actions/workflow/status/somedeveloper00/UnityBestPractices.Analyzers/ci.yml?branch=master&label=build)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/github/actions/workflow/status/somedeveloper00/UnityBestPractices.Analyzers/ci.yml?branch=master&label=tests)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/actions/workflows/ci.yml)
@@ -7,7 +7,18 @@
 
 [English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
 
-A complementary Roslyn analyzer with 74 low-noise diagnostics and 72 opt-in quick fixes for Unity and high-performance C# practices not already covered by `Microsoft.Unity.Analyzers`. Every diagnostic defaults to `Info`, so Rider and Visual Studio can offer actions while builds produce no warnings or errors and the Unity Console stays clean.
+**Find Unity C# performance problems before play mode.** Unity Best Practices Analyzer is a Roslyn analyzer and code-fix package for Unity 2021.3+, JetBrains Rider, and Visual Studio. It provides 74 low-noise diagnostics and 72 opt-in quick fixes for Unity, Burst, Jobs, DOTS/ECS, and high-performance C# practices that are not already covered by `Microsoft.Unity.Analyzers`.
+
+Every diagnostic defaults to `Info`: your IDE can show a useful suggestion without introducing build warnings, errors, or Unity Console noise. Quick-fix labels follow the IDE's system UI language, including English, Japanese, Persian, and Russian.
+
+**Start here:** [install with Unity Package Manager](#unity-package-manager) · [configure rules](#configuration) · [browse all quick fixes](#quick-fixes) · [check Unity compatibility](#compatibility)
+
+## Why use this analyzer?
+
+- Improve common Unity C# hot paths with conservative suggestions for allocations, `Camera.main`, `NativeArray`, `Mathf`, `List<T>`, LINQ, and `StringBuilder`.
+- Modernize Entities 1.x code with review-required `Entities.ForEach`, `SystemAPI.Query`, and `IJobEntity` migration actions.
+- Keep fixes trustworthy: every rule declares whether it is safe to apply automatically or needs code review.
+- Install as a Unity UPM package, a NuGet analyzer, or a manually imported Roslyn analyzer DLL.
 
 ## Safety model
 

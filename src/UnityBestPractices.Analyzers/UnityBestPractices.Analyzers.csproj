@@ -4,17 +4,17 @@
     <AssemblyName>UnityBestPractices.Analyzers</AssemblyName>
     <RootNamespace>UnityBestPractices.Analyzers</RootNamespace>
     <PackageId>UnityBestPractices.Analyzers</PackageId>
-    <Version>0.4.18</Version>
+    <Version>0.4.19</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <Authors>UnityBestPractices contributors</Authors>
-    <Description>Suggestion-level Roslyn diagnostics and quick fixes for Unity best practices.</Description>
+    <Description>Roslyn analyzers and quick fixes for Unity C# performance, Burst, Jobs, DOTS/ECS, and best practices in Rider and Visual Studio.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/somedeveloper00/UnityBestPractices.Analyzers</PackageProjectUrl>
     <RepositoryUrl>https://github.com/somedeveloper00/UnityBestPractices.Analyzers.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>unity;roslyn;analyzer;code-fix;burst;jobs;dots;ecs;performance</PackageTags>
+    <PackageTags>unity;unity3d;roslyn;analyzer;code-fix;code-analysis;csharp;performance;burst;jobs;dots;ecs;rider;visual-studio</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>https://github.com/somedeveloper00/UnityBestPractices.Analyzers/blob/master/CHANGELOG.md</PackageReleaseNotes>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>

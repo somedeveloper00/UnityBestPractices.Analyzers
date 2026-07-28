@@ -7,6 +7,19 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.19] - 2026-07-28
+
+### Added
+
+- Localized quick-fix labels for Japanese, Persian, and Russian IDE UI languages;
+  other languages continue to use English labels.
+
+### Changed
+
+- Improved README, NuGet, and Unity Package Manager metadata so Unity, Roslyn,
+  Rider, Visual Studio, Burst, Jobs, and DOTS/ECS use cases are easier to find
+  and understand.
+
 ## [0.4.18] - 2026-07-28
 
 ### Changed
@@ -224,7 +237,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.18...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.19...HEAD
+[0.4.19]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.19
 [0.4.18]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.18
 [0.4.17]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.17
 [0.4.16]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.16

@@ -44,7 +44,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
             {
                 context.RegisterCodeFix(
                     CodeAction.Create(
-                        DiagnosticCatalog.Get(diagnostic.Id).FixTitle,
+                        FixTitleLocalizer.Get(diagnostic.Id, DiagnosticCatalog.Get(diagnostic.Id).FixTitle),
                         cancellationToken => AdvancedUnityRules.AssignJobHandleAsync(
                             context.Document,
                             diagnostic,
@@ -58,7 +58,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
             {
                 context.RegisterCodeFix(
                     CodeAction.Create(
-                        DiagnosticCatalog.Get(diagnostic.Id).FixTitle,
+                        FixTitleLocalizer.Get(diagnostic.Id, DiagnosticCatalog.Get(diagnostic.Id).FixTitle),
                         cancellationToken => AdvancedUnityRules.CacheShaderPropertyIdAsync(
                             context.Document,
                             diagnostic,
@@ -72,7 +72,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
             {
                 context.RegisterCodeFix(
                     CodeAction.Create(
-                        DiagnosticCatalog.Get(diagnostic.Id).FixTitle,
+                        FixTitleLocalizer.Get(diagnostic.Id, DiagnosticCatalog.Get(diagnostic.Id).FixTitle),
                         cancellationToken => NamespaceConsistencyRules.AddNamespaceAsync(
                             context.Document,
                             diagnostic,
@@ -86,7 +86,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
             {
                 context.RegisterCodeFix(
                     CodeAction.Create(
-                        dotsRule.FixTitle,
+                        FixTitleLocalizer.Get(diagnostic.Id, dotsRule.FixTitle),
                         cancellationToken => DotsQueryCodeFixes.ApplyFixAsync(
                             context.Document,
                             diagnostic,
@@ -101,7 +101,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
             {
                 context.RegisterCodeFix(
                     CodeAction.Create(
-                        expressionRule.FixTitle,
+                        FixTitleLocalizer.Get(diagnostic.Id, expressionRule.FixTitle),
                         cancellationToken => ApplyExpressionQuickFixAsync(
                             context.Document,
                             diagnostic,
@@ -125,7 +125,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
 
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Make private and add SerializeField",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Make private and add SerializeField"),
                             cancellationToken => EncapsulateFieldAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.EncapsulateSerializedField)),
                         diagnostic);
@@ -134,7 +134,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.YieldNull:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Yield null",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Yield null"),
                             cancellationToken => YieldNullAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.YieldNull)),
                         diagnostic);
@@ -143,7 +143,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.UseSquaredMagnitude:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Use squared magnitude",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Use squared magnitude"),
                             cancellationToken => UseSquaredMagnitudeAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.UseSquaredMagnitude)),
                         diagnostic);
@@ -152,7 +152,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.AddBurstCompile:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Add BurstCompile",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Add BurstCompile"),
                             cancellationToken => AddBurstCompileAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.AddBurstCompile)),
                         diagnostic);
@@ -161,7 +161,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.MarkNativeArrayReadOnly:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Mark NativeArray as ReadOnly",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Mark NativeArray as ReadOnly"),
                             cancellationToken => MarkNativeArrayReadOnlyAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.MarkNativeArrayReadOnly)),
                         diagnostic);
@@ -170,7 +170,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.UseStackalloc:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Use stackalloc",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Use stackalloc"),
                             cancellationToken => UseStackallocAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.UseStackalloc)),
                         diagnostic);
@@ -179,7 +179,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.UseRefLocal:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Mutate through a ref local",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Mutate through a ref local"),
                             cancellationToken => UseRefLocalAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.UseRefLocal)),
                         diagnostic);
@@ -188,7 +188,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.CacheCameraMain:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Cache Camera.main in this block",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Cache Camera.main in this block"),
                             cancellationToken => CacheCameraMainAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.CacheCameraMain)),
                         diagnostic);
@@ -197,7 +197,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.PreallocateList:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Preallocate List capacity",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Preallocate List capacity"),
                             cancellationToken => PreallocateListAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.PreallocateList)),
                         diagnostic);
@@ -206,7 +206,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.UseMultiplicationForSquare:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Multiply the value by itself",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Multiply the value by itself"),
                             cancellationToken => UseMultiplicationForSquareAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.UseMultiplicationForSquare)),
                         diagnostic);
@@ -215,7 +215,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                 case DiagnosticIds.UseUninitializedNativeArray:
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            "Use uninitialized NativeArray memory",
+                            FixTitleLocalizer.Get(diagnostic.Id, "Use uninitialized NativeArray memory"),
                             cancellationToken => UseUninitializedNativeArrayAsync(context.Document, diagnostic, cancellationToken),
                             nameof(DiagnosticIds.UseUninitializedNativeArray)),
                         diagnostic);
