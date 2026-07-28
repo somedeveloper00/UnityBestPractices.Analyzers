@@ -7,8 +7,24 @@ internal static class FixTitleLocalizer
 {
 #pragma warning disable RS1035 // Code fixes are displayed by the host UI and must follow its UI culture.
     internal static string Get(string diagnosticId, string englishTitle) =>
-        Get(diagnosticId, englishTitle, CultureInfo.CurrentUICulture);
+        Get(
+            diagnosticId,
+            englishTitle,
+            CultureInfo.CurrentUICulture,
+            CultureInfo.CurrentCulture,
+            CultureInfo.InstalledUICulture);
 #pragma warning restore RS1035
+
+    internal static string Get(
+        string diagnosticId,
+        string englishTitle,
+        CultureInfo currentUICulture,
+        CultureInfo currentCulture,
+        CultureInfo installedUICulture) =>
+        Get(
+            diagnosticId,
+            englishTitle,
+            ResolveCulture(currentUICulture, currentCulture, installedUICulture));
 
     internal static string Get(string diagnosticId, string englishTitle, CultureInfo culture)
     {
@@ -29,6 +45,35 @@ internal static class FixTitleLocalizer
         }
 
         return englishTitle;
+    }
+
+    private static CultureInfo ResolveCulture(
+        CultureInfo currentUICulture,
+        CultureInfo currentCulture,
+        CultureInfo installedUICulture)
+    {
+        // Some IDE analyzer hosts force their worker process UI culture to
+        // English. Prefer a real localized UI culture, but when it is English
+        // consult the user's process/OS cultures before falling back.
+        if (IsLocalized(currentUICulture))
+        {
+            return currentUICulture;
+        }
+
+        if (IsLocalized(currentCulture))
+        {
+            return currentCulture;
+        }
+
+        return IsLocalized(installedUICulture)
+            ? installedUICulture
+            : currentUICulture;
+    }
+
+    private static bool IsLocalized(CultureInfo culture)
+    {
+        var language = culture.TwoLetterISOLanguageName;
+        return language == "ja" || language == "fa" || language == "ru";
     }
 
     private static string TranslateJapanese(string diagnosticId, string englishTitle) => diagnosticId switch

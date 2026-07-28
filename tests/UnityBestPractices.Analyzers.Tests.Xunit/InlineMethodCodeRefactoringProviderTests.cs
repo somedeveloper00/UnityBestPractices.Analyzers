@@ -164,13 +164,13 @@ public sealed class InlineMethodCodeRefactoringProviderTests
     }
 
     [Fact]
-    public async Task DoesNotOfferForANonEmptySelection()
+    public async Task OffersForASelectedMethodName()
     {
         var (workspace, document, cursor) = CreateDocument("""
             public static class Calculator
             {
                 private static int Identity(int value) => value;
-                public static int Calculate(int value) => Identity$$(value);
+                public static int Calculate(int value) => $$Identity(value);
             }
             """);
         using (workspace)
@@ -180,6 +180,29 @@ public sealed class InlineMethodCodeRefactoringProviderTests
                 new CodeRefactoringContext(
                     document,
                     new TextSpan(cursor, "Identity".Length),
+                    actions.Add,
+                    CancellationToken.None));
+            Assert.Single(actions);
+        }
+    }
+
+    [Fact]
+    public async Task DoesNotOfferWhenOnlyAnArgumentIsSelected()
+    {
+        var (workspace, document, cursor) = CreateDocument("""
+            public static class Calculator
+            {
+                private static int Identity(int value) => value;
+                public static int Calculate(int value) => Identity($$value);
+            }
+            """);
+        using (workspace)
+        {
+            var actions = new List<CodeAction>();
+            await new InlineMethodCodeRefactoringProvider().ComputeRefactoringsAsync(
+                new CodeRefactoringContext(
+                    document,
+                    new TextSpan(cursor, "value".Length),
                     actions.Add,
                     CancellationToken.None));
             Assert.Empty(actions);

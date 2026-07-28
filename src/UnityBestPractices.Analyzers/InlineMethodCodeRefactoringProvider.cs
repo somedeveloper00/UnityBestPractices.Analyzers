@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
 
 namespace UnityBestPractices.Analyzers;
 
@@ -21,15 +22,9 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
 
     public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
     {
-        if (!context.Span.IsEmpty)
-        {
-            return;
-        }
-
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
         var semanticModel = await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
-        var invocation = root?.FindToken(context.Span.Start).Parent?
-            .FirstAncestorOrSelf<InvocationExpressionSyntax>();
+        var invocation = FindInvocation(root, context.Span);
         if (invocation is null || semanticModel is null ||
             !TryCreateReplacement(invocation, semanticModel, context.CancellationToken, out var replacement))
         {
@@ -40,6 +35,24 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
             Title,
             cancellationToken => InlineAsync(context.Document, invocation, replacement, cancellationToken),
             Title));
+    }
+
+    private static InvocationExpressionSyntax? FindInvocation(SyntaxNode? root, TextSpan span)
+    {
+        if (root is null || root.FullSpan.IsEmpty || span.Start >= root.FullSpan.End)
+        {
+            return null;
+        }
+
+        var position = System.Math.Min(span.Start, root.FullSpan.End - 1);
+        return root.FindToken(position).Parent?
+            .AncestorsAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .FirstOrDefault(invocation =>
+                span.IsEmpty
+                    ? invocation.Expression.FullSpan.Contains(position) ||
+                      position == invocation.Expression.Span.End
+                    : invocation.Expression.FullSpan.IntersectsWith(span));
     }
 
     private static bool TryCreateReplacement(
