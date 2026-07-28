@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added **Replace string literal with nameof**, an opt-in refactoring for string
+  literals whose value exactly matches an accessible symbol name. The action
+  verifies that the generated `nameof(...)` remains the same string constant
+  before offering the edit.
+
 ## [0.4.16] - 2026-07-27
 
 ### Fixed

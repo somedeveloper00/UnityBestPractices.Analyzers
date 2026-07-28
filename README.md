@@ -142,6 +142,12 @@ Put the caret on a method, constructor, local-function, or indexer parameter and
 
 Put the caret on a call to a simple static method and invoke **Inline method** to replace the call with the method's expression. The refactoring is offered only when every argument is used exactly once and in evaluation order, so inlining does not duplicate, discard, or reorder side effects.
 
+Put the caret on a string literal whose value exactly matches an accessible
+field, property, method, type, parameter, or local name and use
+**Replace string literal with nameof**. The refactoring verifies that the
+replacement is the same compile-time string constant before offering the
+action, including when `nameof` is shadowed or the identifier must be escaped.
+
 Call sites are discovered with Roslyn's solution-wide `SymbolFinder.FindReferencesAsync` API, and each argument is associated with its parameter through Roslyn `IOperation` bindings. The refactoring therefore distinguishes overloads and does not use textual name matching. Moves that would displace an extension `this` parameter, a `params` parameter, or place a required parameter after a parameter with a default are not offered.
 
 Use **Remove parameter** from the same caret position to remove the parameter from related declarations and remove every bound argument from matching call sites. This also handles named, optional, and expanded `params` arguments. Extension receivers and the sole parameter of an indexer cannot be removed because doing so would produce an invalid declaration or call shape.
