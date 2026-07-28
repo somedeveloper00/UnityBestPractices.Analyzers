@@ -65,6 +65,10 @@
           Pack="true"
           PackagePath="\"
           Visible="false" />
+    <None Include="..\..\README.ru.md"
+          Pack="true"
+          PackagePath="\"
+          Visible="false" />
     <None Include="..\..\LICENSE"
           Pack="true"
           PackagePath="\"

@@ -21,6 +21,7 @@ try {
         'README.md',
         'README.ja.md',
         'README.fa.md',
+        'README.ru.md',
         'LICENSE',
         'CHANGELOG.md'
     )

@@ -1,6 +1,6 @@
 # Unity Best Practices Analyzer
 
-[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
+[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md) | [Русский](README.ru.md)
 
 `Microsoft.Unity.Analyzers` ではまだ扱われていない Unity および高性能 C# のベストプラクティスを対象に、74 個の低ノイズ診断と 72 個の任意適用クイックフィックスを提供する Roslyn アナライザーです。すべての診断の既定重大度は `Info` です。Rider と Visual Studio はアクションを提示できますが、ビルドエラーや警告は発生せず、Unity Console に余計なメッセージも表示されません。
 

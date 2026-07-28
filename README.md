@@ -5,7 +5,7 @@
 [![Latest release](https://img.shields.io/github/v/release/somedeveloper00/UnityBestPractices.Analyzers)](https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
+[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md) | [Русский](README.ru.md)
 
 **Find Unity C# performance problems before play mode.** Unity Best Practices Analyzer is a Roslyn analyzer and code-fix package for Unity 2021.3+, JetBrains Rider, and Visual Studio. It provides 74 low-noise diagnostics and 72 opt-in quick fixes for Unity, Burst, Jobs, DOTS/ECS, and high-performance C# practices that are not already covered by `Microsoft.Unity.Analyzers`.
 

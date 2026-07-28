@@ -1,6 +1,6 @@
 # Unity Best Practices Analyzer
 
-[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md)
+[English](README.md) | [日本語](README.ja.md) | [فارسی](README.fa.md) | [Русский](README.ru.md)
 
 یک تحلیل‌گر تکمیلی Roslyn با ۷۴ تشخیص کم‌مزاحمت و ۷۲ اصلاح سریع اختیاری برای بهترین روش‌های Unity و C# پربازده که هنوز توسط `Microsoft.Unity.Analyzers` پوشش داده نشده‌اند. شدت پیش‌فرض همهٔ تشخیص‌ها `Info` است تا Rider و Visual Studio اکشن‌ها را نمایش دهند، بدون آن‌که Build خطا یا هشدار تولید کند یا Unity Console شلوغ شود.
 
