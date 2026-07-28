@@ -26,14 +26,14 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
         var semanticModel = await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
         var invocation = FindInvocation(root, context.Span);
         if (invocation is null || semanticModel is null ||
-            !TryCreateReplacement(invocation, semanticModel, context.CancellationToken, out var replacement))
+            !TryCreateReplacement(invocation, semanticModel, context.CancellationToken, out var nodeToReplace, out var replacement))
         {
             return;
         }
 
         context.RegisterRefactoring(CodeAction.Create(
             Title,
-            cancellationToken => InlineAsync(context.Document, invocation, replacement, cancellationToken),
+            cancellationToken => InlineAsync(context.Document, nodeToReplace, replacement, cancellationToken),
             Title));
     }
 
@@ -59,8 +59,10 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ExpressionSyntax replacement)
+        out SyntaxNode nodeToReplace,
+        out SyntaxNode replacement)
     {
+        nodeToReplace = null!;
         replacement = null!;
         if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation)
         {
@@ -68,7 +70,7 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
         }
 
         var method = operation.TargetMethod;
-        if (!method.IsStatic || method.MethodKind != MethodKind.Ordinary || method.IsAsync ||
+        if (method.MethodKind != MethodKind.Ordinary || method.IsAsync ||
             method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.IsGenericMethod || method.Parameters.Any(parameter => parameter.RefKind != RefKind.None || parameter.IsParams) ||
             method.DeclaringSyntaxReferences.Length != 1)
@@ -77,6 +79,24 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
         }
 
         var declaration = method.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) as MethodDeclarationSyntax;
+        if (TryCreateVoidStatementReplacement(
+                invocation,
+                operation,
+                method,
+                declaration,
+                semanticModel,
+                cancellationToken,
+                out nodeToReplace,
+                out replacement))
+        {
+            return true;
+        }
+
+        if (!method.IsStatic)
+        {
+            return false;
+        }
+
         var bodyExpression = declaration?.ExpressionBody?.Expression ??
             (declaration?.Body?.Statements.Count == 1 && declaration.Body.Statements[0] is ReturnStatementSyntax returnStatement
                 ? returnStatement.Expression
@@ -178,6 +198,49 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
                 invocation.GetLeadingTrivia().AddRange(orphanedTrivia));
         }
 
+        nodeToReplace = invocation;
+        return true;
+    }
+
+    private static bool TryCreateVoidStatementReplacement(
+        InvocationExpressionSyntax invocation,
+        IInvocationOperation operation,
+        IMethodSymbol method,
+        MethodDeclarationSyntax? declaration,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SyntaxNode nodeToReplace,
+        out SyntaxNode replacement)
+    {
+        nodeToReplace = null!;
+        replacement = null!;
+        if (!method.ReturnsVoid || method.Parameters.Length != 0 ||
+            invocation.Parent is not ExpressionStatementSyntax invocationStatement ||
+            declaration?.Body?.Statements.Count != 1 ||
+            declaration.Body.Statements[0] is not ExpressionStatementSyntax bodyStatement ||
+            semanticModel.GetEnclosingSymbol(invocation.SpanStart, cancellationToken)?.ContainingType is not INamedTypeSymbol containingType ||
+            !SymbolEqualityComparer.Default.Equals(containingType, method.ContainingType))
+        {
+            return false;
+        }
+
+        if (!method.IsStatic)
+        {
+            // An explicitly supplied receiver may be evaluated or may differ from
+            // the current instance. Only inline an implicit call on this instance,
+            // and only while still inside the method's declaring type.
+            if (operation.Instance is not IInstanceReferenceOperation { IsImplicit: true })
+            {
+                return false;
+            }
+        }
+
+        nodeToReplace = invocationStatement;
+        replacement = bodyStatement
+            .WithLeadingTrivia(default(SyntaxTriviaList))
+            .WithTrailingTrivia(default(SyntaxTriviaList))
+            .WithTriviaFrom(invocationStatement)
+            .WithAdditionalAnnotations(Formatter.Annotation);
         return true;
     }
 
@@ -187,13 +250,13 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
 
     private static async Task<Document> InlineAsync(
         Document document,
-        InvocationExpressionSyntax invocation,
-        ExpressionSyntax replacement,
+        SyntaxNode nodeToReplace,
+        SyntaxNode replacement,
         CancellationToken cancellationToken)
     {
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         return root is null
             ? document
-            : document.WithSyntaxRoot(root.ReplaceNode(invocation, replacement));
+            : document.WithSyntaxRoot(root.ReplaceNode(nodeToReplace, replacement));
     }
 }
