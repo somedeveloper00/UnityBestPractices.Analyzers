@@ -105,9 +105,14 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProvider : CodeRe
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var constant = updatedModel.GetConstantValue(reboundReplacement, cancellationToken);
+        var hasBindingError = updatedModel.GetDiagnostics(
+                reboundReplacement.Span,
+                cancellationToken: cancellationToken)
+            .Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         return constant.HasValue &&
                constant.Value is string value &&
-               string.Equals(value, symbolName, StringComparison.Ordinal);
+               string.Equals(value, symbolName, StringComparison.Ordinal) &&
+               !hasBindingError;
     }
 
     private static bool IsNameofSymbol(ISymbol symbol) =>

@@ -7,12 +7,21 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.17] - 2026-07-28
+
 ### Added
 
 - Added **Replace string literal with nameof**, an opt-in refactoring for string
   literals whose value exactly matches an accessible symbol name. The action
   verifies that the generated `nameof(...)` remains the same string constant
   before offering the edit.
+
+### Fixed
+
+- **Inline method** now preserves argument comments and withholds transformations
+  that would remove implicit parameter or return conversions.
+- **Replace string literal with nameof** is no longer offered for language
+  versions earlier than C# 6.
 
 ## [0.4.16] - 2026-07-27
 
@@ -206,7 +215,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.16...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.17...HEAD
+[0.4.17]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.17
 [0.4.16]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.16
 [0.4.15]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.15
 [0.4.14]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.14

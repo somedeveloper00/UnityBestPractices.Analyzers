@@ -48,10 +48,77 @@ public sealed class InlineMethodCodeRefactoringProviderTests
         Assert.Contains("(GetValue()) - (2)", Normalize(changed), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task InlinesParameterlessConstantMethod()
+    {
+        var changed = await ApplyAsync("""
+            public static class Calculator
+            {
+                private static int One() => 1;
+                public static int Calculate() => One$$() + 2;
+            }
+            """);
+
+        Assert.Contains("(1) + 2", Normalize(changed), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesCheckedExpression()
+    {
+        var changed = await ApplyAsync("""
+            public static class Calculator
+            {
+                private static int Increment(int value) => checked(value + 1);
+                public static int Calculate(int value) => Increment$$(value);
+            }
+            """);
+
+        Assert.Contains("checked((value) + 1)", Normalize(changed), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PreservesCommentsAttachedToAnArgument()
+    {
+        var changed = await ApplyAsync("""
+            public static class Calculator
+            {
+                private static int Identity(int value) => value;
+                public static int Calculate(int value) => Identity$$(/* keep this */ value);
+            }
+            """);
+
+        Assert.Contains("/* keep this */", changed, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesTheNearestNestedInvocation()
+    {
+        var changed = await ApplyAsync("""
+            public static class Calculator
+            {
+                private static int Identity(int value) => value;
+                private static int Double(int value) => value * 2;
+                public static int Calculate(int value) => Double(Identity$$(value));
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.Contains("Double(((value)))", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Calculate(int value) => Double(Identity(",
+            normalized,
+            StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("private static int Twice(int value) => value + value;", "Twice$$(GetValue())")]
     [InlineData("private static int Reverse(int first, int second) => second - first;", "Reverse$$(GetFirst(), GetSecond())")]
     [InlineData("private int Instance(int value) => value;", "new Calculator().Instance$$(1)")]
+    [InlineData("private static int Ignore(int value) => 1;", "Ignore$$(GetValue())")]
+    [InlineData("private static T Identity<T>(T value) => value;", "Identity$$(GetValue())")]
+    [InlineData("private static int First(params int[] values) => values[0];", "First$$(1, 2)")]
+    [InlineData("private static int Increment(int value = 1) => value + 1;", "Increment$$()")]
+    [InlineData("private static int Absolute(int value) => System.Math.Abs(value);", "Absolute$$(-1)")]
     public async Task DoesNotOfferInlineWhenSubstitutionCouldChangeBehavior(string declaration, string invocation)
     {
         var source = $$"""
@@ -66,6 +133,57 @@ public sealed class InlineMethodCodeRefactoringProviderTests
             """;
 
         Assert.Empty(await GetActionsAsync(source));
+    }
+
+    [Fact]
+    public async Task DoesNotInlineWhenAnArgumentRequiresConversion()
+    {
+        const string source = """
+            public static class Calculator
+            {
+                private static long Double(long value) => value * 2;
+                public static long Calculate(int value) => Double$$(value);
+            }
+            """;
+
+        Assert.Empty(await GetActionsAsync(source));
+    }
+
+    [Fact]
+    public async Task DoesNotInlineWhenTheReturnExpressionRequiresConversion()
+    {
+        const string source = """
+            public static class Calculator
+            {
+                private static object Box(string value) => value;
+                public static object Calculate(string value) => Box$$(value);
+            }
+            """;
+
+        Assert.Empty(await GetActionsAsync(source));
+    }
+
+    [Fact]
+    public async Task DoesNotOfferForANonEmptySelection()
+    {
+        var (workspace, document, cursor) = CreateDocument("""
+            public static class Calculator
+            {
+                private static int Identity(int value) => value;
+                public static int Calculate(int value) => Identity$$(value);
+            }
+            """);
+        using (workspace)
+        {
+            var actions = new List<CodeAction>();
+            await new InlineMethodCodeRefactoringProvider().ComputeRefactoringsAsync(
+                new CodeRefactoringContext(
+                    document,
+                    new TextSpan(cursor, "Identity".Length),
+                    actions.Add,
+                    CancellationToken.None));
+            Assert.Empty(actions);
+        }
     }
 
     private static async Task<string> ApplyAsync(string sourceWithCursor)

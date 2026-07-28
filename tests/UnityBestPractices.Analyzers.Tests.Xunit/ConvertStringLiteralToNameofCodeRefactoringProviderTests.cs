@@ -67,11 +67,69 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProviderTests
     }
 
     [Theory]
+    [InlineData(
+        """class Example { int Count { get; set; } string Name => "$$Count"; }""",
+        "nameof(Count)")]
+    [InlineData(
+        """class Example<TValue> { string Name => "$$TValue"; }""",
+        "nameof(TValue)")]
+    [InlineData(
+        """class Example { void Reset() { } string Name => "$$Reset"; void Reset(int value) { } }""",
+        "nameof(Reset)")]
+    [InlineData(
+        """class Example { int value; string Name => "\u0076$$alue"; }""",
+        "nameof(value)")]
+    [InlineData(
+        """class Example { string Name { set { Use("$$value"); } } void Use(string text) { } }""",
+        "nameof(value)")]
+    public async Task HandlesAdditionalAccessibleSymbolKindsAndSpellings(
+        string source,
+        string expected)
+    {
+        var changed = await ApplyAsync(source);
+
+        Assert.Contains(expected, Normalize(changed), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PreservesCommentsFollowingTheLiteral()
+    {
+        var changed = await ApplyAsync(
+            """class Example { int value; string Name => "$$value" /* keep this */; }""");
+
+        Assert.Contains("nameof(value) /* keep this */", changed, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WorksInAnAttributeConstant()
+    {
+        var changed = await ApplyAsync("""
+            class LabelAttribute : System.Attribute
+            {
+                public LabelAttribute(string value) { }
+            }
+
+            class Example
+            {
+                int value;
+                [Label("$$value")]
+                void Run() { }
+            }
+            """);
+
+        Assert.Contains("[Label(nameof(value))]", Normalize(changed), StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("""class Example { int value; string Name => "$$Value"; }""")]
     [InlineData("""class Example { string Name => "$$missing"; }""")]
     [InlineData("""class Example { string Run() { { int local = 0; } return "$$local"; } }""")]
     [InlineData("""class Example { int value; char Name => '$$v'; }""")]
     [InlineData("""class Example { int value; string Name => $"{nameof(value)}$$"; }""")]
+    [InlineData("""class Box<T> { } class Example { string Name => "$$Box"; }""")]
+    [InlineData("""class Hidden { private int secret; } class Example { string Name => "$$secret"; }""")]
+    [InlineData("""class Example { int value; string Name => [|"value";|] }""")]
+    [InlineData("""class Example { int value; }$$""")]
     public async Task DoesNotOfferForTextThatIsNotAnAccessibleSymbolName(string source)
     {
         Assert.Empty(await GetActionsAsync(source));
@@ -90,6 +148,18 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProviderTests
             """;
 
         Assert.Empty(await GetActionsAsync(source));
+    }
+
+    [Fact]
+    public async Task DoesNotOfferBeforeNameofIsAvailable()
+    {
+        var (workspace, document, span) = CreateDocument(
+            """class Example { int value; string Name => "$$value"; }""",
+            LanguageVersion.CSharp5);
+        using (workspace)
+        {
+            Assert.Empty(await GetActionsAsync(document, span));
+        }
     }
 
     private static async Task<string> ApplyAsync(string sourceWithMarker)
@@ -133,7 +203,8 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProviderTests
     }
 
     private static (AdhocWorkspace Workspace, Document Document, TextSpan Span) CreateDocument(
-        string sourceWithMarker)
+        string sourceWithMarker,
+        LanguageVersion languageVersion = LanguageVersion.CSharp9)
     {
         var selectionStart = sourceWithMarker.IndexOf("[|", StringComparison.Ordinal);
         string source;
@@ -156,7 +227,7 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProviderTests
         var workspace = new AdhocWorkspace();
         var project = workspace.AddProject("NameofTest", LanguageNames.CSharp)
             .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-            .WithParseOptions(new CSharpParseOptions(LanguageVersion.CSharp9));
+            .WithParseOptions(new CSharpParseOptions(languageVersion));
         foreach (var reference in GetPlatformReferences())
         {
             project = project.AddMetadataReference(reference);

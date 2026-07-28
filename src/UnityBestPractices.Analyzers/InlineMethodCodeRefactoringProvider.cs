@@ -56,6 +56,7 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
 
         var method = operation.TargetMethod;
         if (!method.IsStatic || method.MethodKind != MethodKind.Ordinary || method.IsAsync ||
+            method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.IsGenericMethod || method.Parameters.Any(parameter => parameter.RefKind != RefKind.None || parameter.IsParams) ||
             method.DeclaringSyntaxReferences.Length != 1)
         {
@@ -73,6 +74,13 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
         }
 
         var declarationModel = semanticModel.Compilation.GetSemanticModel(declaration!.SyntaxTree);
+        var bodyType = declarationModel.GetTypeInfo(bodyExpression, cancellationToken).Type;
+        if (!SymbolEqualityComparer.Default.Equals(bodyType, method.ReturnType))
+        {
+            // Preserve the implicit conversion performed at the return boundary.
+            return false;
+        }
+
         var identifiers = bodyExpression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().ToImmutableArray();
         var parameterUses = new List<(IdentifierNameSyntax Syntax, IParameterSymbol Symbol)>();
         foreach (var identifier in identifiers)
@@ -104,13 +112,29 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
             return false;
         }
 
+        if (arguments.Any(argument => !argument.InConversion.IsIdentity))
+        {
+            // Inlining would otherwise remove the conversion performed when the
+            // value crosses the method parameter boundary.
+            return false;
+        }
+
         var argumentByParameter = new Dictionary<IParameterSymbol, ExpressionSyntax>(
             SymbolEqualityComparer.Default);
         foreach (var argument in arguments)
         {
+            var argumentSyntax = (ArgumentSyntax)argument.Syntax;
+            var sourceType = semanticModel.GetTypeInfo(
+                argumentSyntax.Expression,
+                cancellationToken).Type;
+            if (!SymbolEqualityComparer.Default.Equals(sourceType, argument.Parameter!.Type))
+            {
+                return false;
+            }
+
             argumentByParameter.Add(
                 argument.Parameter!,
-                ((ArgumentSyntax)argument.Syntax).Expression);
+                argumentSyntax.Expression);
         }
 
         // Substitution must not reorder evaluation of argument expressions.
@@ -124,13 +148,29 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
         var substitutedExpression = bodyExpression.ReplaceNodes(
                 parameterUses.Select(use => use.Syntax),
                 (original, _) => SyntaxFactory.ParenthesizedExpression(argumentByParameter[
-                    (IParameterSymbol)declarationModel.GetSymbolInfo(original, cancellationToken).Symbol!]
-                    .WithoutTrivia()));
+                    (IParameterSymbol)declarationModel.GetSymbolInfo(original, cancellationToken).Symbol!]));
         replacement = SyntaxFactory.ParenthesizedExpression(substitutedExpression.WithoutTrivia())
             .WithTriviaFrom(invocation)
             .WithAdditionalAnnotations(Formatter.Annotation);
+
+        var argumentExpressions = argumentByParameter.Values.ToImmutableArray();
+        var orphanedTrivia = invocation.DescendantTrivia(descendIntoTrivia: true)
+            .Where(trivia =>
+                invocation.Span.Contains(trivia.Span) &&
+                !argumentExpressions.Any(expression => expression.FullSpan.Contains(trivia.Span)))
+            .ToImmutableArray();
+        if (orphanedTrivia.Any(IsComment))
+        {
+            replacement = replacement.WithLeadingTrivia(
+                invocation.GetLeadingTrivia().AddRange(orphanedTrivia));
+        }
+
         return true;
     }
+
+    private static bool IsComment(SyntaxTrivia trivia) =>
+        trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) ||
+        trivia.IsKind(SyntaxKind.MultiLineCommentTrivia);
 
     private static async Task<Document> InlineAsync(
         Document document,
