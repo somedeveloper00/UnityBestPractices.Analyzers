@@ -58,6 +58,7 @@ internal static class TestSources
             {
                 public Vector3(float x, float y, float z = 0) { }
                 public static implicit operator Vector3(Vector2 value) => default;
+                public static Vector3 operator +(Vector3 left, Vector3 right) => default;
             }
             public struct Quaternion { public static Quaternion Euler(float x, float y, float z) => default; }
             public class Transform

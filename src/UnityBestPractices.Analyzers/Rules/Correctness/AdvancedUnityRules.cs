@@ -233,9 +233,11 @@ internal static class AdvancedUnityRules
 
         var index = block.Statements.IndexOf(first);
         if (index < 0 || index + 1 >= block.Statements.Count ||
-            block.Statements[index + 1] is not ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax secondAssignment } ||
+            block.Statements[index + 1] is not ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax secondAssignment } second ||
             !TryGetTransformPropertyAssignment(secondAssignment, context, "localRotation", out var secondReceiver) ||
-            !SyntaxFactory.AreEquivalent(receiver, secondReceiver))
+            !SyntaxFactory.AreEquivalent(receiver, secondReceiver) ||
+            first.GetTrailingTrivia().Concat(second.GetLeadingTrivia()).Any(trivia =>
+                !trivia.IsKind(SyntaxKind.WhitespaceTrivia) && !trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
         {
             return;
         }
@@ -298,9 +300,9 @@ internal static class AdvancedUnityRules
             return document;
         }
 
-        if (position is ObjectCreationExpressionSyntax creation)
+        if (position is ObjectCreationExpressionSyntax { ArgumentList: { } argumentList } creation)
         {
-            position = SyntaxFactory.ImplicitObjectCreationExpression(creation.NewKeyword, creation.ArgumentList, creation.Initializer)
+            position = SyntaxFactory.ImplicitObjectCreationExpression(creation.NewKeyword, argumentList, creation.Initializer)
                 .WithTriviaFrom(position);
         }
 
@@ -318,8 +320,11 @@ internal static class AdvancedUnityRules
             .WithLeadingTrivia(first.GetLeadingTrivia())
             .WithTrailingTrivia(second.GetTrailingTrivia())
             .WithAdditionalAnnotations(Formatter.Annotation);
-        return document.WithSyntaxRoot(root.ReplaceNode(block, block.WithStatements(
-            block.Statements.RemoveAt(index + 1).Replace(first, replacement))));
+        var statements = block.Statements
+            .RemoveAt(index)
+            .RemoveAt(index)
+            .Insert(index, replacement);
+        return document.WithSyntaxRoot(root.ReplaceNode(block, block.WithStatements(statements)));
     }
 
     internal static void AnalyzeTypeDeclaration(SyntaxNodeAnalysisContext context)
