@@ -287,7 +287,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Rele
 dotnet pack src/UnityBestPractices.Analyzers -c Release --no-build -o artifacts/packages
 ```
 
-The dependency-light harness verifies the full 75-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
+The dependency-light harness verifies the full 76-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
 
 ## Release process
 

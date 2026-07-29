@@ -230,6 +230,8 @@ internal static class RuleDocumentationGenerator
                 "- The allocation must be a semantically resolved `NativeArray<T>` using `Allocator.Temp` or `Allocator.TempJob`, and the escape must be a direct return, field/property assignment, or captured escaping delegate.",
             DiagnosticIds.CacheShaderPropertyId =>
                 "- At least two calls in the same non-nested type declaration must resolve to `UnityEngine.Shader.PropertyToID` with the same string literal.",
+            DiagnosticIds.CombineLocalPositionAndRotation =>
+                "- Two consecutive simple assignments must target `Transform.localPosition` and `Transform.localRotation` on the same local, parameter, or field receiver, and the active Unity API must expose `SetLocalPositionAndRotation`.",
             DiagnosticIds.UseRefLocal =>
                 "- The collection must expose a real ref-returning indexer or `ElementAt(int)`. A semantically resolved `NativeArray<T>` may instead expose a public `AsSpan()` returning the matching mutable `System.Span<T>`.",
             DiagnosticIds.MatchFolderNamespace =>
@@ -270,6 +272,8 @@ internal static class RuleDocumentationGenerator
                 "- Reassigned locals, non-native look-alike containers, and uses that remain within the allocating method are excluded.",
             DiagnosticIds.CacheShaderPropertyId =>
                 "- Dynamic strings, a single call, nested-type calls, and same-named non-Unity APIs are excluded.",
+            DiagnosticIds.CombineLocalPositionAndRotation =>
+                "- Reversed or non-adjacent assignments, compound assignments, different or repeatedly evaluated receivers, intervening comments or directives, same-named non-Unity APIs, and Unity versions without the combined API are excluded.",
             DiagnosticIds.UseRefLocal =>
                 "- By-value-only indexers, read-only spans, async or iterator methods, jump statements before the write-back, lambda or local-function captures, and changed container or index values are excluded.",
             DiagnosticIds.MatchFolderNamespace =>
