@@ -32,6 +32,7 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
         .AddRange(DotsQueryRules.FixableDiagnosticIds)
         .Add(DiagnosticIds.DiscardedScheduledJobHandle)
         .Add(DiagnosticIds.CacheShaderPropertyId)
+        .Add(DiagnosticIds.CombineLocalPositionAndRotation)
         .Add(DiagnosticIds.MatchFolderNamespace);
 
     public override FixAllProvider GetFixAllProvider() => RuleAwareFixAllProvider.Instance;
@@ -60,6 +61,20 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
                     CodeAction.Create(
                         FixTitleLocalizer.Get(diagnostic.Id, DiagnosticCatalog.Get(diagnostic.Id).FixTitle),
                         cancellationToken => AdvancedUnityRules.CacheShaderPropertyIdAsync(
+                            context.Document,
+                            diagnostic,
+                            cancellationToken),
+                        diagnostic.Id),
+                    diagnostic);
+                continue;
+            }
+
+            if (diagnostic.Id == DiagnosticIds.CombineLocalPositionAndRotation)
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        FixTitleLocalizer.Get(diagnostic.Id, DiagnosticCatalog.Get(diagnostic.Id).FixTitle),
+                        cancellationToken => AdvancedUnityRules.CombineLocalPositionAndRotationAsync(
                             context.Document,
                             diagnostic,
                             cancellationToken),

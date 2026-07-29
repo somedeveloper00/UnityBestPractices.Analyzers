@@ -65,11 +65,24 @@ internal static class AdvancedUnityRules
         supportsFixAll: false,
         "UnityEngine.Shader");
 
+    private static readonly RuleMetadata CombineLocalPositionAndRotation = Create(
+        DiagnosticIds.CombineLocalPositionAndRotation,
+        "Set local position and rotation together",
+        "Set local position and rotation with one Transform call",
+        "SetLocalPositionAndRotation updates both local transform values in one native call.",
+        "Use SetLocalPositionAndRotation",
+        RuleCategories.UnityPerformanceSafe,
+        RuleSafety.Safe,
+        hasCodeFix: true,
+        supportsFixAll: true,
+        "UnityEngine.Transform");
+
     internal static ImmutableArray<RuleMetadata> Metadata { get; } = ImmutableArray.Create(
         DiscardedJobHandle,
         UndisposedPersistentContainer,
         TemporaryAllocatorEscape,
-        ShaderPropertyId);
+        ShaderPropertyId,
+        CombineLocalPositionAndRotation);
 
     internal static ImmutableArray<DiagnosticDescriptor> Descriptors { get; } =
         Metadata.Select(metadata => metadata.Descriptor).ToImmutableArray();
@@ -206,6 +219,112 @@ internal static class AdvancedUnityRules
         {
             Report(context, TemporaryAllocatorEscape, lambda.GetLocation(), allocatorKind);
         }
+    }
+
+    internal static void AnalyzeExpressionStatement(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is not ExpressionStatementSyntax first ||
+            first.Expression is not AssignmentExpressionSyntax firstAssignment ||
+            !TryGetTransformPropertyAssignment(firstAssignment, context, "localPosition", out var receiver) ||
+            first.Parent is not BlockSyntax block)
+        {
+            return;
+        }
+
+        var index = block.Statements.IndexOf(first);
+        if (index < 0 || index + 1 >= block.Statements.Count ||
+            block.Statements[index + 1] is not ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax secondAssignment } second ||
+            !TryGetTransformPropertyAssignment(secondAssignment, context, "localRotation", out var secondReceiver) ||
+            !SyntaxFactory.AreEquivalent(receiver, secondReceiver) ||
+            first.GetTrailingTrivia().Concat(second.GetLeadingTrivia()).Any(trivia =>
+                !trivia.IsKind(SyntaxKind.WhitespaceTrivia) && !trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
+        {
+            return;
+        }
+
+        Report(context, CombineLocalPositionAndRotation, first.GetLocation());
+    }
+
+    private static bool TryGetTransformPropertyAssignment(
+        AssignmentExpressionSyntax assignment,
+        SyntaxNodeAnalysisContext context,
+        string propertyName,
+        out ExpressionSyntax receiver)
+    {
+        receiver = null!;
+        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+            assignment.Left is not MemberAccessExpressionSyntax memberAccess ||
+            memberAccess.Name.Identifier.ValueText != propertyName ||
+            context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is not IPropertySymbol property ||
+            property.ContainingType?.ToDisplayString() != "UnityEngine.Transform" ||
+            !property.ContainingType.GetMembers("SetLocalPositionAndRotation").OfType<IMethodSymbol>().Any(method => method.Parameters.Length == 2) ||
+            context.SemanticModel.GetSymbolInfo(memberAccess.Expression, context.CancellationToken).Symbol is not
+                (ILocalSymbol or IParameterSymbol or IFieldSymbol))
+        {
+            return false;
+        }
+
+        receiver = memberAccess.Expression;
+        return true;
+    }
+
+    internal static async Task<Document> CombineLocalPositionAndRotationAsync(
+        Document document,
+        Diagnostic diagnostic,
+        CancellationToken cancellationToken)
+    {
+        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        if (root is null)
+        {
+            return document;
+        }
+
+        var first = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true)
+            .FirstAncestorOrSelf<ExpressionStatementSyntax>();
+        if (first?.Expression is not AssignmentExpressionSyntax
+            {
+                Left: MemberAccessExpressionSyntax positionAccess,
+                Right: var position
+            } || first.Parent is not BlockSyntax block)
+        {
+            return document;
+        }
+
+        var index = block.Statements.IndexOf(first);
+        if (index < 0 || index + 1 >= block.Statements.Count ||
+            block.Statements[index + 1] is not ExpressionStatementSyntax
+            {
+                Expression: AssignmentExpressionSyntax { Right: var rotation }
+            } second)
+        {
+            return document;
+        }
+
+        if (position is ObjectCreationExpressionSyntax { ArgumentList: { } argumentList } creation)
+        {
+            position = SyntaxFactory.ImplicitObjectCreationExpression(creation.NewKeyword, argumentList, creation.Initializer)
+                .WithTriviaFrom(position);
+        }
+
+        var invocation = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                positionAccess.Expression.WithoutTrivia(),
+                SyntaxFactory.IdentifierName("SetLocalPositionAndRotation")),
+            SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(new[]
+            {
+                SyntaxFactory.Argument(position.WithoutTrivia()),
+                SyntaxFactory.Argument(rotation.WithoutTrivia())
+            })));
+        var replacement = SyntaxFactory.ExpressionStatement(invocation)
+            .WithLeadingTrivia(first.GetLeadingTrivia())
+            .WithTrailingTrivia(second.GetTrailingTrivia())
+            .WithAdditionalAnnotations(Formatter.Annotation);
+        var statements = block.Statements
+            .RemoveAt(index)
+            .RemoveAt(index)
+            .Insert(index, replacement);
+        return document.WithSyntaxRoot(root.ReplaceNode(block, block.WithStatements(statements)));
     }
 
     internal static void AnalyzeTypeDeclaration(SyntaxNodeAnalysisContext context)

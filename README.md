@@ -33,7 +33,7 @@ Every diagnostic defaults to `Info`: your IDE can show a useful suggestion witho
 | What you need | Where to go |
 | --- | --- |
 | Install the analyzer | [Unity Package Manager](#unity-package-manager), [NuGet](#nuget), or [manual DLL](#manual-dll) |
-| See every diagnostic | [Generated rule index](docs/rules/index.md) (`UBP0001`–`UBP0075`) |
+| See every diagnostic | [Generated rule index](docs/rules/index.md) (`UBP0001`–`UBP0076`) |
 | Choose a safe preset | [`config/ubp-safe.editorconfig`](config/ubp-safe.editorconfig) and the [configuration guide](docs/configuration.md) |
 | Understand fix safety | [Safety model](#safety-model) and [rule safety decisions](docs/safety.md) |
 | Use IDE refactorings | [Parameter and inline-method refactorings](#parameter-refactorings) |
@@ -180,6 +180,7 @@ These quick fixes use the current Entities 1.x query systems. `SystemAPI.Query` 
 | `UBP0073` | A `Temp` or `TempJob` `NativeArray<T>` returned, stored in a field, or captured by an escaping delegate | Diagnostic only; the correct lifetime or ownership depends on the application |
 | `UBP0074` | Repeated constant `Shader.PropertyToID` calls in one type | Adds a uniquely named static readonly ID field and replaces repeated calls |
 | `UBP0075` | A namespace-less type file whose neighbors have a clear most-common namespace | Wraps the file's types in the neighboring namespace |
+| `UBP0076` | Adjacent local position and rotation assignments on the same Transform | Replaces both assignments with `SetLocalPositionAndRotation` |
 
 The analyzer resolves Unity symbols semantically. It ignores unrelated types with similar member names, unsupported field types, non-Unity iterators, dynamic distance thresholds, generated code, and Unity/package versions where the required symbols are absent.
 
@@ -286,7 +287,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Rele
 dotnet pack src/UnityBestPractices.Analyzers -c Release --no-build -o artifacts/packages
 ```
 
-The dependency-light harness verifies the full 75-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
+The dependency-light harness verifies the full 76-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
 
 ## Release process
 

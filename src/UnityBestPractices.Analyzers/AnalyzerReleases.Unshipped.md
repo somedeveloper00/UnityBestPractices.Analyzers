@@ -8,6 +8,7 @@ UBP0071 | Unity.Correctness | Info | Preserve a discarded scheduled JobHandle
 UBP0072 | Unity.Correctness | Info | Detect a narrowly provable undisposed persistent NativeArray
 UBP0073 | Unity.Correctness | Info | Detect a temporary allocator lifetime escape
 UBP0074 | Unity.Performance.Safe | Info | Cache repeated Shader.PropertyToID calls
+UBP0076 | Unity.Performance.Safe | Info | Combine adjacent local position and rotation assignments
 
 ### Changed Rules
 

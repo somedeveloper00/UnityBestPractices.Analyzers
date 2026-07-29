@@ -49,4 +49,25 @@ internal static class TestSources
             }
         }
         """;
+
+    internal const string Transform = """
+        namespace UnityEngine
+        {
+            public struct Vector2 { public Vector2(float x, float y) { } }
+            public struct Vector3
+            {
+                public Vector3(float x, float y, float z = 0) { }
+                public static implicit operator Vector3(Vector2 value) => default;
+                public static Vector3 operator +(Vector3 left, Vector3 right) => default;
+            }
+            public struct Quaternion { public static Quaternion Euler(float x, float y, float z) => default; }
+            public class Transform
+            {
+                public Vector3 localPosition { get; set; }
+                public Quaternion localRotation { get; set; }
+                public void SetLocalPositionAndRotation(Vector3 position, Quaternion rotation) { }
+            }
+            public class RectTransform : Transform { }
+        }
+        """;
 }

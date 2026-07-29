@@ -56,6 +56,7 @@ internal sealed partial class AnalyzerTests
             public struct Vector2
             {
                 public Vector2(float x, float y) { }
+                public static implicit operator Vector3(Vector2 value) => default;
                 public static Vector2 zero => default;
                 public static Vector2 one => default;
                 public static Vector2 up => default;
@@ -68,6 +69,7 @@ internal sealed partial class AnalyzerTests
 
             public struct Vector3
             {
+                public Vector3(float x, float y) { }
                 public Vector3(float x, float y, float z) { }
                 public static Vector3 zero => default;
                 public static Vector3 one => default;
@@ -86,6 +88,13 @@ internal sealed partial class AnalyzerTests
                 public Quaternion(float x, float y, float z, float w) { }
                 public static Quaternion identity => default;
                 public static Quaternion Euler(float x, float y, float z) => default;
+            }
+
+            public class Transform : Component
+            {
+                public Vector3 localPosition { get; set; }
+                public Quaternion localRotation { get; set; }
+                public void SetLocalPositionAndRotation(Vector3 position, Quaternion rotation) { }
             }
 
             public struct Color
@@ -1171,6 +1180,32 @@ internal sealed partial class AnalyzerTests
             await VerifyFixAsync(source, DiagnosticIds.CacheShaderPropertyId, expected);
         }
 
+        for (var index = 0; index < 4; index++)
+        {
+            var source = $$"""
+                using UnityEngine;
+                class TransformUser{{index}}
+                {
+                    void Apply(Transform target, Vector3 position, Quaternion rotation)
+                    {
+                        target.localPosition = position;
+                        target.localRotation = rotation;
+                    }
+                }
+                """;
+            var expected = $$"""
+                using UnityEngine;
+                class TransformUser{{index}}
+                {
+                    void Apply(Transform target, Vector3 position, Quaternion rotation)
+                    {
+                        target.SetLocalPositionAndRotation(position, rotation);
+                    }
+                }
+                """;
+            await VerifyFixAsync(source, DiagnosticIds.CombineLocalPositionAndRotation, expected);
+        }
+
         await VerifyDiagnosticPresenceAsync(
             """
             using Unity.Collections;
@@ -1356,17 +1391,17 @@ internal sealed partial class AnalyzerTests
     private void VerifyCatalogIntegrity()
     {
         var descriptors = _analyzer.SupportedDiagnostics;
-        if (descriptors.Length != 75)
+        if (descriptors.Length != 76)
         {
-            throw new InvalidOperationException($"Expected 75 diagnostics, got {descriptors.Length}.");
+            throw new InvalidOperationException($"Expected 76 diagnostics, got {descriptors.Length}.");
         }
 
-        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 75)
+        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 76)
         {
             throw new InvalidOperationException("Diagnostic IDs must be unique.");
         }
 
-        var expectedIds = Enumerable.Range(1, 75)
+        var expectedIds = Enumerable.Range(1, 76)
             .Select(number => $"UBP{number:0000}")
             .ToArray();
         var actualIds = descriptors
