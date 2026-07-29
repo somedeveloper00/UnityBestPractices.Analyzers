@@ -1356,7 +1356,6 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         System.Threading.CancellationToken cancellationToken)
     {
         if (declaration.Declaration.Variables.Count != 1 ||
-            declaration.AttributeLists.Count != 0 ||
             !declaration.Modifiers.Any(SyntaxKind.PublicKeyword) ||
             declaration.Modifiers.Any(SyntaxKind.StaticKeyword) ||
             declaration.Modifiers.Any(SyntaxKind.ConstKeyword) ||
@@ -1370,7 +1369,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         if (field is null ||
             field.DeclaredAccessibility != Accessibility.Public ||
             !IsUnitySerializedOwner(field.ContainingType, semanticModel.Compilation) ||
-            !IsUnitySerializableType(field.Type, semanticModel.Compilation))
+            !IsUnitySerializableType(field.Type, semanticModel.Compilation) ||
+            HasAttribute(field, "UnityEngine.SerializeField") ||
+            HasAttribute(field, "System.NonSerializedAttribute"))
         {
             return false;
         }
@@ -1379,6 +1380,13 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             semanticModel.Compilation,
             "UnityEngine.SerializeField") is not null;
     }
+
+    private static bool HasAttribute(IFieldSymbol field, string metadataName) =>
+        field.GetAttributes().Any(attribute =>
+            string.Equals(
+                attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+                metadataName,
+                System.StringComparison.Ordinal));
 
     internal static bool IsBoxedNextFrameYield(
         YieldStatementSyntax yieldStatement,
