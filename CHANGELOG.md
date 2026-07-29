@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.25] - 2026-07-29
+
+### Fixed
+
+- Fixed **Inline method** handling for method bodies that reference instance
+  members, including safe receiver evaluation and name-conflict avoidance.
+
 ## [0.4.24] - 2026-07-28
 
 ## [0.4.23] - 2026-07-28
@@ -271,7 +278,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial 70 Unity, Burst, Jobs, high-performance C#, and DOTS migration quick fixes.
 
-[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.24...HEAD
+[Unreleased]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/compare/v0.4.25...HEAD
+[0.4.25]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.25
 [0.4.24]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.24
 [0.4.23]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.23
 [0.4.22]: https://github.com/somedeveloper00/UnityBestPractices.Analyzers/releases/tag/v0.4.22
