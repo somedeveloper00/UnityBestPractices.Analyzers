@@ -66,4 +66,48 @@ public sealed class UBP0002Tests
             }
             """);
     }
+
+    [Theory]
+    [InlineData("false")]
+    [InlineData("true")]
+    [InlineData("default(bool)")]
+    [InlineData("default(int)")]
+    public async Task ReplacesOtherBoxedValueTypes(string yieldedValue)
+    {
+        var test = new CSharpCodeFixTest<
+            UnityBestPracticesAnalyzer,
+            UnityBestPracticesCodeFixProvider,
+            DefaultVerifier>
+        {
+            TestCode = $$"""
+                using System.Collections;
+                using UnityEngine;
+                class Animation : MonoBehaviour
+                {
+                    IEnumerator Run()
+                    {
+                        yield return {|#0:{{yieldedValue}}|};
+                    }
+                }
+                """,
+            FixedCode = """
+                using System.Collections;
+                using UnityEngine;
+                class Animation : MonoBehaviour
+                {
+                    IEnumerator Run()
+                    {
+                        yield return null;
+                    }
+                }
+                """,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net60,
+        };
+        test.TestState.Sources.Add(("UnityEngine.g.cs", TestSources.UnityEngine));
+        test.FixedState.Sources.Add(("UnityEngine.g.cs", TestSources.UnityEngine));
+        test.ExpectedDiagnostics.Add(
+            VerifyCS.Diagnostic(DiagnosticIds.YieldNull).WithLocation(0));
+
+        await test.RunAsync();
+    }
 }
