@@ -75,6 +75,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
                 AdvancedUnityRules.AnalyzeAssignment,
                 SyntaxKind.SimpleAssignmentExpression);
             startContext.RegisterSyntaxNodeAction(
+                AdvancedUnityRules.AnalyzeExpressionStatement,
+                SyntaxKind.ExpressionStatement);
+            startContext.RegisterSyntaxNodeAction(
                 AdvancedUnityRules.AnalyzeTypeDeclaration,
                 SyntaxKind.ClassDeclaration,
                 SyntaxKind.StructDeclaration);

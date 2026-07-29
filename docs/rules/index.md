@@ -79,3 +79,4 @@ This index is generated from the analyzer's central diagnostic catalog. Run `dot
 | [UBP0073](UBP0073.md) | Do not let temporary native memory escape | `Unity.Correctness` | Info | Safe | No |
 | [UBP0074](UBP0074.md) | Cache shader property ID | `Unity.Performance.Safe` | Info | Safe | No |
 | [UBP0075](UBP0075.md) | Match the folder namespace | `CSharp.CodeStyle` | Info | ReviewRequired | No |
+| [UBP0076](UBP0076.md) | Set local position and rotation together | `Unity.Performance.Safe` | Info | Safe | Yes |
