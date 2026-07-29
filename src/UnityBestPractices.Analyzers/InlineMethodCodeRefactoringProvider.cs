@@ -197,10 +197,8 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
             {
                 parameterUses.Add((identifier, parameter));
             }
-            else if (symbol is not null)
+            else if (!CanPreserveExpressionSymbol(identifier, symbol, method))
             {
-                // Unqualified members could bind differently at the call site. Keep this
-                // first version intentionally conservative rather than changing behavior.
                 return false;
             }
         }
@@ -253,10 +251,12 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
             return false;
         }
 
-        var substitutedExpression = bodyExpression.ReplaceNodes(
-                parameterUses.Select(use => use.Syntax),
-                (original, _) => SyntaxFactory.ParenthesizedExpression(argumentByParameter[
-                    (IParameterSymbol)declarationModel.GetSymbolInfo(original, cancellationToken).Symbol!]));
+        var substitutedExpression = (ExpressionSyntax)new InlineExpressionRewriter(
+                declarationModel,
+                argumentByParameter,
+                method,
+                cancellationToken)
+            .Visit(bodyExpression)!;
         replacement = SyntaxFactory.ParenthesizedExpression(substitutedExpression.WithoutTrivia())
             .WithTriviaFrom(invocation)
             .WithAdditionalAnnotations(Formatter.Annotation);
@@ -275,6 +275,37 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
 
         nodeToReplace = invocation;
         return true;
+    }
+
+    private static bool CanPreserveExpressionSymbol(
+        IdentifierNameSyntax identifier,
+        ISymbol? symbol,
+        IMethodSymbol method)
+    {
+        if (symbol is null)
+        {
+            return identifier.Identifier.ValueText == "nameof" &&
+                identifier.Parent is InvocationExpressionSyntax { Expression: var expression } &&
+                expression == identifier;
+        }
+
+        // Names which are already qualified retain their receiver, while type and
+        // namespace names have compilation-wide meaning. Unqualified members of the
+        // declaring type are made explicit by InlineExpressionRewriter so that a
+        // caller local with the same name cannot capture them.
+        if (identifier.Parent is MemberAccessExpressionSyntax memberAccess &&
+            memberAccess.Name == identifier)
+        {
+            return true;
+        }
+
+        if (symbol is INamedTypeSymbol || symbol is INamespaceSymbol)
+        {
+            return true;
+        }
+
+        return symbol is IFieldSymbol or IPropertySymbol or IEventSymbol or IMethodSymbol &&
+            SymbolEqualityComparer.Default.Equals(symbol.ContainingType, method.ContainingType);
     }
 
     private static bool TryCreateVoidStatementReplacement(
@@ -614,6 +645,70 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
     private static bool IsComment(SyntaxTrivia trivia) =>
         trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) ||
         trivia.IsKind(SyntaxKind.MultiLineCommentTrivia);
+
+    private sealed class InlineExpressionRewriter : CSharpSyntaxRewriter
+    {
+        private readonly SemanticModel _semanticModel;
+        private readonly Dictionary<IParameterSymbol, ExpressionSyntax> _arguments;
+        private readonly IMethodSymbol _method;
+        private readonly CancellationToken _cancellationToken;
+
+        public InlineExpressionRewriter(
+            SemanticModel semanticModel,
+            Dictionary<IParameterSymbol, ExpressionSyntax> arguments,
+            IMethodSymbol method,
+            CancellationToken cancellationToken)
+        {
+            _semanticModel = semanticModel;
+            _arguments = arguments;
+            _method = method;
+            _cancellationToken = cancellationToken;
+        }
+
+        public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
+        {
+            var symbol = _semanticModel.GetSymbolInfo(node, _cancellationToken).Symbol;
+            if (symbol is IParameterSymbol parameter && _arguments.TryGetValue(parameter, out var argument))
+            {
+                return SyntaxFactory.ParenthesizedExpression(argument.WithoutTrivia())
+                    .WithTriviaFrom(node);
+            }
+
+            if (node.Parent is not MemberAccessExpressionSyntax { Name: var name } || name != node)
+            {
+                if (symbol is IFieldSymbol or IPropertySymbol or IEventSymbol or IMethodSymbol &&
+                    SymbolEqualityComparer.Default.Equals(symbol.ContainingType, _method.ContainingType))
+                {
+                    ExpressionSyntax receiver = symbol.IsStatic
+                        ? SyntaxFactory.ParseExpression(_method.ContainingType.ToDisplayString(
+                            SymbolDisplayFormat.FullyQualifiedFormat))
+                        : SyntaxFactory.ThisExpression();
+                    return SyntaxFactory.MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            receiver,
+                            node.WithoutTrivia())
+                        .WithTriviaFrom(node);
+                }
+            }
+
+            return base.VisitIdentifierName(node);
+        }
+
+        public override SyntaxNode? VisitInvocationExpression(InvocationExpressionSyntax node)
+        {
+            if (node.Expression is IdentifierNameSyntax { Identifier.ValueText: "nameof" } &&
+                _semanticModel.GetConstantValue(node, _cancellationToken) is
+                    { HasValue: true, Value: string value })
+            {
+                return SyntaxFactory.LiteralExpression(
+                        SyntaxKind.StringLiteralExpression,
+                        SyntaxFactory.Literal(value))
+                    .WithTriviaFrom(node);
+            }
+
+            return base.VisitInvocationExpression(node);
+        }
+    }
 
     private sealed class MethodBodyRewriter : CSharpSyntaxRewriter
     {

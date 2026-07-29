@@ -91,6 +91,46 @@ public sealed class InlineMethodCodeRefactoringProviderTests
     }
 
     [Fact]
+    public async Task InlinesExpressionUsingInstanceMembersWithoutCapturingCallerLocals()
+    {
+        var changed = await ApplyAsync("""
+            public sealed class Gauge
+            {
+                private int _reading;
+                private int Offset => 2;
+                private int Read() => _reading + Offset;
+
+                public int Sample()
+                {
+                    var _reading = 100;
+                    return Read$$();
+                }
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.Contains("return (this._reading + this.Offset);", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("return (_reading + Offset);", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlinesExpressionUsingQualifiedCallsAndOutFields()
+    {
+        var changed = await ApplyAsync("""
+            public sealed class Cache
+            {
+                private string _value;
+                private System.Collections.Generic.Dictionary<int, string> Values { get; } = new();
+                private bool Refresh() => (_value != null) || Values.TryGetValue(1, out _value);
+                public bool Run() => Refresh$$();
+            }
+            """);
+
+        var normalized = Normalize(changed);
+        Assert.Contains("this.Values.TryGetValue(1, out this._value)", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task InlinesParameterlessVoidInstanceMethodStatement()
     {
         var changed = await ApplyAsync("""
@@ -378,7 +418,6 @@ public sealed class InlineMethodCodeRefactoringProviderTests
     [InlineData("private static T Identity<T>(T value) => value;", "Identity$$(GetValue())")]
     [InlineData("private static int First(params int[] values) => values[0];", "First$$(1, 2)")]
     [InlineData("private static int Increment(int value = 1) => value + 1;", "Increment$$()")]
-    [InlineData("private static int Absolute(int value) => System.Math.Abs(value);", "Absolute$$(-1)")]
     public async Task DoesNotOfferInlineWhenSubstitutionCouldChangeBehavior(string declaration, string invocation)
     {
         var source = $$"""
