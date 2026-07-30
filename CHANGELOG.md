@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.27] - 2026-07-30
+
+### Fixed
+
+- Preserved IDE cursor navigation after moving a statement up or down.
+- Prevented UBP0073 from reporting temporary native containers passed into
+  Unity jobs.
+
 ## [0.4.25] - 2026-07-29
 
 ### Fixed
