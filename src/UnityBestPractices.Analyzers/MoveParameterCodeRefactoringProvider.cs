@@ -50,7 +50,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         {
             context.RegisterRefactoring(
                 CodeAction.Create(
-                    MoveLeftTitle,
+                    FixTitleLocalizer.Get(FixTitleLocalizer.MoveParameterLeft, MoveLeftTitle),
                     cancellationToken => MoveParameterAsync(
                         context.Document.Project.Solution,
                         symbol,
@@ -65,7 +65,7 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         {
             context.RegisterRefactoring(
                 CodeAction.Create(
-                    MoveRightTitle,
+                    FixTitleLocalizer.Get(FixTitleLocalizer.MoveParameterRight, MoveRightTitle),
                     cancellationToken => MoveParameterAsync(
                         context.Document.Project.Solution,
                         symbol,

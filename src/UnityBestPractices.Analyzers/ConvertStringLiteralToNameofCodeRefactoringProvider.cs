@@ -42,7 +42,7 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProvider : CodeRe
 
         context.RegisterRefactoring(
             CodeAction.Create(
-                Title,
+                FixTitleLocalizer.Get(FixTitleLocalizer.ConvertStringLiteralToNameof, Title),
                 cancellationToken => ReplaceAsync(
                     context.Document,
                     literal,

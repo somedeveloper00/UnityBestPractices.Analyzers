@@ -1,9 +1,17 @@
 using System.Globalization;
+using System.Linq;
 using UnityBestPractices.Analyzers;
 using Xunit;
 
 public sealed class FixTitleLocalizerTests
 {
+    private static readonly CultureInfo[] SupportedCultures =
+    {
+        CultureInfo.GetCultureInfo("ja-JP"),
+        CultureInfo.GetCultureInfo("fa-IR"),
+        CultureInfo.GetCultureInfo("ru-RU"),
+    };
+
     [Fact]
     public void UsesSystemCultureWhenAnalyzerHostUICultureIsEnglish()
     {
@@ -41,5 +49,41 @@ public sealed class FixTitleLocalizerTests
             CultureInfo.GetCultureInfo("ja-JP"));
 
         Assert.Equal("Вернуть null через yield", title);
+    }
+
+    [Fact]
+    public void EveryQuickFixHasEverySupportedLocalization()
+    {
+        foreach (var rule in DiagnosticCatalog.All.Where(rule => rule.HasCodeFix))
+        {
+            foreach (var culture in SupportedCultures)
+            {
+                Assert.NotEqual(rule.FixTitle, FixTitleLocalizer.Get(rule.DiagnosticId, rule.FixTitle, culture));
+            }
+        }
+    }
+
+    [Fact]
+    public void EveryRefactoringSuggestionHasEverySupportedLocalization()
+    {
+        var suggestions = new[]
+        {
+            (FixTitleLocalizer.ConvertStringLiteralToNameof, ConvertStringLiteralToNameofCodeRefactoringProvider.Title),
+            (FixTitleLocalizer.InlineMethod, InlineMethodCodeRefactoringProvider.Title),
+            (FixTitleLocalizer.MoveParameterLeft, MoveParameterCodeRefactoringProvider.MoveLeftTitle),
+            (FixTitleLocalizer.MoveParameterRight, MoveParameterCodeRefactoringProvider.MoveRightTitle),
+            (FixTitleLocalizer.MoveStatementUp, MoveStatementCodeRefactoringProvider.MoveUpTitle),
+            (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle),
+            (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title),
+            (FixTitleLocalizer.RemoveSymbol, RemoveSymbolCodeRefactoringProvider.Title),
+        };
+
+        foreach (var (key, englishTitle) in suggestions)
+        {
+            foreach (var culture in SupportedCultures)
+            {
+                Assert.NotEqual(englishTitle, FixTitleLocalizer.Get(key, englishTitle, culture));
+            }
+        }
     }
 }
