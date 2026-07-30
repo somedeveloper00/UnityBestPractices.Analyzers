@@ -5,6 +5,15 @@ namespace UnityBestPractices.Analyzers;
 /// <summary>Provides quick-fix labels in the IDE's current UI language.</summary>
 internal static class FixTitleLocalizer
 {
+    internal const string ConvertStringLiteralToNameof = "refactoring.convert-string-to-nameof";
+    internal const string InlineMethod = "refactoring.inline-method";
+    internal const string MoveParameterLeft = "refactoring.move-parameter-left";
+    internal const string MoveParameterRight = "refactoring.move-parameter-right";
+    internal const string MoveStatementUp = "refactoring.move-statement-up";
+    internal const string MoveStatementDown = "refactoring.move-statement-down";
+    internal const string RemoveParameter = "refactoring.remove-parameter";
+    internal const string RemoveSymbol = "refactoring.remove-symbol";
+
 #pragma warning disable RS1035 // Code fixes are displayed by the host UI and must follow its UI culture.
     internal static string Get(string diagnosticId, string englishTitle) =>
         Get(
@@ -78,6 +87,14 @@ internal static class FixTitleLocalizer
 
     private static string TranslateJapanese(string diagnosticId, string englishTitle) => diagnosticId switch
     {
+        ConvertStringLiteralToNameof => "文字列リテラルを nameof に置換",
+        InlineMethod => "メソッドをインライン化",
+        MoveParameterLeft => "パラメーターを左へ移動",
+        MoveParameterRight => "パラメーターを右へ移動",
+        MoveStatementUp => "ステートメントを上へ移動",
+        MoveStatementDown => "ステートメントを下へ移動",
+        RemoveParameter => "パラメーターを削除",
+        RemoveSymbol => "シンボルとすべての使用箇所を削除",
         DiagnosticIds.EncapsulateSerializedField => "private にして SerializeField を追加",
         DiagnosticIds.YieldNull => "null を yield する",
         DiagnosticIds.AddBurstCompile => "BurstCompile を追加",
@@ -100,6 +117,14 @@ internal static class FixTitleLocalizer
 
     private static string TranslatePersian(string diagnosticId, string englishTitle) => diagnosticId switch
     {
+        ConvertStringLiteralToNameof => "جایگزینی لفظ رشته با nameof",
+        InlineMethod => "درون‌خطی کردن متد",
+        MoveParameterLeft => "انتقال پارامتر به چپ",
+        MoveParameterRight => "انتقال پارامتر به راست",
+        MoveStatementUp => "انتقال دستور به بالا",
+        MoveStatementDown => "انتقال دستور به پایین",
+        RemoveParameter => "حذف پارامتر",
+        RemoveSymbol => "حذف نماد و همهٔ کاربردهای آن",
         DiagnosticIds.EncapsulateSerializedField => "private کردن فیلد و افزودن SerializeField",
         DiagnosticIds.YieldNull => "yield کردن null",
         DiagnosticIds.AddBurstCompile => "افزودن BurstCompile",
@@ -122,6 +147,14 @@ internal static class FixTitleLocalizer
 
     private static string TranslateRussian(string diagnosticId, string englishTitle) => diagnosticId switch
     {
+        ConvertStringLiteralToNameof => "Заменить строковый литерал на nameof",
+        InlineMethod => "Встроить метод",
+        MoveParameterLeft => "Переместить параметр влево",
+        MoveParameterRight => "Переместить параметр вправо",
+        MoveStatementUp => "Переместить инструкцию вверх",
+        MoveStatementDown => "Переместить инструкцию вниз",
+        RemoveParameter => "Удалить параметр",
+        RemoveSymbol => "Удалить символ и все его использования",
         DiagnosticIds.EncapsulateSerializedField => "Сделать поле private и добавить SerializeField",
         DiagnosticIds.YieldNull => "Вернуть null через yield",
         DiagnosticIds.AddBurstCompile => "Добавить BurstCompile",

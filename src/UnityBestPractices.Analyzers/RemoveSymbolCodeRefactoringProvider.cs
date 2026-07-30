@@ -45,7 +45,7 @@ public sealed class RemoveSymbolCodeRefactoringProvider : CodeRefactoringProvide
         }
 
         context.RegisterRefactoring(CodeAction.Create(
-            Title,
+            FixTitleLocalizer.Get(FixTitleLocalizer.RemoveSymbol, Title),
             cancellationToken => RemoveAsync(context.Document.Project.Solution, symbol, cancellationToken),
             Title));
     }
