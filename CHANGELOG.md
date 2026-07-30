@@ -7,6 +7,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added **Remove symbol and all usages**, a refactoring for local variables,
+  fields, methods, and classes.
+
 ## [0.4.27] - 2026-07-30
 
 ### Fixed
