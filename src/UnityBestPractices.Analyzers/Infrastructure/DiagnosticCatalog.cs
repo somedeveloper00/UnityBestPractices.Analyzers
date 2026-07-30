@@ -94,7 +94,14 @@ public static class DiagnosticCatalog
             "Match the folder namespace",
             "Place this file in namespace '{0}' to match neighboring files",
             "A namespace-less type file should use the clear most-common namespace declared by neighboring files in the same folder.",
-            "Use the folder namespace"));
+            "Use the folder namespace"),
+        RuleMetadataFactory.Create(
+            DiagnosticIds.RemoveUnusedEntityAccess,
+            "Remove unused entity access",
+            "Remove WithEntityAccess because the entity value is unused",
+            "Avoiding an unused entity value keeps a SystemAPI.Query iteration tuple as small as necessary.",
+            "Remove unused entity access",
+            "Unity.Entities.SystemAPI"));
 
     private static readonly Lazy<ImmutableArray<RuleMetadata>> LazyAll =
         new(

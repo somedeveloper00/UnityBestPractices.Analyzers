@@ -488,6 +488,7 @@ internal sealed partial class AnalyzerTests
         await VerifyEncapsulationSafetyAsync();
         await VerifyFixAllScopesAsync();
         await VerifyNamespaceConsistencyAsync();
+        await VerifyUnusedEntityAccessFixesAsync();
 
         await VerifyFixAsync(
             """
@@ -1388,20 +1389,69 @@ internal sealed partial class AnalyzerTests
             expected: false);
     }
 
+    private async Task VerifyUnusedEntityAccessFixesAsync()
+    {
+        var cases = new[]
+        {
+            ("_", "position.ValueRW.Value++;"),
+            ("entity", "position.ValueRW.Value++;"),
+            ("unusedEntity", "position.ValueRW.Value += 2;"),
+            ("ignored", "position.ValueRW.Value += 3;"),
+        };
+
+        foreach (var (entityName, body) in cases)
+        {
+            await VerifyFixAsync(
+                $$"""
+                using Unity.Entities;
+
+                class MovementSystem
+                {
+                    void Update()
+                    {
+                        foreach (var (position, {{entityName}}) in SystemAPI.Query<RefRW<Position>>().WithEntityAccess())
+                        {
+                            {{body}}
+                        }
+                    }
+                }
+
+                struct Position : IComponentData { public float Value; }
+                """,
+                DiagnosticIds.RemoveUnusedEntityAccess,
+                $$"""
+                using Unity.Entities;
+
+                class MovementSystem
+                {
+                    void Update()
+                    {
+                        foreach (var position in SystemAPI.Query<RefRW<Position>>())
+                        {
+                            {{body}}
+                        }
+                    }
+                }
+
+                struct Position : IComponentData { public float Value; }
+                """);
+        }
+    }
+
     private void VerifyCatalogIntegrity()
     {
         var descriptors = _analyzer.SupportedDiagnostics;
-        if (descriptors.Length != 76)
+        if (descriptors.Length != 77)
         {
-            throw new InvalidOperationException($"Expected 76 diagnostics, got {descriptors.Length}.");
+            throw new InvalidOperationException($"Expected 77 diagnostics, got {descriptors.Length}.");
         }
 
-        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 76)
+        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 77)
         {
             throw new InvalidOperationException("Diagnostic IDs must be unique.");
         }
 
-        var expectedIds = Enumerable.Range(1, 76)
+        var expectedIds = Enumerable.Range(1, 77)
             .Select(number => $"UBP{number:0000}")
             .ToArray();
         var actualIds = descriptors

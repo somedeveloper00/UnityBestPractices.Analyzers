@@ -112,6 +112,7 @@ internal static class FixTitleLocalizer
         DiagnosticIds.JobEntityScheduleToRun or DiagnosticIds.JobEntityScheduleParallelToRun => "Run 実行を使用",
         DiagnosticIds.DiscardedScheduledJobHandle => "スケジュール済み JobHandle を代入",
         DiagnosticIds.CacheShaderPropertyId => "Shader.PropertyToID の結果をキャッシュ",
+        DiagnosticIds.RemoveUnusedEntityAccess => "未使用のエンティティアクセスを削除",
         _ => TranslateUse(englishTitle, "次を使用: "),
     };
 
@@ -142,6 +143,7 @@ internal static class FixTitleLocalizer
         DiagnosticIds.JobEntityScheduleToRun or DiagnosticIds.JobEntityScheduleParallelToRun => "استفاده از اجرای Run",
         DiagnosticIds.DiscardedScheduledJobHandle => "انتساب JobHandle زمان‌بندی‌شده",
         DiagnosticIds.CacheShaderPropertyId => "کش کردن نتیجهٔ Shader.PropertyToID",
+        DiagnosticIds.RemoveUnusedEntityAccess => "حذف دسترسی استفاده‌نشده به موجودیت",
         _ => TranslateUse(englishTitle, "استفاده از "),
     };
 
@@ -172,6 +174,7 @@ internal static class FixTitleLocalizer
         DiagnosticIds.JobEntityScheduleToRun or DiagnosticIds.JobEntityScheduleParallelToRun => "Использовать выполнение Run",
         DiagnosticIds.DiscardedScheduledJobHandle => "Присвоить запланированный JobHandle",
         DiagnosticIds.CacheShaderPropertyId => "Кэшировать результат Shader.PropertyToID",
+        DiagnosticIds.RemoveUnusedEntityAccess => "Удалить неиспользуемый доступ к сущности",
         _ => TranslateUse(englishTitle, "Использовать "),
     };
 

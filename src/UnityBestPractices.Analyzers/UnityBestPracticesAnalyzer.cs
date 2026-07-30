@@ -50,7 +50,8 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         .AddRange(ExpressionQuickFixRegistry.Descriptors)
         .AddRange(DotsQueryRules.Descriptors)
         .AddRange(AdvancedUnityRules.Descriptors)
-        .Add(NamespaceConsistencyRules.Descriptor);
+        .Add(NamespaceConsistencyRules.Descriptor)
+        .Add(DiagnosticCatalog.Get(DiagnosticIds.RemoveUnusedEntityAccess).Descriptor);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -90,6 +91,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             startContext.RegisterSyntaxNodeAction(
                 DotsQueryRules.AnalyzeSystemApiQuery,
                 SyntaxKind.ForEachStatement,
+                SyntaxKind.ForEachVariableStatement);
+            startContext.RegisterSyntaxNodeAction(
+                UnusedEntityAccessRule.Analyze,
                 SyntaxKind.ForEachVariableStatement);
             startContext.RegisterSyntaxNodeAction(
                 AnalyzeRelationalExpression,
