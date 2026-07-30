@@ -30,7 +30,8 @@ public sealed class MoveStatementCodeRefactoringProviderTests
                 }
             }
             """,
-            title);
+            title,
+            "Third();");
 
         Assert.Equal(
             "class Example\n{\n    void Run()\n    {\n        " + expectedBody + "\n    }\n}",
@@ -197,7 +198,8 @@ public sealed class MoveStatementCodeRefactoringProviderTests
                 }
             }
             """,
-            title);
+            title,
+            "state = State.Second;");
 
         Assert.Equal(expected, changed);
     }
@@ -223,7 +225,10 @@ public sealed class MoveStatementCodeRefactoringProviderTests
         Assert.Empty(actions);
     }
 
-    private static async Task<string> ApplyAsync(string sourceWithCursor, string title)
+    private static async Task<string> ApplyAsync(
+        string sourceWithCursor,
+        string title,
+        string? expectedNavigationTarget = null)
     {
         var (workspace, document, cursor) = CreateDocument(sourceWithCursor);
         using (workspace)
@@ -233,6 +238,15 @@ public sealed class MoveStatementCodeRefactoringProviderTests
             var operations = await action.GetOperationsAsync(CancellationToken.None);
             var changedSolution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
             var changedDocument = changedSolution.GetDocument(document.Id)!;
+            if (expectedNavigationTarget is not null)
+            {
+                var changedRoot = await changedDocument.GetSyntaxRootAsync();
+                var navigationTarget = Assert.Single(
+                    changedRoot!.GetAnnotatedNodesAndTokens(
+                        MoveStatementCodeRefactoringProvider.NavigationAnnotationKind));
+                Assert.Equal(expectedNavigationTarget, navigationTarget.ToString());
+            }
+
             return (await changedDocument.GetTextAsync()).ToString();
         }
     }
