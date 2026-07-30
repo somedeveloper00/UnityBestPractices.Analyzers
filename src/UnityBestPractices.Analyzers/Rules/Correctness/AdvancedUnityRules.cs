@@ -195,7 +195,9 @@ internal static class AdvancedUnityRules
         var target = context.SemanticModel.GetSymbolInfo(
             assignment.Left,
             context.CancellationToken).Symbol;
-        if (target is not IFieldSymbol && target is not IPropertySymbol)
+        if (target is not IFieldSymbol && target is not IPropertySymbol ||
+            target is IFieldSymbol { ContainingType: { } containingType } &&
+            UnitySymbolCache.IsUnityJobType(containingType))
         {
             return;
         }

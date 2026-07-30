@@ -300,7 +300,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             "Unity.Burst.BurstCompileAttribute");
         return jobType is not null &&
                burstCompile is not null &&
-               IsUnityJobType(jobType) &&
+               UnitySymbolCache.IsUnityJobType(jobType) &&
                !HasAttribute(jobType, burstCompile);
     }
 
@@ -327,7 +327,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
             nativeArray is null ||
             readOnlyAttribute is null ||
             !SymbolEqualityComparer.Default.Equals(fieldType.OriginalDefinition, nativeArray) ||
-            !IsUnityJobType(field.ContainingType) ||
+            !UnitySymbolCache.IsUnityJobType(field.ContainingType) ||
             HasAttribute(field, readOnlyAttribute))
         {
             return false;
@@ -937,22 +937,6 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
                SymbolEqualityComparer.Default.Equals(
                    semanticModel.GetSymbolInfo(operand, cancellationToken).Symbol,
                    index);
-    }
-
-    private static bool IsUnityJobType(INamedTypeSymbol type)
-    {
-        return type.TypeKind == TypeKind.Struct && type.AllInterfaces.Any(@interface =>
-        {
-            if (!@interface.Name.StartsWith("IJob", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            var containingNamespace = @interface.ContainingNamespace.ToDisplayString();
-            return containingNamespace == "Unity.Jobs" ||
-                   containingNamespace == "UnityEngine.Jobs" ||
-                   containingNamespace == "Unity.Entities";
-        });
     }
 
     private static bool HasAttribute(ISymbol symbol, INamedTypeSymbol attributeType) =>

@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 
@@ -46,5 +48,21 @@ internal sealed class UnitySymbolCache
 
         _resolved.TryAdd(metadataName, resolved);
         return resolved;
+    }
+
+    internal static bool IsUnityJobType(INamedTypeSymbol type)
+    {
+        return type.TypeKind == TypeKind.Struct && type.AllInterfaces.Any(@interface =>
+        {
+            if (!@interface.Name.StartsWith("IJob", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var containingNamespace = @interface.ContainingNamespace.ToDisplayString();
+            return containingNamespace == "Unity.Jobs" ||
+                   containingNamespace == "UnityEngine.Jobs" ||
+                   containingNamespace == "Unity.Entities";
+        });
     }
 }
