@@ -17,6 +17,10 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
     public const string MoveUpTitle = "Move statement up";
     public const string MoveDownTitle = "Move statement down";
 
+    // NavigationAnnotation is internal in the Roslyn 3.8 API used by Unity, so use
+    // the annotation kind understood by the workspace host directly.
+    internal const string NavigationAnnotationKind = "CodeAction_Navigation";
+
     public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
@@ -198,6 +202,7 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         if (node is IfStatementSyntax ifBranch &&
             TryGetIfBranchPosition(ifBranch, out _, out _))
         {
+            var navigationAnnotation = new SyntaxAnnotation(NavigationAnnotationKind);
             var first = GetFirstIfBranch(ifBranch);
             var branchDestination = GetIfBranches(first)[destinationIndex];
             var branchChangedRoot = root.ReplaceNodes(
@@ -225,7 +230,7 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
                         return ifBranch.Condition;
                     }
 
-                    return ifBranch.Statement;
+                    return ifBranch.Statement.WithAdditionalAnnotations(navigationAnnotation);
                 });
             return document.WithSyntaxRoot(branchChangedRoot);
         }
@@ -237,9 +242,10 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         }
 
         var destination = siblings[destinationIndex];
+        var movedNode = node.WithAdditionalAnnotations(new SyntaxAnnotation(NavigationAnnotationKind));
         var changedRoot = root.ReplaceNodes(
             new[] { node, destination },
-            (original, _) => original == node ? destination : node);
+            (original, _) => original == node ? destination : movedNode);
         return document.WithSyntaxRoot(changedRoot);
     }
 }
