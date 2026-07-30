@@ -53,7 +53,7 @@ jobs:
           --no-restore
           -p:ContinuousIntegrationBuild=true
 
-      - name: Run 76-rule regression and Fix All tests
+      - name: Run 77-rule regression and Fix All tests
         run: >
           dotnet run
           --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj

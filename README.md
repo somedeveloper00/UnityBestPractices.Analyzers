@@ -181,6 +181,7 @@ These quick fixes use the current Entities 1.x query systems. `SystemAPI.Query` 
 | `UBP0074` | Repeated constant `Shader.PropertyToID` calls in one type | Adds a uniquely named static readonly ID field and replaces repeated calls |
 | `UBP0075` | A namespace-less type file whose neighbors have a clear most-common namespace | Wraps the file's types in the neighboring namespace |
 | `UBP0076` | Adjacent local position and rotation assignments on the same Transform | Replaces both assignments with `SetLocalPositionAndRotation` |
+| `UBP0077` | A `SystemAPI.Query(...).WithEntityAccess()` loop whose entity result is unused | Removes `WithEntityAccess()` and the unused entity tuple element |
 
 The analyzer resolves Unity symbols semantically. It ignores unrelated types with similar member names, unsupported field types, non-Unity iterators, dynamic distance thresholds, generated code, and Unity/package versions where the required symbols are absent.
 
@@ -287,7 +288,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Rele
 dotnet pack src/UnityBestPractices.Analyzers -c Release --no-build -o artifacts/packages
 ```
 
-The dependency-light harness verifies the full 76-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
+The dependency-light harness verifies the full 77-rule catalog, at least four positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
 
 ## Release process
 
