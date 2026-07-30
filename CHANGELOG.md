@@ -7,6 +7,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.29] - 2026-07-30
+
+### Added
+
+- Added UBP0077 and its quick fix to remove unused entity access from
+  `SystemAPI.Query(...).WithEntityAccess()` loops.
+- Added localized titles for code refactoring suggestions.
+
+### Changed
+
+- Expanded return-to-continue conversion coverage for `SystemAPI.Query` loops.
+
 ## [0.4.28] - 2026-07-30
 
 ### Added
