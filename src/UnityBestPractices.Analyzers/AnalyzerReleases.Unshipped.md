@@ -9,6 +9,7 @@ UBP0072 | Unity.Correctness | Info | Detect a narrowly provable undisposed persi
 UBP0073 | Unity.Correctness | Info | Detect a temporary allocator lifetime escape
 UBP0074 | Unity.Performance.Safe | Info | Cache repeated Shader.PropertyToID calls
 UBP0076 | Unity.Performance.Safe | Info | Combine adjacent local position and rotation assignments
+UBP0077 | Unity.Performance.Safe | Info | Remove unused SystemAPI.Query entity access
 
 ### Changed Rules
 

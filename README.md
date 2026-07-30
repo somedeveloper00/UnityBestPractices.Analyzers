@@ -33,7 +33,7 @@ Every diagnostic defaults to `Info`: your IDE can show a useful suggestion witho
 | What you need | Where to go |
 | --- | --- |
 | Install the analyzer | [Unity Package Manager](#unity-package-manager), [NuGet](#nuget), or [manual DLL](#manual-dll) |
-| See every diagnostic | [Generated rule index](docs/rules/index.md) (`UBP0001`–`UBP0076`) |
+| See every diagnostic | [Generated rule index](docs/rules/index.md) (`UBP0001`–`UBP0077`) |
 | Choose a safe preset | [`config/ubp-safe.editorconfig`](config/ubp-safe.editorconfig) and the [configuration guide](docs/configuration.md) |
 | Understand fix safety | [Safety model](#safety-model) and [rule safety decisions](docs/safety.md) |
 | Use IDE refactorings | [Parameter and inline-method refactorings](#parameter-refactorings) |

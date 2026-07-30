@@ -187,6 +187,11 @@ internal static class RuleMetadataFactory
             return RuleCategories.CSharpCodeStyle;
         }
 
+        if (diagnosticId == DiagnosticIds.RemoveUnusedEntityAccess)
+        {
+            return RuleCategories.UnityPerformanceSafe;
+        }
+
         if (diagnosticId is DiagnosticIds.YieldNull or
             DiagnosticIds.UseSquaredMagnitude or
             DiagnosticIds.AddBurstCompile or
@@ -206,6 +211,7 @@ internal static class RuleMetadataFactory
     }
 
     private static string GetMinimumUnityVersion(string diagnosticId) =>
+        diagnosticId == DiagnosticIds.RemoveUnusedEntityAccess ||
         string.CompareOrdinal(diagnosticId, DiagnosticIds.EntitiesForEachToSystemApiQuery) >= 0 &&
         string.CompareOrdinal(diagnosticId, DiagnosticIds.JobEntityScheduleParallelToSchedule) <= 0
             ? "Unity 2022.3 with Entities 1.0"
