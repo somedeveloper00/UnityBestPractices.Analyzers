@@ -52,7 +52,7 @@ public sealed class RemoveParameterCodeRefactoringProvider : CodeRefactoringProv
 
         context.RegisterRefactoring(
             CodeAction.Create(
-                Title,
+                FixTitleLocalizer.Get(FixTitleLocalizer.RemoveParameter, Title),
                 cancellationToken => RemoveParameterAsync(
                     context.Document.Project.Solution,
                     symbol,

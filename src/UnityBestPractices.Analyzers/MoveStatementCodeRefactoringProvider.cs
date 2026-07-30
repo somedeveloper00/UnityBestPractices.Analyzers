@@ -52,7 +52,9 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         int destinationIndex,
         string title) =>
         context.RegisterRefactoring(CodeAction.Create(
-            title,
+            FixTitleLocalizer.Get(
+                title == MoveUpTitle ? FixTitleLocalizer.MoveStatementUp : FixTitleLocalizer.MoveStatementDown,
+                title),
             cancellationToken => MoveAsync(context.Document, node.Span, destinationIndex, cancellationToken),
             title));
 
