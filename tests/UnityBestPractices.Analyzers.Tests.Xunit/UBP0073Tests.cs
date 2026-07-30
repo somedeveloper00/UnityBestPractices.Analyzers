@@ -92,6 +92,93 @@ public sealed class UBP0073Tests
                 .WithArguments("TempJob"));
     }
 
+    [Theory]
+    [InlineData("Temp")]
+    [InlineData("TempJob")]
+    public async Task IgnoresTemporaryAllocationPassedToJob(string allocator)
+    {
+        var source = $$"""
+                using Unity.Collections;
+                using Unity.Burst;
+                using Unity.Jobs;
+                class Owner
+                {
+                    void Create()
+                    {
+                        var handle = new WorkJob
+                        {
+                            Values = new NativeArray<int>(8, Allocator.{{allocator}})
+                        }.Schedule();
+                    }
+                }
+                [BurstCompile]
+                struct WorkJob : IJob
+                {
+                    public NativeArray<int> Values;
+                    public void Execute() { }
+                }
+                """ + "\n" + TestSources.Collections + "\n" + TestSources.Jobs;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresTemporaryLocalAssignedToJobField()
+    {
+        var source = """
+                using Unity.Collections;
+                using Unity.Burst;
+                using Unity.Jobs;
+                class Owner
+                {
+                    void Create()
+                    {
+                        var values = new NativeArray<int>(8, Allocator.TempJob);
+                        var job = new WorkJob();
+                        job.Values = values;
+                        var handle = job.Schedule();
+                    }
+                }
+                [BurstCompile]
+                struct WorkJob : IJob
+                {
+                    public NativeArray<int> Values;
+                    public void Execute() { }
+                }
+                """ + "\n" + TestSources.Collections + "\n" + TestSources.Jobs;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task ReportsTemporaryAllocationStoredInJobProperty()
+    {
+        var source = """
+                using Unity.Collections;
+                using Unity.Burst;
+                using Unity.Jobs;
+                class Owner
+                {
+                    void Create()
+                    {
+                        var job = new WorkJob
+                        {
+                            Values = {|#0:new NativeArray<int>(8, Allocator.TempJob)|}
+                        };
+                    }
+                }
+                [BurstCompile]
+                struct WorkJob : IJob
+                {
+                    public NativeArray<int> Values { get; set; }
+                    public void Execute() { }
+                }
+                """ + "\n" + TestSources.Collections + "\n" + TestSources.Jobs;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.InvalidTemporaryAllocatorEscape, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("TempJob"));
+    }
+
     [Fact]
     public async Task ReportsTemporaryCapturedByReturnedLambda()
     {
