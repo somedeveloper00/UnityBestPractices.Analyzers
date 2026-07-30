@@ -487,6 +487,7 @@ internal sealed class EntitiesForEachQuery
                         SyntaxFactory.IdentifierName(valueProperty))
                     .WithTriviaFrom(identifier);
             }));
+        rewrittenBody = RewriteLambdaReturns(rewrittenBody);
 
         var variableNames = componentParameters.Select(parameter => parameter.Name).ToList();
         if (componentParameters.Length == 0)
@@ -644,6 +645,7 @@ internal sealed class EntitiesForEachQuery
             replacements.Keys,
             (original, _) => replacements[original]);
         var rewrittenBody = DotsQuerySemanticHelpers.CreateBlock(rewrittenBodyNode);
+        rewrittenBody = RewriteLambdaReturns(rewrittenBody);
         var aliasStatements = componentParameters
             .Where(wrapperNames.ContainsKey)
             .Select(parameter => SyntaxFactory.ParseStatement(
@@ -736,7 +738,7 @@ internal sealed class EntitiesForEachQuery
             string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
             ".WithEntityAccess()";
         var snapshotName = CreateUniqueLocalName("entitiesSnapshot");
-        var body = DotsQuerySemanticHelpers.CreateBlock(Lambda.Body);
+        var body = RewriteLambdaReturns(DotsQuerySemanticHelpers.CreateBlock(Lambda.Body));
         statement = SyntaxFactory.ParseStatement(
             "{\n" +
             "using (var " + snapshotName +
@@ -751,6 +753,52 @@ internal sealed class EntitiesForEachQuery
             "}\n" +
             "}");
         return !statement.ContainsDiagnostics;
+    }
+
+    private BlockSyntax RewriteLambdaReturns(BlockSyntax body)
+    {
+        var returns = body.DescendantNodes()
+            .OfType<ReturnStatementSyntax>()
+            .Where(statement => statement.Expression is null &&
+                !statement.Ancestors()
+                    .TakeWhile(ancestor => ancestor != body)
+                    .Any(ancestor => ancestor is AnonymousFunctionExpressionSyntax ||
+                                     ancestor is LocalFunctionStatementSyntax))
+            .ToImmutableArray();
+        if (returns.IsEmpty)
+        {
+            return body;
+        }
+
+        var returnsInsideNestedLoops = returns
+            .Where(statement => statement.Ancestors()
+                .TakeWhile(ancestor => ancestor != body)
+                .Any(ancestor => ancestor is ForStatementSyntax ||
+                                 ancestor is ForEachStatementSyntax ||
+                                 ancestor is ForEachVariableStatementSyntax ||
+                                 ancestor is WhileStatementSyntax ||
+                                 ancestor is DoStatementSyntax))
+            .ToImmutableHashSet();
+        var continueLabel = returnsInsideNestedLoops.IsEmpty
+            ? null
+            : CreateUniqueLocalName("systemApiQueryContinue");
+        var rewritten = body.ReplaceNodes(returns, (original, _) =>
+        {
+            StatementSyntax replacement = returnsInsideNestedLoops.Contains(original)
+                ? SyntaxFactory.ParseStatement("goto " + continueLabel + ";")
+                : SyntaxFactory.ContinueStatement();
+            return replacement.WithTriviaFrom(original);
+        });
+
+        if (continueLabel is null)
+        {
+            return rewritten;
+        }
+
+        return rewritten.AddStatements(
+            SyntaxFactory.LabeledStatement(
+                continueLabel,
+                SyntaxFactory.EmptyStatement()));
     }
 
     private string CreateUniqueLocalName(string baseName)

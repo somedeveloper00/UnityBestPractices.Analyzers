@@ -118,6 +118,111 @@ internal sealed partial class AnalyzerTests
 
     private async Task VerifyEntitiesForEachRegressionCasesAsync()
     {
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class ReturnSystem : SystemBase { void Update() { " +
+            "Entities.ForEach((ref Position p) => { if (p.Value == 0) return; p.Value++; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class ReturnSystem : SystemBase { void Update() { " +
+            "foreach (var p in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) " +
+            "{ if (p.ValueRW.Value == 0) continue; p.ValueRW.Value++; } } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class NestedReturnSystem : SystemBase { void Update() { " +
+            "Entities.ForEach((ref Position p) => { for (var i = 0; i < 3; i++) { " +
+            "if (p.Value == i) return; p.Value++; } }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class NestedReturnSystem : SystemBase { void Update() { " +
+            "foreach (var p in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) " +
+            "{ for (var i = 0; i < 3; i++) { if (p.ValueRW.Value == i) goto systemApiQueryContinue; " +
+            "p.ValueRW.Value++; } systemApiQueryContinue:; } } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        var nestedLoopCases = new[]
+        {
+            (Name: "While", Loop: "while (p.Value < 3) { if (p.Value == 1) return; p.Value++; }",
+                FixedLoop: "while (p.ValueRW.Value < 3) { if (p.ValueRW.Value == 1) goto systemApiQueryContinue; p.ValueRW.Value++; }"),
+            (Name: "Do", Loop: "do { if (p.Value == 1) return; p.Value++; } while (p.Value < 3);",
+                FixedLoop: "do { if (p.ValueRW.Value == 1) goto systemApiQueryContinue; p.ValueRW.Value++; } while (p.ValueRW.Value < 3);"),
+            (Name: "ForEach", Loop: "foreach (var value in new[] { 1, 2 }) { if (p.Value == value) return; p.Value++; }",
+                FixedLoop: "foreach (var value in new[] { 1, 2 }) { if (p.ValueRW.Value == value) goto systemApiQueryContinue; p.ValueRW.Value++; }"),
+        };
+        foreach (var item in nestedLoopCases)
+        {
+            await VerifyFixAsync(
+                "using Unity.Entities; partial class " + item.Name + "ReturnSystem : SystemBase { void Update() { " +
+                "Entities.ForEach((ref Position p) => { " + item.Loop + " }).Run(); } } " +
+                "struct Position : IComponentData { public float Value; }",
+                DiagnosticIds.EntitiesForEachToSystemApiQuery,
+                "using Unity.Entities; partial class " + item.Name + "ReturnSystem : SystemBase { void Update() { " +
+                "foreach (var p in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) { " +
+                item.FixedLoop + " systemApiQueryContinue:; } } } " +
+                "struct Position : IComponentData { public float Value; }");
+        }
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class MixedReturnSystem : SystemBase { void Update() { " +
+            "Entities.ForEach((ref Position p) => { if (p.Value < 0) return; " +
+            "for (var i = 0; i < 3; i++) if (p.Value == i) return; p.Value++; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class MixedReturnSystem : SystemBase { void Update() { " +
+            "foreach (var p in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) { " +
+            "if (p.ValueRW.Value < 0) continue; for (var i = 0; i < 3; i++) " +
+            "if (p.ValueRW.Value == i) goto systemApiQueryContinue; p.ValueRW.Value++; " +
+            "systemApiQueryContinue:; } } } struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class NestedLambdaReturnSystem : SystemBase { void Update() { " +
+            "Entities.ForEach((ref Position p) => { System.Action callback = () => { return; }; " +
+            "if (p.Value == 0) return; callback(); }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class NestedLambdaReturnSystem : SystemBase { void Update() { " +
+            "foreach (var p in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) { " +
+            "System.Action callback = () => { return; }; if (p.ValueRW.Value == 0) continue; callback(); } } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class LabelCollisionSystem : SystemBase { void Update() { " +
+            "systemApiQueryContinue:; Entities.ForEach((ref Position p) => { " +
+            "while (p.Value < 3) if (p.Value == 1) return; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class LabelCollisionSystem : SystemBase { void Update() { " +
+            "systemApiQueryContinue:; foreach (var p in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) { " +
+            "while (p.ValueRW.Value < 3) if (p.ValueRW.Value == 1) goto systemApiQueryContinue2; " +
+            "systemApiQueryContinue2:; } } } struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class StructuralReturnSystem : SystemBase { void Update() { " +
+            "Entities.WithStructuralChanges().ForEach((ref Position p) => { " +
+            "if (p.Value == 0) return; p.Value++; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class StructuralReturnSystem : SystemBase { void Update() { " +
+            "var ecb = new Unity.Entities.EntityCommandBuffer(Unity.Collections.Allocator.Temp); " +
+            "foreach (var pRef in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) { " +
+            "ref Position p = ref pRef.ValueRW; if (p.Value == 0) continue; p.Value++; } " +
+            "ecb.Playback(EntityManager); ecb.Dispose(); } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class StructuralEntityReturnSystem : SystemBase { void Update() { " +
+            "Entities.WithStructuralChanges().WithAll<Tag>().ForEach((Entity entity) => { " +
+            "for (var i = 0; i < 2; i++) if (entity.GetHashCode() == i) return; }).Run(); } } " +
+            "struct Tag : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class StructuralEntityReturnSystem : SystemBase { void Update() { { " +
+            "using (var entitiesSnapshot = new Unity.Collections.NativeList<Unity.Entities.Entity>" +
+            "(Unity.Collections.Allocator.Temp)) { foreach (var (_, entity) in Unity.Entities.SystemAPI" +
+            ".Query<Unity.Entities.RefRO<Tag>>().WithAll<Tag>().WithEntityAccess()) { entitiesSnapshot.Add(entity); } " +
+            "foreach (var entity in entitiesSnapshot) { for (var i = 0; i < 2; i++) " +
+            "if (entity.GetHashCode() == i) goto systemApiQueryContinue; systemApiQueryContinue:; } } } } } " +
+            "struct Tag : IComponentData { }");
+
         const string dynamicBufferAndIndexSource = """
             using Unity.Entities;
 
