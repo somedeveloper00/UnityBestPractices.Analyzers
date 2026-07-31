@@ -203,10 +203,11 @@ internal sealed partial class AnalyzerTests
             "struct Position : IComponentData { public float Value; }",
             DiagnosticIds.EntitiesForEachToSystemApiQuery,
             "using Unity.Entities; partial class StructuralReturnSystem : SystemBase { void Update() { " +
-            "var ecb = new Unity.Entities.EntityCommandBuffer(Unity.Collections.Allocator.Temp); " +
-            "foreach (var pRef in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) { " +
-            "ref Position p = ref pRef.ValueRW; if (p.Value == 0) continue; p.Value++; } " +
-            "ecb.Playback(EntityManager); ecb.Dispose(); } } " +
+            "using (var entitiesSnapshot = new Unity.Collections.NativeList<Unity.Entities.Entity>" +
+            "(Unity.Collections.Allocator.Temp)) { foreach (var (_, entity) in Unity.Entities.SystemAPI" +
+            ".Query<Unity.Entities.RefRW<Position>>().WithEntityAccess()) { entitiesSnapshot.Add(entity); } " +
+            "foreach (var entity in entitiesSnapshot) { ref Position p = ref Unity.Entities.SystemAPI" +
+            ".GetComponentRW<Position>(entity).ValueRW; if (p.Value == 0) continue; p.Value++; } } } } " +
             "struct Position : IComponentData { public float Value; }");
 
         await VerifyFixAsync(
@@ -222,6 +223,25 @@ internal sealed partial class AnalyzerTests
             "foreach (var entity in entitiesSnapshot) { for (var i = 0; i < 2; i++) " +
             "if (entity.GetHashCode() == i) goto systemApiQueryContinue; systemApiQueryContinue:; } } } } } " +
             "struct Tag : IComponentData { }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class FooSystem : SystemBase { void Update() { " +
+            "Entities.WithoutBurst().WithStructuralChanges().WithNone<BarTag>().ForEach(" +
+            "(Entity fooEntity, ref FooData fooData) => { var bar = EntityManager.GetComponentData<BarData>" +
+            "(fooEntity); fooData.Value += bar.Value; EntityManager.AddComponent<BarTag>(fooEntity); }).Run(); } } " +
+            "struct FooData : IComponentData { public int Value; } struct BarData : IComponentData " +
+            "{ public int Value; } struct BarTag : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class FooSystem : SystemBase { void Update() { using (var " +
+            "entitiesSnapshot = new Unity.Collections.NativeList<Unity.Entities.Entity>" +
+            "(Unity.Collections.Allocator.Temp)) { foreach (var (_, fooEntity) in Unity.Entities.SystemAPI" +
+            ".Query<Unity.Entities.RefRW<FooData>>().WithNone<BarTag>().WithEntityAccess()) " +
+            "{ entitiesSnapshot.Add(fooEntity); } foreach (var fooEntity in entitiesSnapshot) { " +
+            "ref FooData fooData = ref Unity.Entities.SystemAPI.GetComponentRW<FooData>(fooEntity).ValueRW; " +
+            "var bar = EntityManager.GetComponentData<BarData>(fooEntity); fooData.Value += bar.Value; " +
+            "EntityManager.AddComponent<BarTag>(fooEntity); } } } } struct FooData : IComponentData " +
+            "{ public int Value; } struct BarData : IComponentData { public int Value; } " +
+            "struct BarTag : IComponentData { }");
 
         const string dynamicBufferAndIndexSource = """
             using Unity.Entities;
@@ -504,35 +524,38 @@ internal sealed partial class AnalyzerTests
             {
                 void Update()
                 {
-                    var ecb = new Unity.Entities.EntityCommandBuffer(Unity.Collections.Allocator.Temp);
-                    foreach (var (requestRef, entity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<RemovalRequest>>().WithEntityAccess())
+                    using (var entitiesSnapshot = new Unity.Collections.NativeList<Unity.Entities.Entity>(Unity.Collections.Allocator.Temp))
                     {
-                        ref RemovalRequest request = ref requestRef.ValueRW;
-                        if (!request.IsSubmitted)
+                        foreach (var (_, entity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<RemovalRequest>>().WithEntityAccess())
                         {
-                            request.IsSubmitted = true;
-                            RequestService.Submit(request.TargetId.ToString(), EntityManager, entity);
+                            entitiesSnapshot.Add(entity);
                         }
-                        else if (request.IsComplete && request.StatusCode <= 0)
+                        foreach (var entity in entitiesSnapshot)
                         {
-                            if (!request.IsRemovalScheduled)
+                            ref RemovalRequest request = ref Unity.Entities.SystemAPI.GetComponentRW<RemovalRequest>(entity).ValueRW;
+                            if (!request.IsSubmitted)
                             {
-                                request.IsRemovalScheduled = true;
-                                request.RemoveAfterSeconds = 15;
+                                request.IsSubmitted = true;
+                                RequestService.Submit(request.TargetId.ToString(), EntityManager, entity);
                             }
-                            else
+                            else if (request.IsComplete && request.StatusCode <= 0)
                             {
-                                request.RemoveAfterSeconds -= Unity.Entities.SystemAPI.Time.DeltaTime;
-                                if (request.RemoveAfterSeconds <= 0)
+                                if (!request.IsRemovalScheduled)
                                 {
-                                    ecb.RemoveComponent<RemovalRequest>(entity);
+                                    request.IsRemovalScheduled = true;
+                                    request.RemoveAfterSeconds = 15;
+                                }
+                                else
+                                {
+                                    request.RemoveAfterSeconds -= Unity.Entities.SystemAPI.Time.DeltaTime;
+                                    if (request.RemoveAfterSeconds <= 0)
+                                    {
+                                        EntityManager.RemoveComponent<RemovalRequest>(entity);
+                                    }
                                 }
                             }
                         }
                     }
-
-                    ecb.Playback(EntityManager);
-                    ecb.Dispose();
                 }
             }
 

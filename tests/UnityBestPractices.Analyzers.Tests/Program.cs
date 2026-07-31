@@ -191,6 +191,10 @@ internal sealed partial class AnalyzerTests
 
             public struct EntityManager
             {
+                public void AddComponent<T>(Entity entity)
+                    where T : struct, IComponentData { }
+                public T GetComponentData<T>(Entity entity)
+                    where T : struct, IComponentData => default;
                 public void RemoveComponent<T>(Entity entity)
                     where T : struct, IComponentData { }
             }
@@ -313,6 +317,12 @@ internal sealed partial class AnalyzerTests
             public static class SystemAPI
             {
                 public static TimeData Time => default;
+                public static RefRW<T> GetComponentRW<T>(Entity entity)
+                    where T : struct, IComponentData => default;
+                public static RefRO<T> GetComponentRO<T>(Entity entity)
+                    where T : struct, IComponentData => default;
+                public static DynamicBuffer<T> GetBuffer<T>(Entity entity)
+                    where T : struct, IBufferElementData => default;
                 public static QueryEnumerable<T1> Query<T1>() => default;
                 public static QueryEnumerable<T1, T2> Query<T1, T2>() => default;
                 public static QueryEnumerable<T1, T2, T3, T4, T5> Query<T1, T2, T3, T4, T5>() =>

@@ -566,66 +566,17 @@ internal sealed class EntitiesForEachQuery
     {
         statement = null!;
         var compilation = semanticModel.Compilation;
-        var entityCommandBufferType = UnitySymbolCache.GetTypeByMetadataName(
-            compilation,
-            "Unity.Entities.EntityCommandBuffer");
-        var entityManagerType = UnitySymbolCache.GetTypeByMetadataName(
-            compilation,
-            "Unity.Entities.EntityManager");
-        if (entityCommandBufferType is null ||
-            entityManagerType is null ||
+        if (UnitySymbolCache.GetTypeByMetadataName(
+                compilation,
+                "Unity.Collections.Allocator") is null ||
             UnitySymbolCache.GetTypeByMetadataName(
                 compilation,
-                "Unity.Collections.Allocator") is null)
+                "Unity.Collections.NativeList`1") is null)
         {
             return false;
-        }
-
-        var entityManagerInvocations = Lambda.Body.DescendantNodesAndSelf()
-            .OfType<InvocationExpressionSyntax>()
-            .Where(invocation =>
-            {
-                var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
-                return method is not null &&
-                       SymbolEqualityComparer.Default.Equals(method.ContainingType, entityManagerType);
-            })
-            .ToImmutableArray();
-        if (entityManagerInvocations.Any(invocation =>
-                ((IMethodSymbol)semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol!)
-                    .Name != "RemoveComponent"))
-        {
-            // Only EntityManager.RemoveComponent has the same call shape on an ECB.
-            // Leave other EntityManager operations untouched rather than guessing at
-            // an overload or changing a return-value dependency.
-            return false;
-        }
-
-        var ecbName = CreateUniqueLocalName("ecb");
-        var wrapperNames = new Dictionary<DotsQueryParameter, string>();
-        foreach (var parameter in componentParameters)
-        {
-            if (parameter.Access == DotsParameterAccess.ReadWrite ||
-                parameter.Access == DotsParameterAccess.ReadOnly)
-            {
-                wrapperNames.Add(parameter, CreateUniqueLocalName(parameter.Name + "Ref"));
-            }
         }
 
         var replacements = new Dictionary<SyntaxNode, SyntaxNode>();
-        foreach (var invocation in entityManagerInvocations)
-        {
-            if (invocation.Expression is not MemberAccessExpressionSyntax access)
-            {
-                return false;
-            }
-
-            replacements.Add(
-                invocation,
-                invocation.WithExpression(
-                    access.WithExpression(
-                        SyntaxFactory.IdentifierName(ecbName)
-                            .WithTriviaFrom(access.Expression))));
-        }
 
         foreach (var access in Lambda.Body.DescendantNodesAndSelf()
                      .OfType<MemberAccessExpressionSyntax>()
@@ -646,47 +597,51 @@ internal sealed class EntitiesForEachQuery
             (original, _) => replacements[original]);
         var rewrittenBody = DotsQuerySemanticHelpers.CreateBlock(rewrittenBodyNode);
         rewrittenBody = RewriteLambdaReturns(rewrittenBody);
+        var entityName = entityParameter?.Name ?? CreateUniqueLocalName("entity");
         var aliasStatements = componentParameters
-            .Where(wrapperNames.ContainsKey)
-            .Select(parameter => SyntaxFactory.ParseStatement(
-                parameter.Access == DotsParameterAccess.ReadWrite
-                    ? "ref " + parameter.TypeName + " " + parameter.Name +
-                      " = ref " + wrapperNames[parameter] + ".ValueRW;"
-                    : "ref readonly " + parameter.TypeName + " " + parameter.Name +
-                      " = ref " + wrapperNames[parameter] + ".ValueRO;"))
+            .Select(parameter => SyntaxFactory.ParseStatement(parameter.Access switch
+            {
+                DotsParameterAccess.ReadWrite =>
+                    "ref " + parameter.TypeName + " " + parameter.Name +
+                    " = ref Unity.Entities.SystemAPI.GetComponentRW<" + parameter.TypeName +
+                    ">(" + entityName + ").ValueRW;",
+                DotsParameterAccess.ReadOnly =>
+                    "ref readonly " + parameter.TypeName + " " + parameter.Name +
+                    " = ref Unity.Entities.SystemAPI.GetComponentRO<" + parameter.TypeName +
+                    ">(" + entityName + ").ValueRO;",
+                _ => "var " + parameter.Name + " = Unity.Entities.SystemAPI.GetBuffer<" +
+                     GetDynamicBufferElementType(parameter.TypeName) + ">(" + entityName + ");",
+            }))
             .ToImmutableArray();
         rewrittenBody = rewrittenBody.WithStatements(
             rewrittenBody.Statements.InsertRange(0, aliasStatements));
 
-        var iterationNames = componentParameters
-            .Select(parameter => wrapperNames.TryGetValue(parameter, out var wrapperName)
-                ? wrapperName
-                : parameter.Name)
-            .ToList();
-        if (entityParameter is not null)
-        {
-            iterationNames.Add(entityParameter.Name);
-        }
-
-        var iterationVariable = iterationNames.Count == 1
-            ? "var " + iterationNames[0]
-            : "var (" + string.Join(", ", iterationNames) + ")";
         var query =
             "Unity.Entities.SystemAPI.Query<" +
             string.Join(", ", componentParameters.Select(parameter => parameter.SystemApiType)) +
             ">()" +
             string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
-            (entityParameter is null ? string.Empty : ".WithEntityAccess()");
+            ".WithEntityAccess()";
+        var snapshotName = CreateUniqueLocalName("entitiesSnapshot");
+        var discardNames = string.Join(", ", componentParameters.Select(_ => "_"));
         statement = SyntaxFactory.ParseStatement(
             "{\n" +
-            "var " + ecbName +
-            " = new Unity.Entities.EntityCommandBuffer(Unity.Collections.Allocator.Temp);\n" +
-            "foreach (" + iterationVariable + " in " + query + ")\n" +
+            "using (var " + snapshotName +
+            " = new Unity.Collections.NativeList<Unity.Entities.Entity>(Unity.Collections.Allocator.Temp))\n" +
+            "{\n" +
+            "foreach (var (" + discardNames + ", " + entityName + ") in " + query + ")\n" +
+            "{ " + snapshotName + ".Add(" + entityName + "); }\n" +
+            "foreach (var " + entityName + " in " + snapshotName + ")\n" +
             rewrittenBody.ToFullString() + "\n" +
-            ecbName + ".Playback(EntityManager);\n" +
-            ecbName + ".Dispose();\n" +
+            "}\n" +
             "}");
         return !statement.ContainsDiagnostics;
+    }
+
+    private static string GetDynamicBufferElementType(string typeName)
+    {
+        var start = typeName.IndexOf('<') + 1;
+        return start == 0 ? typeName : typeName.Substring(start, typeName.Length - start - 1);
     }
 
     private static bool IsLegacyWorldTimeAccess(
