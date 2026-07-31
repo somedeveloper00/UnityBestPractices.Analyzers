@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.31] - 2026-07-31
+
+### Fixed
+
+- Improved `Entities.ForEach` to `SystemAPI.Query` conversion fixes for
+  structural changes and kept UBP0058 documentation in sync.
+
 ## [0.4.30] - 2026-07-31
 
 ### Added
