@@ -251,7 +251,7 @@ internal static class RuleDocumentationGenerator
         {
             if (rule.DiagnosticId == DiagnosticIds.EntitiesForEachToSystemApiQuery)
             {
-                return "- Nested lambdas, unresolved or unsupported filters, read-only `in DynamicBuffer<T>` parameters, entity-only loops without a usable query component, and structural-change component loops that directly invoke unsupported `EntityManager` methods are excluded. Scheduled job conversions remain unavailable for managed or mutated captures, unsupported `SystemAPI` access, `WithoutBurst()`, or structural-change pipelines.";
+                return "- Nested lambdas, unresolved or unsupported filters, read-only `in DynamicBuffer<T>` parameters, and entity-only loops without a usable query component are excluded. Scheduled job conversions remain unavailable for managed or mutated captures, unsupported `SystemAPI` access, `WithoutBurst()`, or structural-change pipelines.";
             }
 
             if (IsEntitiesForEachJobConversion(rule))
