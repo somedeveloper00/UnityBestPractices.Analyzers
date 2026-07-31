@@ -75,6 +75,7 @@ public sealed class FixTitleLocalizerTests
             (FixTitleLocalizer.MoveStatementUp, MoveStatementCodeRefactoringProvider.MoveUpTitle),
             (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle),
             (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title),
+            (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title),
             (FixTitleLocalizer.RemoveSymbol, RemoveSymbolCodeRefactoringProvider.Title),
         };
 

@@ -216,6 +216,10 @@ members, methods, properties, fields, nested types, namespaces, and top-level
 type declarations. Comments and other trivia attached to the moved syntax travel
 with it, and an action is omitted when there is no sibling in that direction.
 
+Use **Remove double empty lines** to collapse every run of consecutive empty
+lines in the current document to one. Lines containing only spaces or tabs are
+treated as empty, while the document's existing line-ending style is preserved.
+
 ## Deliberately out of scope
 
 This package was checked against the current [`Microsoft.Unity.Analyzers` catalog](https://github.com/microsoft/Microsoft.Unity.Analyzers/tree/main/doc) (`UNT0001` through `UNT0043`). It intentionally does not duplicate existing rules such as empty Unity messages, `CompareTag`, `TryGetComponent`, non-allocating physics APIs, cached yield instructions, transform position/rotation APIs, mesh-array loop access, or `Animator.StringToHash`.

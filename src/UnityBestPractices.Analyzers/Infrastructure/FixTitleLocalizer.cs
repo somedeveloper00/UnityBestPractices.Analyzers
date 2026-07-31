@@ -12,6 +12,7 @@ internal static class FixTitleLocalizer
     internal const string MoveStatementUp = "refactoring.move-statement-up";
     internal const string MoveStatementDown = "refactoring.move-statement-down";
     internal const string RemoveParameter = "refactoring.remove-parameter";
+    internal const string RemoveDoubleEmptyLines = "refactoring.remove-double-empty-lines";
     internal const string RemoveSymbol = "refactoring.remove-symbol";
 
 #pragma warning disable RS1035 // Code fixes are displayed by the host UI and must follow its UI culture.
@@ -94,6 +95,7 @@ internal static class FixTitleLocalizer
         MoveStatementUp => "ステートメントを上へ移動",
         MoveStatementDown => "ステートメントを下へ移動",
         RemoveParameter => "パラメーターを削除",
+        RemoveDoubleEmptyLines => "連続する空行を削除",
         RemoveSymbol => "シンボルとすべての使用箇所を削除",
         DiagnosticIds.EncapsulateSerializedField => "private にして SerializeField を追加",
         DiagnosticIds.YieldNull => "null を yield する",
@@ -125,6 +127,7 @@ internal static class FixTitleLocalizer
         MoveStatementUp => "انتقال دستور به بالا",
         MoveStatementDown => "انتقال دستور به پایین",
         RemoveParameter => "حذف پارامتر",
+        RemoveDoubleEmptyLines => "حذف خطوط خالی تکراری",
         RemoveSymbol => "حذف نماد و همهٔ کاربردهای آن",
         DiagnosticIds.EncapsulateSerializedField => "private کردن فیلد و افزودن SerializeField",
         DiagnosticIds.YieldNull => "yield کردن null",
@@ -156,6 +159,7 @@ internal static class FixTitleLocalizer
         MoveStatementUp => "Переместить инструкцию вверх",
         MoveStatementDown => "Переместить инструкцию вниз",
         RemoveParameter => "Удалить параметр",
+        RemoveDoubleEmptyLines => "Удалить повторяющиеся пустые строки",
         RemoveSymbol => "Удалить символ и все его использования",
         DiagnosticIds.EncapsulateSerializedField => "Сделать поле private и добавить SerializeField",
         DiagnosticIds.YieldNull => "Вернуть null через yield",

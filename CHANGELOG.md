@@ -7,6 +7,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added **Remove double empty lines**, a document-wide refactoring that collapses
+  consecutive blank lines, including lines containing only spaces or tabs.
+
 ## [0.4.29] - 2026-07-30
 
 ### Added
