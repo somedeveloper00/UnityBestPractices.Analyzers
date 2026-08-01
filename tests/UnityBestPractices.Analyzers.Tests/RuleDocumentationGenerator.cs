@@ -259,7 +259,7 @@ internal static class RuleDocumentationGenerator
                 return "- Managed or mutated captures, nested lambdas, structural-change pipelines, unsupported `SystemAPI` access, unsupported filters, system-instance method access, and ambiguous package symbols are excluded.";
             }
 
-            return "- Captured locals, nested lambdas, structural-change pipelines, unsupported filters, system-instance method access, and ambiguous package symbols are excluded.";
+            return "- Captured locals, nested lambdas, structural-change pipelines, unsupported filters, system-instance access, and ambiguous package symbols are excluded.";
         }
 
         return rule.DiagnosticId switch
