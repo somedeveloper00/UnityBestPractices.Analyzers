@@ -35,6 +35,7 @@ internal static class TestSources
             {
                 public NativeArray(int length, Allocator allocator) { }
                 public int Length => 0;
+                public T this[int index] { get => default; set { } }
                 public void Dispose() { }
             }
         }
