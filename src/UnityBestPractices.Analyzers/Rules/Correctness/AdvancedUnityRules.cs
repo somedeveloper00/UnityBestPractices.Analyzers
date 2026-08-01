@@ -195,9 +195,7 @@ internal static class AdvancedUnityRules
         var target = context.SemanticModel.GetSymbolInfo(
             assignment.Left,
             context.CancellationToken).Symbol;
-        if (target is not IFieldSymbol && target is not IPropertySymbol ||
-            target is IFieldSymbol { ContainingType: { } containingType } &&
-            UnitySymbolCache.IsUnityJobType(containingType))
+        if (target is not IFieldSymbol && target is not IPropertySymbol)
         {
             return;
         }
@@ -208,6 +206,16 @@ internal static class AdvancedUnityRules
                 context.CancellationToken,
                 out var allocatorKind))
         {
+            // TempJob allocations are specifically intended to survive long enough for a
+            // scheduled job. Allocator.Temp allocations are thread-local and must never
+            // receive the same job-field exemption.
+            if (allocatorKind == "TempJob" &&
+                target is IFieldSymbol { ContainingType: { } containingType } &&
+                UnitySymbolCache.IsUnityJobType(containingType))
+            {
+                return;
+            }
+
             Report(context, TemporaryAllocatorEscape, assignment.Right.GetLocation(), allocatorKind);
             return;
         }
@@ -517,13 +525,13 @@ internal static class AdvancedUnityRules
                 {
                     Initializer.Value: { } initializer
                 } declarator ||
-            !TryGetAllocatorKind(
+            declarator.SpanStart >= expression.SpanStart ||
+            !TryGetTemporaryEscape(
                 initializer,
                 semanticModel,
                 cancellationToken,
                 out allocatorKind) ||
-            (allocatorKind != "Temp" && allocatorKind != "TempJob") ||
-            declarator.SpanStart >= expression.SpanStart)
+            (allocatorKind != "Temp" && allocatorKind != "TempJob"))
         {
             allocatorKind = string.Empty;
             return false;
