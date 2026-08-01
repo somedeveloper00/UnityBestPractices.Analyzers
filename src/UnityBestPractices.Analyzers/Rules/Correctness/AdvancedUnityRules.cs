@@ -171,17 +171,6 @@ internal static class AdvancedUnityRules
                 out var allocatorKind))
         {
             Report(context, TemporaryAllocatorEscape, expression.GetLocation(), allocatorKind);
-            return;
-        }
-
-        if (expression is AnonymousFunctionExpressionSyntax lambda &&
-            TryGetCapturedTemporaryAllocator(
-                lambda,
-                context.SemanticModel,
-                context.CancellationToken,
-                out allocatorKind))
-        {
-            Report(context, TemporaryAllocatorEscape, lambda.GetLocation(), allocatorKind);
         }
     }
 
@@ -217,17 +206,6 @@ internal static class AdvancedUnityRules
             }
 
             Report(context, TemporaryAllocatorEscape, assignment.Right.GetLocation(), allocatorKind);
-            return;
-        }
-
-        if (assignment.Right is AnonymousFunctionExpressionSyntax lambda &&
-            TryGetCapturedTemporaryAllocator(
-                lambda,
-                context.SemanticModel,
-                context.CancellationToken,
-                out allocatorKind))
-        {
-            Report(context, TemporaryAllocatorEscape, lambda.GetLocation(), allocatorKind);
         }
     }
 
@@ -526,65 +504,84 @@ internal static class AdvancedUnityRules
         CancellationToken cancellationToken,
         out string allocatorKind)
     {
+        return TryGetTemporaryEscape(
+            expression,
+            semanticModel,
+            cancellationToken,
+            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+            out allocatorKind);
+    }
+
+    private static bool TryGetTemporaryEscape(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        HashSet<ILocalSymbol> visitedLocals,
+        out string allocatorKind)
+    {
         if (TryGetAllocatorKind(expression, semanticModel, cancellationToken, out allocatorKind) &&
             (allocatorKind == "Temp" || allocatorKind == "TempJob"))
         {
             return true;
         }
 
-        if (expression is not IdentifierNameSyntax identifier ||
-            semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local ||
-            local.DeclaringSyntaxReferences.SingleOrDefault()
-                ?.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax
-                {
-                    Initializer.Value: { } initializer
-                } declarator ||
-            declarator.SpanStart >= expression.SpanStart ||
-            !TryGetTemporaryEscape(
-                initializer,
+        if (expression is AnonymousFunctionExpressionSyntax lambda)
+        {
+            return TryGetCapturedTemporaryAllocator(
+                lambda,
                 semanticModel,
                 cancellationToken,
-                out allocatorKind) ||
-            (allocatorKind != "Temp" && allocatorKind != "TempJob"))
+                visitedLocals,
+                out allocatorKind);
+        }
+
+        if (expression is not IdentifierNameSyntax identifier ||
+            semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local ||
+            !visitedLocals.Add(local) ||
+            local.RefKind != RefKind.None ||
+            local.DeclaringSyntaxReferences.Length != 1 ||
+            local.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not VariableDeclaratorSyntax
+            {
+                Initializer.Value: { } initializer
+            } declarator ||
+            initializer is RefExpressionSyntax ||
+            !HasUnambiguousUnwrittenValue(
+                local,
+                declarator,
+                expression,
+                semanticModel,
+                cancellationToken))
         {
             allocatorKind = string.Empty;
             return false;
         }
 
-        var method = expression.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>();
-        return method is not null &&
-               !method.DescendantNodes()
-                   .OfType<AssignmentExpressionSyntax>()
-                   .Any(assignment =>
-                       assignment.SpanStart > declarator.Span.End &&
-                       assignment.SpanStart < expression.SpanStart &&
-                       SymbolEqualityComparer.Default.Equals(
-                           semanticModel.GetSymbolInfo(
-                               assignment.Left,
-                               cancellationToken).Symbol,
-                           local));
+        return TryGetTemporaryEscape(
+            initializer,
+            semanticModel,
+            cancellationToken,
+            visitedLocals,
+            out allocatorKind);
     }
 
     private static bool TryGetCapturedTemporaryAllocator(
         AnonymousFunctionExpressionSyntax lambda,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
+        HashSet<ILocalSymbol> visitedLocals,
         out string allocatorKind)
     {
         foreach (var identifier in lambda.DescendantNodes().OfType<IdentifierNameSyntax>())
         {
             if (semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol is not ILocalSymbol local ||
-                local.DeclaringSyntaxReferences.SingleOrDefault()
-                    ?.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax
-                    {
-                        Initializer.Value: { } initializer
-                    } ||
-                !TryGetAllocatorKind(
-                    initializer,
+                local.DeclaringSyntaxReferences.Any(reference =>
+                    lambda.Span.Contains(reference.Span)) ||
+                !TryGetTemporaryEscape(
+                    identifier,
                     semanticModel,
                     cancellationToken,
-                    out allocatorKind) ||
-                (allocatorKind != "Temp" && allocatorKind != "TempJob"))
+                    new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                    out allocatorKind))
             {
                 continue;
             }
@@ -594,6 +591,49 @@ internal static class AdvancedUnityRules
 
         allocatorKind = string.Empty;
         return false;
+    }
+
+    private static bool HasUnambiguousUnwrittenValue(
+        ILocalSymbol local,
+        VariableDeclaratorSyntax declarator,
+        ExpressionSyntax use,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var declarationStatement = declarator.AncestorsAndSelf()
+            .OfType<StatementSyntax>()
+            .FirstOrDefault(statement => statement.Parent is BlockSyntax);
+        var useStatement = use.AncestorsAndSelf()
+            .OfType<StatementSyntax>()
+            .FirstOrDefault(statement => statement.Parent is BlockSyntax);
+        if (declarationStatement?.Parent is not BlockSyntax declarationBlock ||
+            useStatement?.Parent is not BlockSyntax useBlock ||
+            declarationBlock != useBlock ||
+            declarator.SpanStart >= use.SpanStart)
+        {
+            return false;
+        }
+
+        return !declarationBlock.DescendantNodes()
+            .Where(node => node.SpanStart > declarator.Span.End && node.SpanStart < use.SpanStart)
+            .Any(node => node switch
+            {
+                AssignmentExpressionSyntax assignment => IsSymbol(assignment.Left, local),
+                PrefixUnaryExpressionSyntax prefix when
+                    prefix.IsKind(SyntaxKind.PreIncrementExpression) ||
+                    prefix.IsKind(SyntaxKind.PreDecrementExpression) => IsSymbol(prefix.Operand, local),
+                PostfixUnaryExpressionSyntax postfix when
+                    postfix.IsKind(SyntaxKind.PostIncrementExpression) ||
+                    postfix.IsKind(SyntaxKind.PostDecrementExpression) => IsSymbol(postfix.Operand, local),
+                ArgumentSyntax { RefKindKeyword.RawKind: not 0 } argument => IsSymbol(argument.Expression, local),
+                RefExpressionSyntax reference => IsSymbol(reference.Expression, local),
+                _ => false
+            });
+
+        bool IsSymbol(ExpressionSyntax candidate, ISymbol symbol) =>
+            SymbolEqualityComparer.Default.Equals(
+                semanticModel.GetSymbolInfo(candidate, cancellationToken).Symbol,
+                symbol);
     }
 
     private static bool TryGetAllocatorKind(

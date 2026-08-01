@@ -310,4 +310,133 @@ public sealed class UBP0073Tests
                 """ + "\n" + TestSources.Collections;
         await VerifyCS.VerifyAnalyzerAsync(source);
     }
+
+    [Theory]
+    [InlineData("var alias = values; return {|#0:alias|};")]
+    [InlineData("var alias = values; var second = alias; return {|#0:second|};")]
+    public async Task ReportsTemporaryReturnedThroughAliases(string statements)
+    {
+        var source = $$"""
+                using Unity.Collections;
+                class Owner
+                {
+                    NativeArray<int> Create()
+                    {
+                        var values = new NativeArray<int>(8, Allocator.TempJob);
+                        {{statements}}
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.InvalidTemporaryAllocatorEscape, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("TempJob"));
+    }
+
+    [Fact]
+    public async Task IgnoresAliasReassignedBeforeReturn()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    NativeArray<int> Create()
+                    {
+                        var values = new NativeArray<int>(8, Allocator.Temp);
+                        var alias = values;
+                        alias = new NativeArray<int>(8, Allocator.Persistent);
+                        return alias;
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresAliasFromAmbiguousControlFlow()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    NativeArray<int> Create(bool condition)
+                    {
+                        var values = new NativeArray<int>(8, Allocator.Temp);
+                        var alias = values;
+                        if (condition)
+                            alias = new NativeArray<int>(8, Allocator.Persistent);
+                        return alias;
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresUnsupportedRefAliasFlow()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    NativeArray<int> Create()
+                    {
+                        var values = new NativeArray<int>(8, Allocator.Temp);
+                        ref var alias = ref values;
+                        return alias;
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task ReportsTemporaryAliasStoredInField()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    NativeArray<int> stored;
+                    void Create()
+                    {
+                        var values = new NativeArray<int>(8, Allocator.Temp);
+                        var alias = values;
+                        stored = {|#0:alias|};
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.InvalidTemporaryAllocatorEscape, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("Temp"));
+    }
+
+    [Theory]
+    [InlineData("return {|#0:() => alias.Length|};")]
+    [InlineData("callback = {|#0:() => alias.Length|}; return null;")]
+    public async Task ReportsEscapingLambdaCapturingTemporaryAlias(string escape)
+    {
+        var source = $$"""
+                using System;
+                using Unity.Collections;
+                class Owner
+                {
+                    Func<int> callback;
+                    Func<int> Create()
+                    {
+                        var values = new NativeArray<int>(8, Allocator.TempJob);
+                        var alias = values;
+                        {{escape}}
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.InvalidTemporaryAllocatorEscape, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("TempJob"));
+    }
 }
