@@ -263,7 +263,7 @@ internal sealed class EntitiesForEachQuery
         foreach (var parameter in syntaxParameters)
         {
             var symbol = semanticModel.GetDeclaredSymbol(parameter, cancellationToken) as IParameterSymbol;
-            if (symbol is null || parameter.Type is null || symbol.RefKind == RefKind.Out)
+            if (symbol is null || parameter.Type is null)
             {
                 return false;
             }
@@ -290,7 +290,8 @@ internal sealed class EntitiesForEachQuery
                          namedType.OriginalDefinition,
                          dynamicBufferType))
             {
-                if (symbol.RefKind != RefKind.Ref && symbol.RefKind != RefKind.In)
+                if (symbol.RefKind != RefKind.Ref &&
+                    symbol.RefKind != RefKind.In)
                 {
                     return false;
                 }
@@ -303,7 +304,12 @@ internal sealed class EntitiesForEachQuery
                      componentNamedType.AllInterfaces.Any(@interface =>
                          SymbolEqualityComparer.Default.Equals(@interface, componentData)))
             {
-                access = symbol.RefKind == RefKind.Ref
+                // Neither SystemAPI.Query nor IJobEntity has a write-only component
+                // parameter. RefRW/ref is the closest equivalent for an `out`
+                // Entities.ForEach parameter; the original lambda's definite-
+                // assignment rules ensure its body does not depend on the incoming
+                // component value.
+                access = symbol.RefKind is RefKind.Ref or RefKind.Out
                     ? DotsParameterAccess.ReadWrite
                     : DotsParameterAccess.ReadOnly;
             }

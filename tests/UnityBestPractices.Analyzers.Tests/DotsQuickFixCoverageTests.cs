@@ -62,6 +62,10 @@ internal sealed partial class AnalyzerTests
                 "var velocity", "Unity.Entities.RefRO<Velocity>", "", "var sample = velocity.ValueRO.Value;",
                 "in Velocity velocity"),
             new DotsMigrationCase(
+                "SingleWriterOut", "", "out Position position", "position = new Position { Value = 3f };",
+                "var position", "Unity.Entities.RefRW<Position>", "",
+                "position.ValueRW = new Position { Value = 3f };", "ref Position position"),
+            new DotsMigrationCase(
                 "ReaderWriter", "", "ref Position position, in Velocity velocity", "position.Value += velocity.Value;",
                 "var (position, velocity)", "Unity.Entities.RefRW<Position>, Unity.Entities.RefRO<Velocity>", "",
                 "position.ValueRW.Value += velocity.ValueRO.Value;", "ref Position position, in Velocity velocity"),
