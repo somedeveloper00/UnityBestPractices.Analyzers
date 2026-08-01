@@ -13,6 +13,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   converting their write-only access to the `RefRW`/`ref`
   representation supported by `SystemAPI.Query` and `IJobEntity`.
 
+## [0.4.32] - 2026-08-01
+
+### Fixed
+
+- Improved `Entities.ForEach` conversion support for captured instance values,
+  corrected DOTS documentation generation, and handled multiline cleanup after
+  removing a symbol and its usages.
+- Routed additional code refactorings through VS Code shortcut-compatible
+  titles.
+
 ## [0.4.31] - 2026-07-31
 
 ### Fixed
