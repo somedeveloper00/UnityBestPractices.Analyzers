@@ -29,9 +29,9 @@ internal static class AdvancedUnityRules
 
     private static readonly RuleMetadata UndisposedPersistentContainer = Create(
         DiagnosticIds.UndisposedPersistentNativeContainer,
-        "Dispose persistent native container",
-        "Persistent native container '{0}' is never disposed",
-        "A locally owned persistent NativeArray in a straight-line method must be disposed before the method exits.",
+        "Dispose persistent NativeArray",
+        "Persistent NativeArray '{0}' is never disposed",
+        "A locally owned NativeArray allocated with Allocator.Persistent in a straight-line method must be disposed before the method exits.",
         string.Empty,
         RuleCategories.UnityCorrectness,
         RuleSafety.Safe,
@@ -42,9 +42,9 @@ internal static class AdvancedUnityRules
 
     private static readonly RuleMetadata TemporaryAllocatorEscape = Create(
         DiagnosticIds.InvalidTemporaryAllocatorEscape,
-        "Do not let temporary native memory escape",
-        "A container allocated with '{0}' escapes its valid local lifetime",
-        "Allocator.Temp and Allocator.TempJob storage cannot safely be returned, stored in a field, or captured by a longer-lived delegate.",
+        "Do not let a temporary NativeArray escape",
+        "A NativeArray allocated with '{0}' escapes its valid local lifetime",
+        "A NativeArray allocated with Allocator.Temp or Allocator.TempJob cannot safely be returned, stored in a field, or captured by a longer-lived delegate.",
         string.Empty,
         RuleCategories.UnityCorrectness,
         RuleSafety.Safe,

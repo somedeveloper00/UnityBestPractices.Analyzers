@@ -267,9 +267,9 @@ internal static class RuleDocumentationGenerator
             DiagnosticIds.DiscardedScheduledJobHandle =>
                 "- Calls returning `void`, already assigned/returned handles, look-alike scheduling APIs, and Entities APIs that may update a system dependency internally are excluded.",
             DiagnosticIds.UndisposedPersistentNativeContainer =>
-                "- Containers passed elsewhere, returned, conditionally owned, referenced later, or allocated with another allocator are excluded pending reliable path-sensitive ownership analysis.",
+                "- `NativeArray<T>` instances passed elsewhere, returned, conditionally owned, referenced later, or allocated with another allocator are excluded pending reliable path-sensitive ownership analysis.",
             DiagnosticIds.InvalidTemporaryAllocatorEscape =>
-                "- Reassigned locals, non-native look-alike containers, and uses that remain within the allocating method are excluded.",
+                "- Reassigned locals, non-`NativeArray<T>` types, and uses that remain within the allocating method are excluded.",
             DiagnosticIds.CacheShaderPropertyId =>
                 "- Dynamic strings, a single call, nested-type calls, and same-named non-Unity APIs are excluded.",
             DiagnosticIds.CombineLocalPositionAndRotation =>

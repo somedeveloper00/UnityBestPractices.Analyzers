@@ -75,8 +75,8 @@ This index is generated from the analyzer's central diagnostic catalog. Run `dot
 | [UBP0069](UBP0069.md) | Switch IJobEntity from ScheduleParallel to Run | `Unity.DOTS.Migration` | Info | ReviewRequired | No |
 | [UBP0070](UBP0070.md) | Switch IJobEntity from ScheduleParallel to Schedule | `Unity.DOTS.Migration` | Info | ReviewRequired | No |
 | [UBP0071](UBP0071.md) | Preserve scheduled JobHandle | `Unity.Correctness` | Info | Safe | No |
-| [UBP0072](UBP0072.md) | Dispose persistent native container | `Unity.Correctness` | Info | Safe | No |
-| [UBP0073](UBP0073.md) | Do not let temporary native memory escape | `Unity.Correctness` | Info | Safe | No |
+| [UBP0072](UBP0072.md) | Dispose persistent NativeArray | `Unity.Correctness` | Info | Safe | No |
+| [UBP0073](UBP0073.md) | Do not let a temporary NativeArray escape | `Unity.Correctness` | Info | Safe | No |
 | [UBP0074](UBP0074.md) | Cache shader property ID | `Unity.Performance.Safe` | Info | Safe | No |
 | [UBP0075](UBP0075.md) | Match the folder namespace | `CSharp.CodeStyle` | Info | ReviewRequired | No |
 | [UBP0076](UBP0076.md) | Set local position and rotation together | `Unity.Performance.Safe` | Info | Safe | Yes |
