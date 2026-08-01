@@ -92,12 +92,10 @@ public sealed class UBP0073Tests
                 .WithArguments("TempJob"));
     }
 
-    [Theory]
-    [InlineData("Temp")]
-    [InlineData("TempJob")]
-    public async Task IgnoresTemporaryAllocationPassedToJob(string allocator)
+    [Fact]
+    public async Task ReportsTempAllocationPassedToJobInObjectInitializer()
     {
-        var source = $$"""
+        var source = """
                 using Unity.Collections;
                 using Unity.Burst;
                 using Unity.Jobs;
@@ -107,7 +105,7 @@ public sealed class UBP0073Tests
                     {
                         var handle = new WorkJob
                         {
-                            Values = new NativeArray<int>(8, Allocator.{{allocator}})
+                            Values = {|#0:new NativeArray<int>(8, Allocator.Temp)|}
                         }.Schedule();
                     }
                 }
@@ -118,11 +116,15 @@ public sealed class UBP0073Tests
                     public void Execute() { }
                 }
                 """ + "\n" + TestSources.Collections + "\n" + TestSources.Jobs;
-        await VerifyCS.VerifyAnalyzerAsync(source);
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.InvalidTemporaryAllocatorEscape, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("Temp"));
     }
 
     [Fact]
-    public async Task IgnoresTemporaryLocalAssignedToJobField()
+    public async Task ReportsTempLocalAssignedToJobField()
     {
         var source = """
                 using Unity.Collections;
@@ -132,9 +134,44 @@ public sealed class UBP0073Tests
                 {
                     void Create()
                     {
-                        var values = new NativeArray<int>(8, Allocator.TempJob);
+                        var values = new NativeArray<int>(8, Allocator.Temp);
                         var job = new WorkJob();
-                        job.Values = values;
+                        job.Values = {|#0:values|};
+                        var handle = job.Schedule();
+                    }
+                }
+                [BurstCompile]
+                struct WorkJob : IJob
+                {
+                    public NativeArray<int> Values;
+                    public void Execute() { }
+                }
+                """ + "\n" + TestSources.Collections + "\n" + TestSources.Jobs;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.InvalidTemporaryAllocatorEscape, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("Temp"));
+    }
+
+    [Theory]
+    [InlineData("object-initializer")]
+    [InlineData("assignment")]
+    public async Task IgnoresTempJobAllocationPassedToJobField(string form)
+    {
+        var jobCreation = form == "object-initializer"
+            ? "var job = new WorkJob { Values = values };"
+            : "var job = new WorkJob(); job.Values = values;";
+        var source = $$"""
+                using Unity.Collections;
+                using Unity.Burst;
+                using Unity.Jobs;
+                class Owner
+                {
+                    void Create()
+                    {
+                        var values = new NativeArray<int>(8, Allocator.TempJob);
+                        {{jobCreation}}
                         var handle = job.Schedule();
                     }
                 }
