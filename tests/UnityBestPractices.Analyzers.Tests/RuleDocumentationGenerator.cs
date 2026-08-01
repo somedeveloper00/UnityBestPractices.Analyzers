@@ -269,7 +269,7 @@ internal static class RuleDocumentationGenerator
             DiagnosticIds.UndisposedPersistentNativeContainer =>
                 "- The analyzer remains silent if any reachable exit disposes or transfers ownership, and for unsupported bodies. `Dispose()`, `using` declarations, and `using` statements are recognized disposal forms. Ordinary reads, element writes, and calls to unconfigured methods are non-owning uses. Returns and field/property assignments transfer ownership; configured invocation sinks use `ubp_0072_ownership_transfer_methods` with comma- or semicolon-separated method names or documentation IDs.",
             DiagnosticIds.InvalidTemporaryAllocatorEscape =>
-                "- Reassigned locals, non-native look-alike containers, and uses that remain within the allocating method are excluded.",
+                "- Reassigned locals, non-`NativeArray<T>` types, and uses that remain within the allocating method are excluded.",
             DiagnosticIds.CacheShaderPropertyId =>
                 "- Dynamic strings, a single call, nested-type calls, and same-named non-Unity APIs are excluded.",
             DiagnosticIds.CombineLocalPositionAndRotation =>

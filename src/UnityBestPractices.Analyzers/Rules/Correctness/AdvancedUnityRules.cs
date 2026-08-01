@@ -31,8 +31,8 @@ internal static class AdvancedUnityRules
 
     private static readonly RuleMetadata UndisposedPersistentContainer = Create(
         DiagnosticIds.UndisposedPersistentNativeContainer,
-        "Dispose persistent native container",
-        "Persistent native container '{0}' is never disposed",
+        "Dispose persistent NativeArray",
+        "Persistent NativeArray '{0}' is never disposed",
         "A locally owned persistent NativeArray must be disposed or transfer ownership before the method exits.",
         string.Empty,
         RuleCategories.UnityCorrectness,
@@ -44,9 +44,9 @@ internal static class AdvancedUnityRules
 
     private static readonly RuleMetadata TemporaryAllocatorEscape = Create(
         DiagnosticIds.InvalidTemporaryAllocatorEscape,
-        "Do not let temporary native memory escape",
-        "A container allocated with '{0}' escapes its valid local lifetime",
-        "Allocator.Temp and Allocator.TempJob storage cannot safely be returned, stored in a field, or captured by a longer-lived delegate.",
+        "Do not let a temporary NativeArray escape",
+        "A NativeArray allocated with '{0}' escapes its valid local lifetime",
+        "A NativeArray allocated with Allocator.Temp or Allocator.TempJob cannot safely be returned, stored in a field, or captured by a longer-lived delegate.",
         string.Empty,
         RuleCategories.UnityCorrectness,
         RuleSafety.Safe,
@@ -378,9 +378,7 @@ internal static class AdvancedUnityRules
         var target = context.SemanticModel.GetSymbolInfo(
             assignment.Left,
             context.CancellationToken).Symbol;
-        if (target is not IFieldSymbol && target is not IPropertySymbol ||
-            target is IFieldSymbol { ContainingType: { } containingType } &&
-            UnitySymbolCache.IsUnityJobType(containingType))
+        if (target is not IFieldSymbol && target is not IPropertySymbol)
         {
             return;
         }
@@ -391,6 +389,16 @@ internal static class AdvancedUnityRules
                 context.CancellationToken,
                 out var allocatorKind))
         {
+            // TempJob allocations are specifically intended to survive long enough for a
+            // scheduled job. Allocator.Temp allocations are thread-local and must never
+            // receive the same job-field exemption.
+            if (allocatorKind == "TempJob" &&
+                target is IFieldSymbol { ContainingType: { } containingType } &&
+                UnitySymbolCache.IsUnityJobType(containingType))
+            {
+                return;
+            }
+
             Report(context, TemporaryAllocatorEscape, assignment.Right.GetLocation(), allocatorKind);
             return;
         }
@@ -410,7 +418,12 @@ internal static class AdvancedUnityRules
     {
         if (context.Node is not ExpressionStatementSyntax first ||
             first.Expression is not AssignmentExpressionSyntax firstAssignment ||
-            !TryGetTransformPropertyAssignment(firstAssignment, context, "localPosition", out var receiver) ||
+            !TryGetTransformPropertyAssignment(
+                firstAssignment,
+                context,
+                "localPosition",
+                out var receiver,
+                out var receiverSymbol) ||
             first.Parent is not BlockSyntax block)
         {
             return;
@@ -419,8 +432,14 @@ internal static class AdvancedUnityRules
         var index = block.Statements.IndexOf(first);
         if (index < 0 || index + 1 >= block.Statements.Count ||
             block.Statements[index + 1] is not ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax secondAssignment } second ||
-            !TryGetTransformPropertyAssignment(secondAssignment, context, "localRotation", out var secondReceiver) ||
+            !TryGetTransformPropertyAssignment(
+                secondAssignment,
+                context,
+                "localRotation",
+                out var secondReceiver,
+                out var secondReceiverSymbol) ||
             !SyntaxFactory.AreEquivalent(receiver, secondReceiver) ||
+            !SymbolEqualityComparer.Default.Equals(receiverSymbol, secondReceiverSymbol) ||
             first.GetTrailingTrivia().Concat(second.GetLeadingTrivia()).Any(trivia =>
                 !trivia.IsKind(SyntaxKind.WhitespaceTrivia) && !trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
         {
@@ -434,22 +453,25 @@ internal static class AdvancedUnityRules
         AssignmentExpressionSyntax assignment,
         SyntaxNodeAnalysisContext context,
         string propertyName,
-        out ExpressionSyntax receiver)
+        out ExpressionSyntax receiver,
+        out ISymbol receiverSymbol)
     {
         receiver = null!;
+        receiverSymbol = null!;
         if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
             assignment.Left is not MemberAccessExpressionSyntax memberAccess ||
             memberAccess.Name.Identifier.ValueText != propertyName ||
             context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is not IPropertySymbol property ||
             property.ContainingType?.ToDisplayString() != "UnityEngine.Transform" ||
             !property.ContainingType.GetMembers("SetLocalPositionAndRotation").OfType<IMethodSymbol>().Any(method => method.Parameters.Length == 2) ||
-            context.SemanticModel.GetSymbolInfo(memberAccess.Expression, context.CancellationToken).Symbol is not
-                (ILocalSymbol or IParameterSymbol or IFieldSymbol))
+            context.SemanticModel.GetSymbolInfo(memberAccess.Expression, context.CancellationToken).Symbol is not { } symbol ||
+            symbol is not ILocalSymbol and not IParameterSymbol)
         {
             return false;
         }
 
         receiver = memberAccess.Expression;
+        receiverSymbol = symbol;
         return true;
     }
 
@@ -700,13 +722,13 @@ internal static class AdvancedUnityRules
                 {
                     Initializer.Value: { } initializer
                 } declarator ||
-            !TryGetAllocatorKind(
+            declarator.SpanStart >= expression.SpanStart ||
+            !TryGetTemporaryEscape(
                 initializer,
                 semanticModel,
                 cancellationToken,
                 out allocatorKind) ||
-            (allocatorKind != "Temp" && allocatorKind != "TempJob") ||
-            declarator.SpanStart >= expression.SpanStart)
+            (allocatorKind != "Temp" && allocatorKind != "TempJob"))
         {
             allocatorKind = string.Empty;
             return false;
