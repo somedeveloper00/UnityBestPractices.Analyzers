@@ -1307,8 +1307,7 @@ internal static class DotsQuerySemanticHelpers
             }
 
             if (symbol is IFieldSymbol { IsStatic: false } or
-                IPropertySymbol { IsStatic: false } or
-                IMethodSymbol { IsStatic: false })
+                IPropertySymbol { IsStatic: false })
             {
                 var isMemberAccessName =
                     identifier.Parent is MemberAccessExpressionSyntax memberAccess &&
@@ -1318,6 +1317,41 @@ internal static class DotsQuerySemanticHelpers
                     assignment.Left == identifier &&
                     assignment.Parent is InitializerExpressionSyntax;
                 if (!isMemberAccessName && !isObjectInitializerMember)
+                {
+                    var captureType = symbol switch
+                    {
+                        IFieldSymbol capturedField => capturedField.Type,
+                        IPropertySymbol capturedProperty => capturedProperty.Type,
+                        _ => throw new InvalidOperationException(),
+                    };
+                    if (!captureType.IsUnmanagedType || IsWrittenByReference(identifier))
+                    {
+                        return false;
+                    }
+
+                    if (!capturedFieldNames.TryGetValue(symbol, out var fieldName))
+                    {
+                        fieldName = CreateUniqueJobFieldName(symbol.Name, usedNames);
+                        usedNames = usedNames.Add(fieldName);
+                        capturedFieldNames.Add(symbol, fieldName);
+                        fields.Add(new DotsJobField(
+                            fieldName,
+                            captureType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                            "this." + EscapeIdentifier(symbol.Name)));
+                    }
+
+                    replacements.Add(identifier, fieldName);
+                }
+
+                continue;
+            }
+
+            if (symbol is IMethodSymbol { IsStatic: false })
+            {
+                var isMemberAccessName =
+                    identifier.Parent is MemberAccessExpressionSyntax memberAccess &&
+                    memberAccess.Name == identifier;
+                if (!isMemberAccessName)
                 {
                     return false;
                 }

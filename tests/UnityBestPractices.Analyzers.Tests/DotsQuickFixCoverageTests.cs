@@ -444,6 +444,17 @@ internal sealed partial class AnalyzerTests
             "{ p.ValueRW.Value *= scale; } } } struct Position : IComponentData { public float Value; }");
 
         await VerifyFixAsync(
+            "using Unity.Entities; partial class CapturedFieldSystem : SystemBase { " +
+            "private float scale = 2f; void Update() { Entities.ForEach((ref Position p) => " +
+            "{ p.Value *= scale; }).Run(); } } struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            "using Unity.Entities; partial class CapturedFieldSystem : SystemBase { " +
+            "private float scale = 2f; void Update() { new EntitiesForEachJob { Scale = this.scale }.Run(); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "public float Scale; public void Execute(ref Position p) { p.Value *= Scale; } } } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
             "using Unity.Entities; partial class EntityOnlySystem : SystemBase { void Update() { " +
             "Entities.WithoutBurst().WithAll<Tag>().ForEach((Entity entity) => " +
             "{ var hash = entity.GetHashCode(); }).Run(); } } struct Tag : IComponentData { }",
