@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `Entities.ForEach` migrations now accept `out` component parameters,
+  converting their write-only access to the `RefRW`/`ref`
+  representation supported by `SystemAPI.Query` and `IJobEntity`.
+
 ## [0.4.31] - 2026-07-31
 
 ### Fixed

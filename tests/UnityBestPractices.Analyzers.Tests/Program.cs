@@ -241,6 +241,7 @@ internal sealed partial class AnalyzerTests
 
             public delegate void RefAction<T>(ref T value) where T : struct, IComponentData;
             public delegate void InAction<T>(in T value) where T : struct, IComponentData;
+            public delegate void OutAction<T>(out T value) where T : struct, IComponentData;
             public delegate void EntityAction(Entity entity);
             public delegate void EntityRefAction<T>(Entity entity, ref T value)
                 where T : struct, IComponentData;
@@ -281,6 +282,7 @@ internal sealed partial class AnalyzerTests
                 public ForEachDescription ForEach(EntityAction action) => default;
                 public ForEachDescription ForEach<T>(RefAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(InAction<T> action) where T : struct, IComponentData => default;
+                public ForEachDescription ForEach<T>(OutAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(EntityRefAction<T> action)
                     where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T1, T2>(RefInAction<T1, T2> action)
