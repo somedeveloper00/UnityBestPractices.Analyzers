@@ -33,6 +33,67 @@ public sealed class RemoveSymbolCodeRefactoringProviderTests
     }
 
     [Fact]
+    public async Task RemovesLinesThatBecomeEmptyButPreservesExistingEmptyLines()
+    {
+        var changed = await ApplyAsync("""
+            public sealed class Example
+            {
+                public void Run()
+                {
+                    var $$value = 1;
+                    System.Console.WriteLine(value);
+
+                    System.Console.WriteLine("kept");
+                }
+            }
+            """);
+
+        var expected = """
+            public sealed class Example
+            {
+                public void Run()
+                {
+
+                    System.Console.WriteLine("kept");
+                }
+            }
+            """;
+        Assert.Equal(expected.ReplaceLineEndings(), changed.ReplaceLineEndings());
+    }
+
+    [Fact]
+    public async Task RemovesEmptyLinesWhenAMultilineDeclarationChangesFollowingLineNumbers()
+    {
+        var changed = await ApplyAsync("""
+            public sealed class Example
+            {
+                private void $$DeleteMe()
+                {
+                    System.Console.WriteLine("deleted");
+                }
+
+                public void Run()
+                {
+                    DeleteMe();
+                    System.Console.WriteLine("kept");
+                }
+            }
+            """);
+
+        var expected = """
+            public sealed class Example
+            {
+
+                public void Run()
+                {
+                    System.Console.WriteLine("kept");
+                }
+            }
+            """;
+        Assert.Equal(expected.ReplaceLineEndings(), changed.ReplaceLineEndings());
+    }
+
+    [Fact]
     public async Task RemovesOneFieldDeclaratorAndAllUsageStatements()
     {
         var changed = await ApplyAsync("""

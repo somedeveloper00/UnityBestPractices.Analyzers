@@ -102,6 +102,8 @@ public sealed class RemoveSymbolCodeRefactoringProvider : CodeRefactoringProvide
                 continue;
             }
 
+            var originalText = await document!.GetTextAsync(cancellationToken).ConfigureAwait(false);
+
             var nodes = pair.Value.Select(span => FindRemovalNode(root, span))
                 .Where(candidate => candidate is not null)
                 .Cast<SyntaxNode>()
@@ -114,11 +116,59 @@ public sealed class RemoveSymbolCodeRefactoringProvider : CodeRefactoringProvide
                 ?.WithAdditionalAnnotations(Formatter.Annotation);
             if (updatedRoot is not null)
             {
-                changedSolution = changedSolution.WithDocumentSyntaxRoot(pair.Key, updatedRoot);
+                var updatedText = RemoveNewlyEmptyLines(
+                    originalText,
+                    updatedRoot.GetText(),
+                    outermostNodes.Select(node => node.Span));
+                changedSolution = changedSolution.WithDocumentText(pair.Key, updatedText);
             }
         }
 
         return changedSolution;
+    }
+
+    private static SourceText RemoveNewlyEmptyLines(
+        SourceText originalText,
+        SourceText updatedText,
+        IEnumerable<TextSpan> removedSpans)
+    {
+        // KeepExteriorTrivia deliberately preserves comments and existing spacing. It also leaves the
+        // indentation and line break behind when an entire declaration or usage occupied a line.
+        // Map lines touched by removed nodes into the updated text so multiline removals do not make
+        // unrelated line numbers appear to have become empty.
+        var candidateLineNumbers = new HashSet<int>();
+        var removedLineCount = 0;
+        foreach (var span in removedSpans.OrderBy(span => span.Start))
+        {
+            var firstLine = originalText.Lines.GetLineFromPosition(span.Start).LineNumber;
+            var lastPosition = span.IsEmpty ? span.Start : span.End - 1;
+            var lastLine = originalText.Lines.GetLineFromPosition(lastPosition).LineNumber;
+            candidateLineNumbers.Add(firstLine - removedLineCount);
+            removedLineCount += lastLine - firstLine;
+        }
+
+        var changes = candidateLineNumbers
+            .Where(lineNumber => lineNumber >= 0 && lineNumber < updatedText.Lines.Count)
+            .Select(lineNumber => updatedText.Lines[lineNumber])
+            .Where(line => IsEmpty(updatedText, line.Span))
+            .Select(line => line.SpanIncludingLineBreak)
+            .Distinct()
+            .Select(span => new TextChange(span, string.Empty))
+            .ToImmutableArray();
+        return changes.IsEmpty ? updatedText : updatedText.WithChanges(changes);
+    }
+
+    private static bool IsEmpty(SourceText text, TextSpan span)
+    {
+        for (var index = span.Start; index < span.End; index++)
+        {
+            if (!char.IsWhiteSpace(text[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static SyntaxNode? FindRemovalNode(SyntaxNode root, TextSpan span)
