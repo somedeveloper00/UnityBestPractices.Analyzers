@@ -214,7 +214,7 @@ internal static class RuleDocumentationGenerator
 
             if (IsEntitiesForEachJobConversion(rule))
             {
-                return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model. `DynamicBuffer<T>` parameters retain their `ref` or `in` modifier, the special `entityInQueryIndex` parameter becomes `[EntityIndexInQuery]`, read-only unmanaged captures become initialized job fields, and `SystemAPI.Time.ElapsedTime` / `DeltaTime` are evaluated by the system and passed into the job.";
+                return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model. `DynamicBuffer<T>` parameters retain their `ref` or `in` modifier, the special `entityInQueryIndex` parameter becomes `[EntityIndexInQuery]`, read-only unmanaged local and instance-member captures become initialized job fields, and `SystemAPI.Time.ElapsedTime` / `DeltaTime` are evaluated by the system and passed into the job.";
             }
 
             return "- Query parameters, filters, entity access, captures, wrapper access, and the resolved Unity.Entities API must match the supported Entities 1.x model.";
@@ -256,10 +256,10 @@ internal static class RuleDocumentationGenerator
 
             if (IsEntitiesForEachJobConversion(rule))
             {
-                return "- Managed or mutated captures, nested lambdas, structural-change pipelines, unsupported `SystemAPI` access, unsupported filters, system-instance access, and ambiguous package symbols are excluded.";
+                return "- Managed or mutated captures, nested lambdas, structural-change pipelines, unsupported `SystemAPI` access, unsupported filters, system-instance method access, and ambiguous package symbols are excluded.";
             }
 
-            return "- Captured locals, nested lambdas, structural-change pipelines, unsupported filters, system-instance access, and ambiguous package symbols are excluded.";
+            return "- Captured locals, nested lambdas, structural-change pipelines, unsupported filters, system-instance method access, and ambiguous package symbols are excluded.";
         }
 
         return rule.DiagnosticId switch
