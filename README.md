@@ -176,8 +176,8 @@ These quick fixes use the current Entities 1.x query systems. `SystemAPI.Query` 
 | ID | Recognizes | Fix |
 |---|---|---|
 | `UBP0071` | A returned `Unity.Jobs.JobHandle` discarded from a supported `Schedule` call | Assigns the handle to a collision-free local so it can be propagated or combined |
-| `UBP0072` | A narrowly provable, unused local `NativeArray<T>` allocated with `Allocator.Persistent` | Diagnostic only; disposal and ownership must be chosen by the developer |
-| `UBP0073` | A `Temp` or `TempJob` `NativeArray<T>` returned, stored in a field, or captured by an escaping delegate | Diagnostic only; the correct lifetime or ownership depends on the application |
+| `UBP0072` | Only a narrowly provable, unused local `NativeArray<T>` allocated with `Allocator.Persistent` | Diagnostic only; disposal and ownership must be chosen by the developer |
+| `UBP0073` | Only a `NativeArray<T>` allocated with `Temp` or `TempJob` and returned, stored in a field, or captured by an escaping delegate | Diagnostic only; the correct lifetime or ownership depends on the application |
 | `UBP0074` | Repeated constant `Shader.PropertyToID` calls in one type | Adds a uniquely named static readonly ID field and replaces repeated calls |
 | `UBP0075` | A namespace-less type file whose neighbors have a clear most-common namespace | Wraps the file's types in the neighboring namespace |
 | `UBP0076` | Adjacent local position and rotation assignments on the same Transform | Replaces both assignments with `SetLocalPositionAndRotation` |
