@@ -50,7 +50,8 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         {
             context.RegisterRefactoring(
                 CodeAction.Create(
-                    FixTitleLocalizer.Get(FixTitleLocalizer.MoveParameterLeft, MoveLeftTitle),
+                    OmniSharpRefactoringTitle.Inline(
+                        FixTitleLocalizer.Get(FixTitleLocalizer.MoveParameterLeft, MoveLeftTitle)),
                     cancellationToken => MoveParameterAsync(
                         context.Document.Project.Solution,
                         symbol,
@@ -65,7 +66,8 @@ public sealed class MoveParameterCodeRefactoringProvider : CodeRefactoringProvid
         {
             context.RegisterRefactoring(
                 CodeAction.Create(
-                    FixTitleLocalizer.Get(FixTitleLocalizer.MoveParameterRight, MoveRightTitle),
+                    OmniSharpRefactoringTitle.Extract(
+                        FixTitleLocalizer.Get(FixTitleLocalizer.MoveParameterRight, MoveRightTitle)),
                     cancellationToken => MoveParameterAsync(
                         context.Document.Project.Solution,
                         symbol,

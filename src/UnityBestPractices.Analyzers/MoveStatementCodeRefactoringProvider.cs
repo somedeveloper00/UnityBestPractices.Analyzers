@@ -50,13 +50,24 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         CodeRefactoringContext context,
         SyntaxNode node,
         int destinationIndex,
-        string title) =>
+        string title)
+    {
+        var localizedTitle = FixTitleLocalizer.Get(
+            title == MoveUpTitle ? FixTitleLocalizer.MoveStatementUp : FixTitleLocalizer.MoveStatementDown,
+            title);
+
+        // Legacy OmniSharp maps these title prefixes to VS Code's
+        // refactor.inline and refactor.extract CodeActionKind values. Giving
+        // each direction a distinct kind lets keybindings invoke it directly.
+        var routedTitle = title == MoveUpTitle
+            ? OmniSharpRefactoringTitle.Inline(localizedTitle)
+            : OmniSharpRefactoringTitle.Extract(localizedTitle);
+
         context.RegisterRefactoring(CodeAction.Create(
-            FixTitleLocalizer.Get(
-                title == MoveUpTitle ? FixTitleLocalizer.MoveStatementUp : FixTitleLocalizer.MoveStatementDown,
-                title),
+            routedTitle,
             cancellationToken => MoveAsync(context.Document, node.Span, destinationIndex, cancellationToken),
             title));
+    }
 
     private static SyntaxNode? FindMovableNode(SyntaxNode root, TextSpan span)
     {

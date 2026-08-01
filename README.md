@@ -216,6 +216,69 @@ members, methods, properties, fields, nested types, namespaces, and top-level
 type declarations. Comments and other trivia attached to the moved syntax travel
 with it, and an action is omitted when there is no sibling in that direction.
 
+When VS Code uses the legacy OmniSharp language server, the two directions are
+exposed as distinct code-action kinds and can be invoked directly from
+`keybindings.json`:
+
+```jsonc
+{
+    "key": "ctrl+alt+up",
+    "command": "editor.action.codeAction",
+    "args": { "kind": "refactor.inline", "apply": "first" },
+    "when": "editorTextFocus && editorLangId == csharp"
+},
+{
+    "key": "ctrl+alt+down",
+    "command": "editor.action.codeAction",
+    "args": { "kind": "refactor.extract", "apply": "first" },
+    "when": "editorTextFocus && editorLangId == csharp"
+}
+```
+
+The same routing is available for the directional parameter refactorings. These
+bindings move the parameter under the caret and update its call sites:
+
+```jsonc
+{
+    "key": "ctrl+alt+left",
+    "command": "editor.action.codeAction",
+    "args": { "kind": "refactor.inline", "apply": "first" },
+    "when": "editorTextFocus && editorLangId == csharp"
+},
+{
+    "key": "ctrl+alt+right",
+    "command": "editor.action.codeAction",
+    "args": { "kind": "refactor.extract", "apply": "first" },
+    "when": "editorTextFocus && editorLangId == csharp"
+}
+```
+
+**Inline method** is also exposed as `refactor.inline`, including when its label
+is localized. The analyzer's diagnostic quick fixes can be applied from a
+shortcut as well:
+
+```jsonc
+{
+    "key": "ctrl+alt+enter",
+    "command": "editor.action.codeAction",
+    "args": { "kind": "quickfix", "apply": "first" },
+    "when": "editorTextFocus && editorLangId == csharp"
+}
+```
+
+That binding applies the first quick fix at the caret, regardless of its UBP
+diagnostic ID. Use `"apply": "never"` to show the matching fixes instead.
+Non-directional refactorings remain available from the standard `refactor`
+picker because OmniSharp provides no additional title-derived kinds with which
+to address them individually.
+
+This routing depends on OmniSharp's title-based classification. Configure the
+C# extension with `"dotnet.server.useOmnisharp": true`; the modern Roslyn LSP
+reports third-party refactorings under the generic `refactor` kind. Because the
+inline and extract kinds are shared with other providers, use `"apply":
+"never"` instead if you prefer a picker whenever more than one matching action
+is available.
+
 Use **Remove double empty lines** to collapse every run of consecutive empty
 lines in the current document to one. Lines containing only spaces or tabs are
 treated as empty, while the document's existing line-ending style is preserved.

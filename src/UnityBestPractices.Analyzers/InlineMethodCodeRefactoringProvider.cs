@@ -61,7 +61,8 @@ public sealed class InlineMethodCodeRefactoringProvider : CodeRefactoringProvide
         }
 
         context.RegisterRefactoring(CodeAction.Create(
-            FixTitleLocalizer.Get(FixTitleLocalizer.InlineMethod, Title),
+            OmniSharpRefactoringTitle.Inline(
+                FixTitleLocalizer.Get(FixTitleLocalizer.InlineMethod, Title)),
             cancellationToken => InlineAsync(context.Document, nodeToReplace, replacement, cancellationToken),
             Title));
     }
