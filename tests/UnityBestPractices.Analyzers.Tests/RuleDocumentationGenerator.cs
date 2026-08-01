@@ -225,7 +225,7 @@ internal static class RuleDocumentationGenerator
             DiagnosticIds.DiscardedScheduledJobHandle =>
                 "- The discarded invocation must resolve to a supported Unity.Jobs scheduling API or `Unity.Entities.IJobEntityExtensions`, and its exact return type must be `Unity.Jobs.JobHandle`.",
             DiagnosticIds.UndisposedPersistentNativeContainer =>
-                "- The initial implementation reports only a directly constructed, locally owned `NativeArray<T>` using `Allocator.Persistent` when the local has no subsequent references.",
+                "- The allocation must be a directly constructed local `NativeArray<T>` using `Allocator.Persistent` in a block-bodied method, constructor, or local function, and Roslyn control flow must prove that every reachable exit retains ownership without disposal.",
             DiagnosticIds.InvalidTemporaryAllocatorEscape =>
                 "- The allocation must be a semantically resolved `NativeArray<T>` using `Allocator.Temp` or `Allocator.TempJob`, and the escape must be a direct return, field/property assignment, or captured escaping delegate.",
             DiagnosticIds.CacheShaderPropertyId =>
@@ -267,7 +267,7 @@ internal static class RuleDocumentationGenerator
             DiagnosticIds.DiscardedScheduledJobHandle =>
                 "- Calls returning `void`, already assigned/returned handles, look-alike scheduling APIs, and Entities APIs that may update a system dependency internally are excluded.",
             DiagnosticIds.UndisposedPersistentNativeContainer =>
-                "- Containers passed elsewhere, returned, conditionally owned, referenced later, or allocated with another allocator are excluded pending reliable path-sensitive ownership analysis.",
+                "- The analyzer remains silent if any reachable exit disposes or transfers ownership, and for unsupported bodies. `Dispose()`, `using` declarations, and `using` statements are recognized disposal forms. Ordinary reads, element writes, and calls to unconfigured methods are non-owning uses. Returns and field/property assignments transfer ownership; configured invocation sinks use `ubp_0072_ownership_transfer_methods` with comma- or semicolon-separated method names or documentation IDs.",
             DiagnosticIds.InvalidTemporaryAllocatorEscape =>
                 "- Reassigned locals, non-native look-alike containers, and uses that remain within the allocating method are excluded.",
             DiagnosticIds.CacheShaderPropertyId =>

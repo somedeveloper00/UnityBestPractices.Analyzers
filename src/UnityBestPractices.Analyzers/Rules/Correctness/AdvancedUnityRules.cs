@@ -10,6 +10,8 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.FlowAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace UnityBestPractices.Analyzers;
 
@@ -31,7 +33,7 @@ internal static class AdvancedUnityRules
         DiagnosticIds.UndisposedPersistentNativeContainer,
         "Dispose persistent native container",
         "Persistent native container '{0}' is never disposed",
-        "A locally owned persistent NativeArray in a straight-line method must be disposed before the method exits.",
+        "A locally owned persistent NativeArray must be disposed or transfer ownership before the method exits.",
         string.Empty,
         RuleCategories.UnityCorrectness,
         RuleSafety.Safe,
@@ -128,24 +130,12 @@ internal static class AdvancedUnityRules
                 context.CancellationToken,
                 out var allocatorKind) ||
             allocatorKind != "Persistent" ||
-            context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken) is not ILocalSymbol local ||
-            declaration.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>() is not { } method)
+            context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken) is not ILocalSymbol local)
         {
             return;
         }
 
-        var references = method.DescendantNodes()
-            .OfType<IdentifierNameSyntax>()
-            .Where(identifier =>
-                identifier.SpanStart != variable.Identifier.SpanStart &&
-                SymbolEqualityComparer.Default.Equals(
-                    context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol,
-                    local))
-            .ToArray();
-
-        // Begin with the narrow, provable leak: ownership never leaves the declaration,
-        // and the local is never used or disposed on the method's only relevant path.
-        if (references.Length != 0)
+        if (!IsDefinitelyUndisposedOnEveryExit(declaration, local, context))
         {
             return;
         }
@@ -156,6 +146,199 @@ internal static class AdvancedUnityRules
             variable.Identifier.GetLocation(),
             variable.Identifier.ValueText);
     }
+
+    private static bool IsDefinitelyUndisposedOnEveryExit(
+        LocalDeclarationStatementSyntax declaration,
+        ILocalSymbol local,
+        SyntaxNodeAnalysisContext context)
+    {
+        var executable = declaration.Ancestors()
+            .FirstOrDefault(node =>
+                node is BaseMethodDeclarationSyntax ||
+                node is LocalFunctionStatementSyntax);
+        if (executable is null)
+        {
+            return false;
+        }
+
+        ControlFlowGraph graph;
+        try
+        {
+            if (executable is LocalFunctionStatementSyntax localFunction)
+            {
+                var containingMethod = localFunction.Ancestors().OfType<BaseMethodDeclarationSyntax>().FirstOrDefault();
+                var localFunctionSymbol = context.SemanticModel.GetDeclaredSymbol(
+                    localFunction,
+                    context.CancellationToken) as IMethodSymbol;
+                if (containingMethod is null || localFunctionSymbol is null)
+                {
+                    return false;
+                }
+
+                var containingGraph = ControlFlowGraph.Create(
+                    containingMethod,
+                    context.SemanticModel,
+                    context.CancellationToken);
+                graph = containingGraph.GetLocalFunctionControlFlowGraphInScope(
+                    localFunctionSymbol,
+                    context.CancellationToken);
+            }
+            else
+            {
+                graph = ControlFlowGraph.Create(
+                    executable,
+                    context.SemanticModel,
+                    context.CancellationToken);
+            }
+        }
+        catch (ArgumentException)
+        {
+            // Broken or unsupported operation trees are not a safe basis for a leak diagnostic.
+            return false;
+        }
+
+        // Each bit records whether a path reaching the block still owns the allocation.
+        // Reporting requires the exit to contain only the owned bit: if even one path
+        // disposes or transfers ownership, the analysis deliberately remains silent.
+        const int disposed = 1;
+        const int owned = 2;
+        var states = new int[graph.Blocks.Length];
+        var declarationSeen = false;
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var block in graph.Blocks)
+            {
+                var state = states[block.Ordinal];
+                foreach (var operation in block.Operations)
+                {
+                    if (declaration.Span.Contains(operation.Syntax.Span))
+                    {
+                        state |= owned;
+                        declarationSeen = true;
+                    }
+
+                    state = ApplyOwnershipEffects(operation, state, local, context);
+                }
+
+                if (block.BranchValue is { } branchValue)
+                {
+                    state = ApplyOwnershipEffects(branchValue, state, local, context);
+                    if ((block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return ||
+                         block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Return) &&
+                        ReferencesLocal(branchValue, local))
+                    {
+                        state = (state & ~owned) | disposed;
+                    }
+                }
+
+                changed |= Propagate(block.FallThroughSuccessor, state, states);
+                changed |= Propagate(block.ConditionalSuccessor, state, states);
+            }
+        }
+
+        return declarationSeen && states[graph.Blocks[graph.Blocks.Length - 1].Ordinal] == owned;
+
+        static bool Propagate(ControlFlowBranch? branch, int state, int[] targetStates)
+        {
+            if (branch?.Destination is not { } destination || state == 0)
+            {
+                return false;
+            }
+
+            var combined = targetStates[destination.Ordinal] | state;
+            if (combined == targetStates[destination.Ordinal])
+            {
+                return false;
+            }
+
+            targetStates[destination.Ordinal] = combined;
+            return true;
+        }
+
+        static int ApplyOwnershipEffects(
+            IOperation operation,
+            int state,
+            ILocalSymbol local,
+            SyntaxNodeAnalysisContext context)
+        {
+            foreach (var child in operation.Children)
+            {
+                state = ApplyOwnershipEffects(child, state, local, context);
+            }
+
+            if ((state & owned) == 0)
+            {
+                return state;
+            }
+
+            var transfers = operation switch
+            {
+                IInvocationOperation invocation => IsDispose(invocation, local) ||
+                    IsConfiguredOwnershipSink(invocation, local, context),
+                IReturnOperation returned => ReferencesLocal(returned.ReturnedValue, local),
+                ILocalReferenceOperation reference =>
+                    SymbolEqualityComparer.Default.Equals(reference.Local, local) &&
+                    IsUsingResource(reference.Syntax, local, context),
+                ISimpleAssignmentOperation assignment =>
+                    assignment.Target.Type is not null &&
+                    (assignment.Target is IFieldReferenceOperation || assignment.Target is IPropertyReferenceOperation) &&
+                    ReferencesLocal(assignment.Value, local),
+                _ => operation.Syntax is UsingStatementSyntax usingStatement &&
+                    usingStatement.Expression is { } expression &&
+                    SymbolEqualityComparer.Default.Equals(
+                        context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol,
+                        local),
+            };
+            return transfers ? (state & ~owned) | disposed : state;
+        }
+    }
+
+    private static bool IsDispose(IInvocationOperation invocation, ILocalSymbol local) =>
+        invocation.TargetMethod.Name == "Dispose" &&
+        invocation.Arguments.Length == 0 &&
+        ReferencesLocal(invocation.Instance, local);
+
+    private static bool IsUsingResource(
+        SyntaxNode syntax,
+        ILocalSymbol local,
+        SyntaxNodeAnalysisContext context)
+    {
+        var usingStatement = syntax.FirstAncestorOrSelf<UsingStatementSyntax>();
+        return usingStatement?.Expression is { } expression &&
+            expression.Span.Contains(syntax.Span) &&
+            SymbolEqualityComparer.Default.Equals(
+                context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol,
+                local);
+    }
+
+    private static bool IsConfiguredOwnershipSink(
+        IInvocationOperation invocation,
+        ILocalSymbol local,
+        SyntaxNodeAnalysisContext context)
+    {
+        if (!invocation.Arguments.Any(argument => ReferencesLocal(argument.Value, local)))
+        {
+            return false;
+        }
+
+        var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Node.SyntaxTree);
+        if (!options.TryGetValue("ubp_0072_ownership_transfer_methods", out var configured))
+        {
+            return false;
+        }
+
+        var documentationId = invocation.TargetMethod.OriginalDefinition.GetDocumentationCommentId();
+        return configured.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => value.Trim())
+            .Any(value => value == invocation.TargetMethod.Name || value == documentationId);
+    }
+
+    private static bool ReferencesLocal(IOperation? operation, ILocalSymbol local) =>
+        operation is not null && operation.DescendantsAndSelf()
+            .OfType<ILocalReferenceOperation>()
+            .Any(reference => SymbolEqualityComparer.Default.Equals(reference.Local, local));
 
     internal static void AnalyzeReturn(SyntaxNodeAnalysisContext context)
     {

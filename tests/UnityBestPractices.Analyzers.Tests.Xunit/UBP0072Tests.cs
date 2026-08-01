@@ -93,7 +93,7 @@ public sealed class UBP0072Tests
     }
 
     [Fact]
-    public async Task IgnoresPersistentAllocationPassedElsewhere()
+    public async Task ReportsPersistentAllocationPassedToUnconfiguredMethod()
     {
         var source = """
                 using Unity.Collections;
@@ -102,8 +102,166 @@ public sealed class UBP0072Tests
                     void Consume(NativeArray<int> values) { }
                     void Create()
                     {
-                        var values = new NativeArray<int>(1, Allocator.Persistent);
+                        var {|#0:values|} = new NativeArray<int>(1, Allocator.Persistent);
                         Consume(values);
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.UndisposedPersistentNativeContainer, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("values"));
+    }
+
+    [Fact]
+    public async Task ReportsUsedButUndisposedLocal()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    void Create()
+                    {
+                        var {|#0:values|} = new NativeArray<int>(1, Allocator.Persistent);
+                        var length = values.Length;
+                        values[0] = length;
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.UndisposedPersistentNativeContainer, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("values"));
+    }
+
+    [Fact]
+    public async Task IgnoresDisposalAfterUse()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    void Create()
+                    {
+                        var values = new NativeArray<int>(1, Allocator.Persistent);
+                        var length = values.Length;
+                        values.Dispose();
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresConditionalDisposalBecauseNotEveryExitLeaks()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    void Create(bool dispose)
+                    {
+                        var values = new NativeArray<int>(1, Allocator.Persistent);
+                        if (dispose) values.Dispose();
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresEarlyReturnWhenOtherPathDisposes()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    void Create(bool stop)
+                    {
+                        var values = new NativeArray<int>(1, Allocator.Persistent);
+                        if (stop) return;
+                        values.Dispose();
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task ReportsEarlyReturnWhenEveryExitLeaks()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    void Create(bool stop)
+                    {
+                        var {|#0:values|} = new NativeArray<int>(1, Allocator.Persistent);
+                        if (stop) return;
+                        _ = values.Length;
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.UndisposedPersistentNativeContainer, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("values"));
+    }
+
+    [Fact]
+    public async Task ReportsNonOwningUsesInBothBranches()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    void Create(bool first)
+                    {
+                        var {|#0:values|} = new NativeArray<int>(1, Allocator.Persistent);
+                        if (first) values[0] = 1;
+                        else _ = values.Length;
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.UndisposedPersistentNativeContainer, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("values"));
+    }
+
+    [Fact]
+    public async Task IgnoresOwnershipTransferredByReturn()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    NativeArray<int> Create()
+                    {
+                        var values = new NativeArray<int>(1, Allocator.Persistent);
+                        return values;
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresOwnershipTransferredToField()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    NativeArray<int> owned;
+                    void Create()
+                    {
+                        var values = new NativeArray<int>(1, Allocator.Persistent);
+                        owned = values;
                     }
                 }
                 """ + "\n" + TestSources.Collections;
@@ -121,6 +279,48 @@ public sealed class UBP0072Tests
                 }
                 """ + "\n" + TestSources.Collections;
         await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresUsingStatementForExistingLocal()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    void Create()
+                    {
+                        var values = new NativeArray<int>(1, Allocator.Persistent);
+                        using (values) { _ = values.Length; }
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task ReportsInsideLocalFunction()
+    {
+        var source = """
+                using Unity.Collections;
+                class Owner
+                {
+                    void Create()
+                    {
+                        void Allocate()
+                        {
+                            var {|#0:values|} = new NativeArray<int>(1, Allocator.Persistent);
+                            _ = values.Length;
+                        }
+                        Allocate();
+                    }
+                }
+                """ + "\n" + TestSources.Collections;
+        await VerifyCS.VerifyAnalyzerAsync(
+            source,
+            new DiagnosticResult(DiagnosticIds.UndisposedPersistentNativeContainer, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                .WithLocation(0)
+                .WithArguments("values"));
     }
 
     [Fact]
