@@ -140,12 +140,12 @@ public sealed class MoveStatementCodeRefactoringProviderTests
     public async Task OffersOnlyDirectionsThatHaveASibling()
     {
         var firstActions = await GetActionsAsync("class C { void M() { $$First(); Second(); } }");
-        Assert.DoesNotContain(firstActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveUpTitle);
-        Assert.Contains(firstActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveDownTitle);
+        Assert.DoesNotContain(firstActions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveUpTitle);
+        Assert.Contains(firstActions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveDownTitle);
 
         var lastActions = await GetActionsAsync("class C { void M() { First(); $$Second(); } }");
-        Assert.Contains(lastActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveUpTitle);
-        Assert.DoesNotContain(lastActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveDownTitle);
+        Assert.Contains(lastActions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveUpTitle);
+        Assert.DoesNotContain(lastActions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveDownTitle);
     }
 
     [Theory]
@@ -209,13 +209,13 @@ public sealed class MoveStatementCodeRefactoringProviderTests
     {
         var firstActions = await GetActionsAsync(
             "class C { void M() { $$if (First()) A(); else if (Second()) B(); else Fallback(); } }");
-        Assert.DoesNotContain(firstActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveUpTitle);
-        Assert.Contains(firstActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveDownTitle);
+        Assert.DoesNotContain(firstActions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveUpTitle);
+        Assert.Contains(firstActions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveDownTitle);
 
         var lastActions = await GetActionsAsync(
             "class C { void M() { if (First()) A(); $$else if (Second()) B(); else Fallback(); } }");
-        Assert.Contains(lastActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveUpTitle);
-        Assert.DoesNotContain(lastActions, action => action.Title == MoveStatementCodeRefactoringProvider.MoveDownTitle);
+        Assert.Contains(lastActions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveUpTitle);
+        Assert.DoesNotContain(lastActions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveDownTitle);
     }
 
     [Fact]
@@ -234,7 +234,8 @@ public sealed class MoveStatementCodeRefactoringProviderTests
         using (workspace)
         {
             var actions = await GetActionsAsync(document, cursor);
-            var action = Assert.Single(actions.Where(candidate => candidate.Title == title));
+            var action = Assert.Single(actions.Where(candidate => candidate.EquivalenceKey == title));
+            Assert.StartsWith(title == MoveStatementCodeRefactoringProvider.MoveUpTitle ? "Inline " : "Extract ", action.Title);
             var operations = await action.GetOperationsAsync(CancellationToken.None);
             var changedSolution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
             var changedDocument = changedSolution.GetDocument(document.Id)!;

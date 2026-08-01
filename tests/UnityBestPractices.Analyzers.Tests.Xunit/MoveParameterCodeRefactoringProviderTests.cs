@@ -592,8 +592,15 @@ public sealed class MoveParameterCodeRefactoringProviderTests
             actions.Add,
             CancellationToken.None);
 
-        await (provider ?? new MoveParameterCodeRefactoringProvider()).ComputeRefactoringsAsync(context);
-        var action = Assert.Single(actions, candidate => candidate.Title == title);
+        var refactoringProvider = provider ?? new MoveParameterCodeRefactoringProvider();
+        await refactoringProvider.ComputeRefactoringsAsync(context);
+        var action = Assert.Single(actions, candidate => candidate.EquivalenceKey == title);
+        if (refactoringProvider is MoveParameterCodeRefactoringProvider)
+        {
+            Assert.StartsWith(
+                title == MoveParameterCodeRefactoringProvider.MoveLeftTitle ? "Inline " : "Extract ",
+                action.Title);
+        }
         var operations = await action.GetOperationsAsync(CancellationToken.None);
         var changedSolution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
         var compilation = await changedSolution.GetProject(projectId)!.GetCompilationAsync();
