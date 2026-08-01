@@ -184,7 +184,11 @@ public sealed class RemoveSymbolCodeRefactoringProviderTests
         using (workspace)
         {
             var action = Assert.Single(await GetActionsAsync(document, cursor));
-            Assert.Equal(RemoveSymbolCodeRefactoringProvider.Title, action.Title);
+            Assert.Equal(
+                FixTitleLocalizer.Get(
+                    FixTitleLocalizer.RemoveSymbol,
+                    RemoveSymbolCodeRefactoringProvider.Title),
+                action.Title);
             var operations = await action.GetOperationsAsync(CancellationToken.None);
             var solution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
             var changedDocument = solution.GetDocument(document.Id)!;

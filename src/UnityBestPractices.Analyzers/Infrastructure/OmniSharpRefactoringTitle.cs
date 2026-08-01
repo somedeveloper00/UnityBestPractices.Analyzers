@@ -7,12 +7,14 @@ internal static class OmniSharpRefactoringTitle
     internal const string InlinePrefix = "Inline ";
     internal const string ExtractPrefix = "Extract ";
 
-    internal static string Inline(string localizedTitle) => AddPrefix(localizedTitle, InlinePrefix);
+    internal static string Inline(string displayTitle, string englishTitle) =>
+        AddPrefix(displayTitle, englishTitle, InlinePrefix);
 
-    internal static string Extract(string localizedTitle) => AddPrefix(localizedTitle, ExtractPrefix);
+    internal static string Extract(string displayTitle, string englishTitle) =>
+        AddPrefix(displayTitle, englishTitle, ExtractPrefix);
 
-    private static string AddPrefix(string localizedTitle, string prefix) =>
-        localizedTitle.StartsWith(prefix, StringComparison.Ordinal)
-            ? localizedTitle
-            : prefix + localizedTitle;
+    private static string AddPrefix(string displayTitle, string englishTitle, string prefix) =>
+        displayTitle == englishTitle && !displayTitle.StartsWith(prefix, StringComparison.Ordinal)
+            ? prefix + displayTitle
+            : displayTitle;
 }

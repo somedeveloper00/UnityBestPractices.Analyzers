@@ -87,4 +87,27 @@ public sealed class FixTitleLocalizerTests
             }
         }
     }
+
+    [Fact]
+    public void JapaneseRefactoringSuggestionsUseJapaneseDisplayTitles()
+    {
+        var suggestions = new[]
+        {
+            (FixTitleLocalizer.ConvertStringLiteralToNameof, ConvertStringLiteralToNameofCodeRefactoringProvider.Title, "文字列リテラルを nameof に置換"),
+            (FixTitleLocalizer.InlineMethod, InlineMethodCodeRefactoringProvider.Title, "メソッドをインライン化"),
+            (FixTitleLocalizer.MoveParameterLeft, MoveParameterCodeRefactoringProvider.MoveLeftTitle, "パラメーターを左へ移動"),
+            (FixTitleLocalizer.MoveParameterRight, MoveParameterCodeRefactoringProvider.MoveRightTitle, "パラメーターを右へ移動"),
+            (FixTitleLocalizer.MoveStatementUp, MoveStatementCodeRefactoringProvider.MoveUpTitle, "ステートメントを上へ移動"),
+            (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle, "ステートメントを下へ移動"),
+            (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title, "パラメーターを削除"),
+            (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title, "連続する空行を削除"),
+            (FixTitleLocalizer.RemoveSymbol, RemoveSymbolCodeRefactoringProvider.Title, "シンボルとすべての使用箇所を削除"),
+        };
+
+        var culture = CultureInfo.GetCultureInfo("ja-JP");
+        foreach (var (key, englishTitle, japaneseTitle) in suggestions)
+        {
+            Assert.Equal(japaneseTitle, FixTitleLocalizer.Get(key, englishTitle, culture));
+        }
+    }
 }

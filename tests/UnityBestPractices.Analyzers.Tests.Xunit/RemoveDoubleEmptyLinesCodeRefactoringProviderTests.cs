@@ -48,7 +48,11 @@ public sealed class RemoveDoubleEmptyLinesCodeRefactoringProviderTests
         using (workspace)
         {
             var action = Assert.Single(await GetActionsAsync(document));
-            Assert.Equal(RemoveDoubleEmptyLinesCodeRefactoringProvider.Title, action.Title);
+            Assert.Equal(
+                FixTitleLocalizer.Get(
+                    FixTitleLocalizer.RemoveDoubleEmptyLines,
+                    RemoveDoubleEmptyLinesCodeRefactoringProvider.Title),
+                action.Title);
             var operations = await action.GetOperationsAsync(CancellationToken.None);
             var solution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
             return (await solution.GetDocument(document.Id)!.GetTextAsync()).ToString();

@@ -225,7 +225,11 @@ public sealed class ConvertStringLiteralToNameofCodeRefactoringProviderTests
         using (workspace)
         {
             var action = Assert.Single(await GetActionsAsync(document, span));
-            Assert.Equal(ConvertStringLiteralToNameofCodeRefactoringProvider.Title, action.Title);
+            Assert.Equal(
+                FixTitleLocalizer.Get(
+                    FixTitleLocalizer.ConvertStringLiteralToNameof,
+                    ConvertStringLiteralToNameofCodeRefactoringProvider.Title),
+                action.Title);
             var operations = await action.GetOperationsAsync(CancellationToken.None);
             var solution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
             var changedDocument = solution.GetDocument(document.Id)!;

@@ -7,7 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.33] - 2026-08-01
+
 ### Fixed
+
+- Preserved localized refactoring titles while retaining the OmniSharp routing
+  prefixes required for English VS Code shortcut support.
 
 - `Entities.ForEach` migrations now accept `out` component parameters,
   converting their write-only access to the `RefRW`/`ref`

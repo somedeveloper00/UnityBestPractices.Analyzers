@@ -235,7 +235,16 @@ public sealed class MoveStatementCodeRefactoringProviderTests
         {
             var actions = await GetActionsAsync(document, cursor);
             var action = Assert.Single(actions.Where(candidate => candidate.EquivalenceKey == title));
-            Assert.StartsWith(title == MoveStatementCodeRefactoringProvider.MoveUpTitle ? "Inline " : "Extract ", action.Title);
+            var localizedTitle = FixTitleLocalizer.Get(
+                title == MoveStatementCodeRefactoringProvider.MoveUpTitle
+                    ? FixTitleLocalizer.MoveStatementUp
+                    : FixTitleLocalizer.MoveStatementDown,
+                title);
+            Assert.Equal(
+                title == MoveStatementCodeRefactoringProvider.MoveUpTitle
+                    ? OmniSharpRefactoringTitle.Inline(localizedTitle, title)
+                    : OmniSharpRefactoringTitle.Extract(localizedTitle, title),
+                action.Title);
             var operations = await action.GetOperationsAsync(CancellationToken.None);
             var changedSolution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
             var changedDocument = changedSolution.GetDocument(document.Id)!;

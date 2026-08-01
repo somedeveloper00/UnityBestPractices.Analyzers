@@ -60,8 +60,8 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         // refactor.inline and refactor.extract CodeActionKind values. Giving
         // each direction a distinct kind lets keybindings invoke it directly.
         var routedTitle = title == MoveUpTitle
-            ? OmniSharpRefactoringTitle.Inline(localizedTitle)
-            : OmniSharpRefactoringTitle.Extract(localizedTitle);
+            ? OmniSharpRefactoringTitle.Inline(localizedTitle, MoveUpTitle)
+            : OmniSharpRefactoringTitle.Extract(localizedTitle, MoveDownTitle);
 
         context.RegisterRefactoring(CodeAction.Create(
             routedTitle,

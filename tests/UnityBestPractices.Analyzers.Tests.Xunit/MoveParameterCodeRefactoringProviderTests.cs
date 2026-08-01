@@ -597,8 +597,15 @@ public sealed class MoveParameterCodeRefactoringProviderTests
         var action = Assert.Single(actions, candidate => candidate.EquivalenceKey == title);
         if (refactoringProvider is MoveParameterCodeRefactoringProvider)
         {
-            Assert.StartsWith(
-                title == MoveParameterCodeRefactoringProvider.MoveLeftTitle ? "Inline " : "Extract ",
+            var localizedTitle = FixTitleLocalizer.Get(
+                title == MoveParameterCodeRefactoringProvider.MoveLeftTitle
+                    ? FixTitleLocalizer.MoveParameterLeft
+                    : FixTitleLocalizer.MoveParameterRight,
+                title);
+            Assert.Equal(
+                title == MoveParameterCodeRefactoringProvider.MoveLeftTitle
+                    ? OmniSharpRefactoringTitle.Inline(localizedTitle, title)
+                    : OmniSharpRefactoringTitle.Extract(localizedTitle, title),
                 action.Title);
         }
         var operations = await action.GetOperationsAsync(CancellationToken.None);
