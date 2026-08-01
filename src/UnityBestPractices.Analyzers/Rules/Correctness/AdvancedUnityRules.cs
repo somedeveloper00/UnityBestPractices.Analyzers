@@ -227,7 +227,12 @@ internal static class AdvancedUnityRules
     {
         if (context.Node is not ExpressionStatementSyntax first ||
             first.Expression is not AssignmentExpressionSyntax firstAssignment ||
-            !TryGetTransformPropertyAssignment(firstAssignment, context, "localPosition", out var receiver) ||
+            !TryGetTransformPropertyAssignment(
+                firstAssignment,
+                context,
+                "localPosition",
+                out var receiver,
+                out var receiverSymbol) ||
             first.Parent is not BlockSyntax block)
         {
             return;
@@ -236,8 +241,14 @@ internal static class AdvancedUnityRules
         var index = block.Statements.IndexOf(first);
         if (index < 0 || index + 1 >= block.Statements.Count ||
             block.Statements[index + 1] is not ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax secondAssignment } second ||
-            !TryGetTransformPropertyAssignment(secondAssignment, context, "localRotation", out var secondReceiver) ||
+            !TryGetTransformPropertyAssignment(
+                secondAssignment,
+                context,
+                "localRotation",
+                out var secondReceiver,
+                out var secondReceiverSymbol) ||
             !SyntaxFactory.AreEquivalent(receiver, secondReceiver) ||
+            !SymbolEqualityComparer.Default.Equals(receiverSymbol, secondReceiverSymbol) ||
             first.GetTrailingTrivia().Concat(second.GetLeadingTrivia()).Any(trivia =>
                 !trivia.IsKind(SyntaxKind.WhitespaceTrivia) && !trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
         {
@@ -251,22 +262,25 @@ internal static class AdvancedUnityRules
         AssignmentExpressionSyntax assignment,
         SyntaxNodeAnalysisContext context,
         string propertyName,
-        out ExpressionSyntax receiver)
+        out ExpressionSyntax receiver,
+        out ISymbol receiverSymbol)
     {
         receiver = null!;
+        receiverSymbol = null!;
         if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
             assignment.Left is not MemberAccessExpressionSyntax memberAccess ||
             memberAccess.Name.Identifier.ValueText != propertyName ||
             context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is not IPropertySymbol property ||
             property.ContainingType?.ToDisplayString() != "UnityEngine.Transform" ||
             !property.ContainingType.GetMembers("SetLocalPositionAndRotation").OfType<IMethodSymbol>().Any(method => method.Parameters.Length == 2) ||
-            context.SemanticModel.GetSymbolInfo(memberAccess.Expression, context.CancellationToken).Symbol is not
-                (ILocalSymbol or IParameterSymbol or IFieldSymbol))
+            context.SemanticModel.GetSymbolInfo(memberAccess.Expression, context.CancellationToken).Symbol is not { } symbol ||
+            symbol is not ILocalSymbol and not IParameterSymbol)
         {
             return false;
         }
 
         receiver = memberAccess.Expression;
+        receiverSymbol = symbol;
         return true;
     }
 

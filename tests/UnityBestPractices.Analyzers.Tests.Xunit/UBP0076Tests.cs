@@ -235,7 +235,7 @@ public sealed class UBP0076Tests
     }
 
     [Fact]
-    public async Task CombinesAssignmentsThroughFieldReceiver()
+    public async Task IgnoresAssignmentsThroughFieldReceiver()
     {
         var source = """
             using UnityEngine;
@@ -244,27 +244,60 @@ public sealed class UBP0076Tests
                 private Transform iconRect;
                 void Layout(Vector3 position, Quaternion rotation)
                 {
-                    {|#0:iconRect.localPosition = position;|}
+                    iconRect.localPosition = position;
                     iconRect.localRotation = rotation;
                 }
             }
             """ + "\n" + TestSources.Transform;
-        var fixedSource = """
+
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresInstanceFieldReceiverMutatedByFirstRightHandSide()
+    {
+        var source = """
             using UnityEngine;
             class View
             {
                 private Transform iconRect;
-                void Layout(Vector3 position, Quaternion rotation)
+                Vector3 MoveToNextTransform()
                 {
-                    iconRect.SetLocalPositionAndRotation(position, rotation);
+                    iconRect = new Transform();
+                    return new Vector3();
+                }
+                void Layout(Quaternion rotation)
+                {
+                    iconRect.localPosition = MoveToNextTransform();
+                    iconRect.localRotation = rotation;
                 }
             }
             """ + "\n" + TestSources.Transform;
 
-        await VerifyCS.VerifyCodeFixAsync(
-            source,
-            new DiagnosticResult(DiagnosticIds.CombineLocalPositionAndRotation, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
-                .WithLocation(0),
-            fixedSource);
+        await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    [Fact]
+    public async Task IgnoresStaticFieldReceiverMutatedByFirstRightHandSide()
+    {
+        var source = """
+            using UnityEngine;
+            class View
+            {
+                private static Transform iconRect;
+                static Vector3 MoveToNextTransform()
+                {
+                    iconRect = new Transform();
+                    return new Vector3();
+                }
+                static void Layout(Quaternion rotation)
+                {
+                    iconRect.localPosition = MoveToNextTransform();
+                    iconRect.localRotation = rotation;
+                }
+            }
+            """ + "\n" + TestSources.Transform;
+
+        await VerifyCS.VerifyAnalyzerAsync(source);
     }
 }
