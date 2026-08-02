@@ -42,7 +42,7 @@ Jede Regel ist in der [generierten Regelübersicht](docs/rules/index.md) als `Sa
 | API-Design | serialisierte Felder sicher kapseln und Namespaces vereinheitlichen |
 | Refactorings | Parameter und Anweisungen verschieben, Methoden inline erweitern, Symbole entfernen |
 
-Die vollständige Liste von `UBP0001` bis `UBP0077`, einschließlich Voraussetzungen, Beispiele und Sicherheitsklasse, steht in der [Regelübersicht](docs/rules/index.md). Die Schnellkorrekturtitel folgen der UI-Sprache der IDE, auch auf Deutsch.
+Die vollständige Liste von `UBP0001` bis `UBP0078`, einschließlich Voraussetzungen, Beispiele und Sicherheitsklasse, steht in der [Regelübersicht](docs/rules/index.md). Die Schnellkorrekturtitel folgen der UI-Sprache der IDE, auch auf Deutsch.
 
 ## Installation
 

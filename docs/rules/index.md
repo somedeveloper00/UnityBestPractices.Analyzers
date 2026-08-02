@@ -81,3 +81,4 @@ This index is generated from the analyzer's central diagnostic catalog. Run `dot
 | [UBP0075](UBP0075.md) | Match the folder namespace | `CSharp.CodeStyle` | Info | ReviewRequired | No |
 | [UBP0076](UBP0076.md) | Set local position and rotation together | `Unity.Performance.Safe` | Info | Safe | Yes |
 | [UBP0077](UBP0077.md) | Remove unused entity access | `Unity.Performance.Safe` | Info | Safe | Yes |
+| [UBP0078](UBP0078.md) | Use modern Unity object find API | `Unity.Performance.Safe` | Info | Safe | Yes |
