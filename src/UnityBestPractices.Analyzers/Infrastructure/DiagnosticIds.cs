@@ -80,4 +80,5 @@ public static class DiagnosticIds
     public const string MatchFolderNamespace = "UBP0075";
     public const string CombineLocalPositionAndRotation = "UBP0076";
     public const string RemoveUnusedEntityAccess = "UBP0077";
+    public const string UseModernObjectFindApi = "UBP0078";
 }

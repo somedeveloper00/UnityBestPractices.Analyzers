@@ -187,7 +187,7 @@ internal static class RuleMetadataFactory
             return RuleCategories.CSharpCodeStyle;
         }
 
-        if (diagnosticId == DiagnosticIds.RemoveUnusedEntityAccess)
+        if (diagnosticId is DiagnosticIds.RemoveUnusedEntityAccess or DiagnosticIds.UseModernObjectFindApi)
         {
             return RuleCategories.UnityPerformanceSafe;
         }
@@ -211,7 +211,9 @@ internal static class RuleMetadataFactory
     }
 
     private static string GetMinimumUnityVersion(string diagnosticId) =>
-        diagnosticId == DiagnosticIds.RemoveUnusedEntityAccess ||
+        diagnosticId == DiagnosticIds.UseModernObjectFindApi
+            ? "Unity 2023.1"
+            : diagnosticId == DiagnosticIds.RemoveUnusedEntityAccess ||
         string.CompareOrdinal(diagnosticId, DiagnosticIds.EntitiesForEachToSystemApiQuery) >= 0 &&
         string.CompareOrdinal(diagnosticId, DiagnosticIds.JobEntityScheduleParallelToSchedule) <= 0
             ? "Unity 2022.3 with Entities 1.0"

@@ -101,7 +101,15 @@ public static class DiagnosticCatalog
             "Remove WithEntityAccess because the entity value is unused",
             "Avoiding an unused entity value keeps a SystemAPI.Query iteration tuple as small as necessary.",
             "Remove unused entity access",
-            "Unity.Entities.SystemAPI"));
+            "Unity.Entities.SystemAPI"),
+        RuleMetadataFactory.Create(
+            DiagnosticIds.UseModernObjectFindApi,
+            "Use modern Unity object find API",
+            "Replace obsolete '{0}' with '{1}'",
+            "Unity's modern object find APIs replace the obsolete FindObjectOfType and FindObjectsOfType methods while preserving deterministic first-object and array ordering semantics.",
+            "Use modern object find API",
+            "UnityEngine.Object",
+            "UnityEngine.FindObjectsSortMode"));
 
     private static readonly Lazy<ImmutableArray<RuleMetadata>> LazyAll =
         new(

@@ -51,7 +51,8 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
         .AddRange(DotsQueryRules.Descriptors)
         .AddRange(AdvancedUnityRules.Descriptors)
         .Add(NamespaceConsistencyRules.Descriptor)
-        .Add(DiagnosticCatalog.Get(DiagnosticIds.RemoveUnusedEntityAccess).Descriptor);
+        .Add(DiagnosticCatalog.Get(DiagnosticIds.RemoveUnusedEntityAccess).Descriptor)
+        .Add(DiagnosticCatalog.Get(DiagnosticIds.UseModernObjectFindApi).Descriptor);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -246,6 +247,7 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
     {
         AdvancedUnityRules.AnalyzeInvocation(context);
         var invocation = (InvocationExpressionSyntax)context.Node;
+        ModernObjectFindRule.AnalyzeInvocation(context, invocation);
         if (!TryGetMathfSquare(
                 invocation,
                 context.SemanticModel,
