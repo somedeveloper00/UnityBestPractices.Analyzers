@@ -156,6 +156,11 @@ internal sealed partial class AnalyzerTests
                 public bool HasComponent(Entity entity) => false;
             }
 
+            public struct EntityStorageInfoLookup
+            {
+                public bool Exists(Entity entity) => false;
+            }
+
             public struct DynamicBuffer<T> where T : struct, IBufferElementData
             {
                 private T[] _items;
@@ -301,6 +306,18 @@ internal sealed partial class AnalyzerTests
                 where TBuffer : struct, IBufferElementData
                 where T3 : struct, IComponentData
                 where T4 : struct, IComponentData;
+            public delegate void EntityRefInBufferThreeInAction<T1, TBuffer, T2, T3, T4>(
+                Entity entity,
+                ref T1 first,
+                in DynamicBuffer<TBuffer> buffer,
+                in T2 second,
+                in T3 third,
+                in T4 fourth)
+                where T1 : struct, IComponentData
+                where TBuffer : struct, IBufferElementData
+                where T2 : struct, IComponentData
+                where T3 : struct, IComponentData
+                where T4 : struct, IComponentData;
             public delegate void EntityFourBuffersThreeComponentsAction<TBuffer1, TBuffer2, TBuffer3, TBuffer4, T1, T2, T3>(
                 Entity entity,
                 ref DynamicBuffer<TBuffer1> buffer1,
@@ -321,6 +338,9 @@ internal sealed partial class AnalyzerTests
             public struct EntitiesBuilder
             {
                 public EntitiesBuilder WithAll<T>() where T : struct, IComponentData => this;
+                public EntitiesBuilder WithAll<T1, T2>()
+                    where T1 : struct, IComponentData
+                    where T2 : struct, IComponentData => this;
                 public EntitiesBuilder WithAny<T>() where T : struct, IComponentData => this;
                 public EntitiesBuilder WithNone<T>() where T : struct, IComponentData => this;
                 public EntitiesBuilder WithChangeFilter<T>() where T : struct, IComponentData => this;
@@ -356,6 +376,13 @@ internal sealed partial class AnalyzerTests
                     where T1 : struct, IComponentData
                     where T2 : struct, IComponentData
                     where TBuffer : struct, IBufferElementData
+                    where T3 : struct, IComponentData
+                    where T4 : struct, IComponentData => default;
+                public ForEachDescription ForEach<T1, TBuffer, T2, T3, T4>(
+                    EntityRefInBufferThreeInAction<T1, TBuffer, T2, T3, T4> action)
+                    where T1 : struct, IComponentData
+                    where TBuffer : struct, IBufferElementData
+                    where T2 : struct, IComponentData
                     where T3 : struct, IComponentData
                     where T4 : struct, IComponentData => default;
                 public ForEachDescription ForEach<TBuffer1, TBuffer2, TBuffer3, TBuffer4, T1, T2, T3>(
@@ -394,6 +421,8 @@ internal sealed partial class AnalyzerTests
                 public static TimeData Time => default;
                 public static bool HasComponent<T>(Entity entity)
                     where T : struct, IComponentData => false;
+                public static bool Exists(Entity entity) => false;
+                public static EntityStorageInfoLookup GetEntityStorageInfoLookup() => default;
                 public static ComponentLookup<T> GetComponentLookup<T>(bool isReadOnly = false)
                     where T : struct, IComponentData => default;
                 public static RefRW<T> GetComponentRW<T>(Entity entity)

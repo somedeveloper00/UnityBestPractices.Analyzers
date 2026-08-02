@@ -198,6 +198,39 @@ internal sealed partial class AnalyzerTests
 
     private async Task VerifyEntitiesForEachRegressionCasesAsync()
     {
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class TargetSystem : SystemBase { void Update() { " +
+            "var collisionWorld = new Capture(); var transformLookup = new Capture(); " +
+            "Entities.WithReadOnly(collisionWorld).WithReadOnly(transformLookup).WithAll<PlayerTag, LocalTag>()" +
+            ".ForEach((Entity playerEntity, ref TargetData targetData, in DynamicBuffer<DetectedElement> detectedBuffer, " +
+            "in PlayerInputs input, in CharacterStance stance, in AgentShape shape) => { " +
+            "if (SystemAPI.Exists(targetData.Current) == false) { targetData.Current = playerEntity; } " +
+            "if (detectedBuffer.Length == 0) return; targetData.Value += collisionWorld.Value + transformLookup.Value + " +
+            "input.Value + stance.Value + shape.Value; }).ScheduleParallel(); } } " +
+            "struct Capture { public int Value; } struct PlayerTag : IComponentData { } struct LocalTag : IComponentData { } " +
+            "struct TargetData : IComponentData { public Entity Current; public int Value; } " +
+            "struct DetectedElement : IBufferElementData { } struct PlayerInputs : IComponentData { public int Value; } " +
+            "struct CharacterStance : IComponentData { public int Value; } struct AgentShape : IComponentData { public int Value; }",
+            DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel,
+            "using Unity.Entities; partial class TargetSystem : SystemBase { void Update() { " +
+            "var collisionWorld = new Capture(); var transformLookup = new Capture(); " +
+            "new EntitiesForEachJob { CollisionWorld = collisionWorld, TransformLookup = transformLookup, " +
+            "EntityStorageInfoLookup = Unity.Entities.SystemAPI.GetEntityStorageInfoLookup() }.ScheduleParallel(); } " +
+            "[Unity.Burst.BurstCompile] [Unity.Entities.WithAll(typeof(PlayerTag), typeof(LocalTag))] " +
+            "private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "[Unity.Collections.ReadOnly] public global::Capture CollisionWorld; " +
+            "[Unity.Collections.ReadOnly] public global::Capture TransformLookup; " +
+            "[Unity.Collections.ReadOnly] public Unity.Entities.EntityStorageInfoLookup EntityStorageInfoLookup; " +
+            "public void Execute(Entity playerEntity, ref TargetData targetData, in DynamicBuffer<DetectedElement> detectedBuffer, " +
+            "in PlayerInputs input, in CharacterStance stance, in AgentShape shape) { " +
+            "if (EntityStorageInfoLookup.Exists(targetData.Current) == false) { targetData.Current = playerEntity; } " +
+            "if (detectedBuffer.Length == 0) return; targetData.Value += CollisionWorld.Value + TransformLookup.Value + " +
+            "input.Value + stance.Value + shape.Value; } } } " +
+            "struct Capture { public int Value; } struct PlayerTag : IComponentData { } struct LocalTag : IComponentData { } " +
+            "struct TargetData : IComponentData { public Entity Current; public int Value; } " +
+            "struct DetectedElement : IBufferElementData { } struct PlayerInputs : IComponentData { public int Value; } " +
+            "struct CharacterStance : IComponentData { public int Value; } struct AgentShape : IComponentData { public int Value; }");
+
         await VerifyExactDotsDiagnosticsAsync(
             "using Unity.Entities; using Unity.Jobs; partial class LargeCaptureSystem : SystemBase { " +
             "void Update() { var collisionWorld = new Capture(); var slots = new Capture(); " +

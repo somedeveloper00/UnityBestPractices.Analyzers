@@ -1622,8 +1622,8 @@ internal static class DotsQuerySemanticHelpers
         jobFields = ImmutableArray<DotsJobField>.Empty;
         // Generic method names are GenericNameSyntax, so the identifier-based
         // unsupported-SystemAPI check below does not see calls such as
-        // GetComponentRW<T>. HasComponent<T> is the only invocation explicitly
-        // lowered by this conversion.
+        // GetComponentRW<T>. HasComponent<T> and Exists are the only invocations
+        // explicitly lowered by this conversion.
         if (body.DescendantNodesAndSelf()
             .OfType<InvocationExpressionSyntax>()
             .Select(invocation =>
@@ -1631,6 +1631,7 @@ internal static class DotsQuerySemanticHelpers
             .Any(method =>
                 method is not null &&
                 method.Name != "HasComponent" &&
+                method.Name != "Exists" &&
                 method.ContainingType.ToDisplayString() == "Unity.Entities.SystemAPI"))
         {
             return false;
@@ -1671,6 +1672,9 @@ internal static class DotsQuerySemanticHelpers
         var componentLookupType = UnitySymbolCache.GetTypeByMetadataName(
             semanticModel.Compilation,
             "Unity.Entities.ComponentLookup`1");
+        var entityStorageInfoLookupType = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Entities.EntityStorageInfoLookup");
         var hasComponentCalls = body.DescendantNodesAndSelf()
             .OfType<InvocationExpressionSyntax>()
             .Select(invocation => TryGetHasComponentCall(
@@ -1691,6 +1695,22 @@ internal static class DotsQuerySemanticHelpers
                 LooksLikeHasComponent(invocation, semanticModel, cancellationToken) &&
                 !hasComponentCalls.Any(call => call.Invocation == invocation)) ||
             (hasComponentCalls.Length != 0 && componentLookupType is null))
+        {
+            return false;
+        }
+
+        var existsCalls = body.DescendantNodesAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .Where(invocation => TryGetExistsCall(
+                invocation,
+                semanticModel,
+                cancellationToken,
+                out _))
+            .ToImmutableArray();
+        if (body.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>().Any(invocation =>
+                LooksLikeSystemApiCall(invocation, "Exists", semanticModel, cancellationToken) &&
+                !existsCalls.Contains(invocation)) ||
+            (existsCalls.Length != 0 && entityStorageInfoLookupType is null))
         {
             return false;
         }
@@ -1869,6 +1889,34 @@ internal static class DotsQuerySemanticHelpers
             }
         }
 
+        if (!existsCalls.IsEmpty)
+        {
+            var fieldName = CreateUniqueJobFieldName("EntityStorageInfoLookup", usedNames);
+            usedNames = usedNames.Add(fieldName);
+            fields.Add(new DotsJobField(
+                fieldName,
+                "Unity.Entities.EntityStorageInfoLookup",
+                "Unity.Entities.SystemAPI.GetEntityStorageInfoLookup()")
+            {
+                IsReadOnly = true,
+            });
+
+            foreach (var call in existsCalls)
+            {
+                var entityExpression = call.ArgumentList.Arguments[0].Expression;
+                var nestedReplacements = replacements.Keys
+                    .Where(node => entityExpression.Span.Contains(node.Span))
+                    .ToImmutableArray();
+                entityExpression = entityExpression.ReplaceNodes(
+                    nestedReplacements,
+                    (original, _) => SyntaxFactory.IdentifierName(replacements[original])
+                        .WithTriviaFrom(original));
+                replacements.Add(
+                    call,
+                    fieldName + ".Exists(" + entityExpression.WithoutTrivia().ToFullString() + ")");
+            }
+        }
+
         var unsupportedSystemApiAccess = body.DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
             .Any(identifier =>
@@ -2015,6 +2063,62 @@ internal static class DotsQuerySemanticHelpers
         }
 
         return true;
+    }
+
+    private static bool TryGetExistsCall(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax entityExpression)
+    {
+        entityExpression = null!;
+        var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+        if (method is null ||
+            method.Name != "Exists" ||
+            method.ContainingType?.ToDisplayString() != "Unity.Entities.SystemAPI" ||
+            !method.IsStatic ||
+            method.Parameters.Length != 1 ||
+            method.Parameters[0].RefKind != RefKind.None ||
+            method.Parameters[0].Type.ToDisplayString() != "Unity.Entities.Entity" ||
+            method.ReturnType.SpecialType != SpecialType.System_Boolean ||
+            invocation.ArgumentList.Arguments.Count != 1 ||
+            !invocation.ArgumentList.Arguments[0].RefKindKeyword.IsKind(SyntaxKind.None))
+        {
+            return false;
+        }
+
+        entityExpression = invocation.ArgumentList.Arguments[0].Expression;
+        return !entityExpression.ContainsDiagnostics;
+    }
+
+    private static bool LooksLikeSystemApiCall(
+        InvocationExpressionSyntax invocation,
+        string methodName,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var name = invocation.Expression switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            MemberAccessExpressionSyntax { Name: IdentifierNameSyntax identifier } =>
+                identifier.Identifier.ValueText,
+            _ => string.Empty,
+        };
+        if (name != methodName)
+        {
+            return false;
+        }
+
+        var symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken);
+        if (symbolInfo.Symbol?.ContainingType?.ToDisplayString() == "Unity.Entities.SystemAPI" ||
+            symbolInfo.CandidateSymbols.Any(symbol =>
+                symbol.ContainingType?.ToDisplayString() == "Unity.Entities.SystemAPI"))
+        {
+            return true;
+        }
+
+        return invocation.Expression is MemberAccessExpressionSyntax member &&
+               member.Expression.ToString().EndsWith("SystemAPI", StringComparison.Ordinal);
     }
 
     private static bool LooksLikeHasComponent(
