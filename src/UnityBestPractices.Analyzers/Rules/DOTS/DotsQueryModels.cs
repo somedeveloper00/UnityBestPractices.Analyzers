@@ -64,12 +64,18 @@ internal sealed class DotsQueryParameter
 
 internal sealed class DotsJobField
 {
-    internal DotsJobField(string name, string typeName, string initializer, ISymbol? sourceSymbol = null)
+    internal DotsJobField(
+        string name,
+        string typeName,
+        string initializer,
+        ISymbol? sourceSymbol = null,
+        string? preJobDeclaration = null)
     {
         Name = name;
         TypeName = typeName;
         Initializer = initializer;
         SourceSymbol = sourceSymbol;
+        PreJobDeclaration = preJobDeclaration;
     }
 
     internal string Name { get; }
@@ -79,6 +85,9 @@ internal sealed class DotsJobField
     internal string Initializer { get; }
 
     internal ISymbol? SourceSymbol { get; }
+
+    // A declaration which must be evaluated by the system before constructing the job.
+    internal string? PreJobDeclaration { get; }
 
     internal bool IsReadOnly { get; set; }
 }
@@ -373,7 +382,10 @@ internal sealed class EntitiesForEachQuery
             out var jobFields);
         foreach (var field in jobFields)
         {
-            field.IsReadOnly = field.SourceSymbol is not null && readOnlyCaptures.Contains(field.SourceSymbol);
+            if (field.SourceSymbol is not null)
+            {
+                field.IsReadOnly = readOnlyCaptures.Contains(field.SourceSymbol);
+            }
         }
         var disposalCaptures = ImmutableArray.CreateBuilder<DotsDisposalCapture>();
         foreach (var symbol in disposalCaptureSymbols)
@@ -1471,9 +1483,37 @@ internal static class DotsQuerySemanticHelpers
             .Concat(allowedParameters.Select(parameter => parameter.Name))
             .ToImmutableHashSet(StringComparer.Ordinal);
         var fields = ImmutableArray.CreateBuilder<DotsJobField>();
+        var synthesizedLocalNames = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
         var capturedFieldNames = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
         var replacements = new Dictionary<SyntaxNode, string>();
         var bodySpan = body.Span;
+
+        var componentLookupType = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Entities.ComponentLookup`1");
+        var hasComponentCalls = body.DescendantNodesAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .Select(invocation => TryGetHasComponentCall(
+                    invocation,
+                    semanticModel,
+                    cancellationToken,
+                    out var componentType,
+                    out var entityExpression)
+                ? new HasComponentCall(invocation, componentType, entityExpression)
+                : null)
+            .Where(call => call is not null)
+            .Cast<HasComponentCall>()
+            .ToImmutableArray();
+
+        // A SystemAPI.HasComponent-shaped expression which did not bind to the one supported
+        // overload must not silently become an ordinary capture or survive in the generated job.
+        if (body.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>().Any(invocation =>
+                LooksLikeHasComponent(invocation, semanticModel, cancellationToken) &&
+                !hasComponentCalls.Any(call => call.Invocation == invocation)) ||
+            (hasComponentCalls.Length != 0 && componentLookupType is null))
+        {
+            return false;
+        }
 
         foreach (var identifier in body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
         {
@@ -1594,6 +1634,61 @@ internal static class DotsQuerySemanticHelpers
             replacements.Add(access, fieldName);
         }
 
+        foreach (var group in hasComponentCalls.GroupBy<HasComponentCall, ITypeSymbol>(
+                     call => call.ComponentType,
+                     SymbolEqualityComparer.Default))
+        {
+            var componentType = group.Key;
+            var componentName = componentType.Name;
+            var fieldName = CreateUniqueJobFieldName(componentName + "Lookup", usedNames);
+            usedNames = usedNames.Add(fieldName);
+
+            var localName = TryFindCompatibleLookupLocal(
+                body,
+                componentType,
+                semanticModel,
+                cancellationToken);
+            string? declaration = null;
+            if (localName is null)
+            {
+                var localNames = GetContainingMemberNames(body)
+                    .Concat(usedNames)
+                    .Concat(synthesizedLocalNames)
+                    .ToImmutableHashSet(StringComparer.Ordinal);
+                localName = CreateUniqueLocalName(
+                    char.ToLowerInvariant(componentName[0]) + componentName.Substring(1) + "Lookup",
+                    localNames);
+                synthesizedLocalNames = synthesizedLocalNames.Add(localName);
+                declaration =
+                    "var " + localName + " = Unity.Entities.SystemAPI.GetComponentLookup<" +
+                    componentType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ">(true);";
+            }
+
+            fields.Add(new DotsJobField(
+                fieldName,
+                "Unity.Entities.ComponentLookup<" +
+                componentType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ">",
+                EscapeIdentifier(localName),
+                preJobDeclaration: declaration)
+            {
+                IsReadOnly = true,
+            });
+
+            foreach (var call in group)
+            {
+                var nestedReplacements = replacements.Keys
+                    .Where(node => call.EntityExpression.Span.Contains(node.Span))
+                    .ToImmutableArray();
+                var entityExpression = call.EntityExpression.ReplaceNodes(
+                    nestedReplacements,
+                    (original, _) => SyntaxFactory.IdentifierName(replacements[original])
+                        .WithTriviaFrom(original));
+                replacements.Add(
+                    call.Invocation,
+                    fieldName + ".HasComponent(" + entityExpression.WithoutTrivia().ToFullString() + ")");
+            }
+        }
+
         var unsupportedSystemApiAccess = body.DescendantNodesAndSelf()
             .OfType<IdentifierNameSyntax>()
             .Any(identifier =>
@@ -1606,7 +1701,10 @@ internal static class DotsQuerySemanticHelpers
 
                 return !identifier.AncestorsAndSelf()
                     .OfType<MemberAccessExpressionSyntax>()
-                    .Any(access => replacements.ContainsKey(access));
+                    .Any(access => replacements.ContainsKey(access)) &&
+                    !identifier.AncestorsAndSelf()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Any(invocation => replacements.ContainsKey(invocation));
             });
         if (unsupportedSystemApiAccess)
         {
@@ -1615,8 +1713,11 @@ internal static class DotsQuerySemanticHelpers
 
         jobBody = CreateBlock(
             body.ReplaceNodes(
-                replacements.Keys,
-                (original, _) => SyntaxFactory.IdentifierName(replacements[original])
+                replacements.Keys.Where(node => !replacements.Keys.Any(parent =>
+                    parent != node && parent.Span.Contains(node.Span))),
+                (original, _) => (original is InvocationExpressionSyntax
+                        ? SyntaxFactory.ParseExpression(replacements[original])
+                        : SyntaxFactory.IdentifierName(replacements[original]))
                     .WithTriviaFrom(original)));
         jobFields = fields.ToImmutable();
         return true;
@@ -1672,6 +1773,156 @@ internal static class DotsQuerySemanticHelpers
         }
 
         return false;
+    }
+
+    private sealed class HasComponentCall
+    {
+        internal HasComponentCall(
+            InvocationExpressionSyntax invocation,
+            ITypeSymbol componentType,
+            ExpressionSyntax entityExpression)
+        {
+            Invocation = invocation;
+            ComponentType = componentType;
+            EntityExpression = entityExpression;
+        }
+
+        internal InvocationExpressionSyntax Invocation { get; }
+
+        internal ITypeSymbol ComponentType { get; }
+
+        internal ExpressionSyntax EntityExpression { get; }
+    }
+
+    private static bool TryGetHasComponentCall(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ITypeSymbol componentType,
+        out ExpressionSyntax entityExpression)
+    {
+        componentType = null!;
+        entityExpression = null!;
+        var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+        if (method is null ||
+            method.Name != "HasComponent" ||
+            method.ContainingType?.ToDisplayString() != "Unity.Entities.SystemAPI" ||
+            !method.IsStatic ||
+            method.TypeArguments.Length != 1 ||
+            method.Parameters.Length != 1 ||
+            method.Parameters[0].RefKind != RefKind.None ||
+            method.Parameters[0].Type.ToDisplayString() != "Unity.Entities.Entity" ||
+            method.ReturnType.SpecialType != SpecialType.System_Boolean ||
+            invocation.ArgumentList.Arguments.Count != 1 ||
+            !invocation.ArgumentList.Arguments[0].RefKindKeyword.IsKind(SyntaxKind.None))
+        {
+            return false;
+        }
+
+        componentType = method.TypeArguments[0];
+        if (componentType.TypeKind is TypeKind.Error or TypeKind.TypeParameter)
+        {
+            return false;
+        }
+
+        entityExpression = invocation.ArgumentList.Arguments[0].Expression;
+        if (entityExpression.ContainsDiagnostics ||
+            entityExpression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
+                semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol
+                    ?.ContainingType?.ToDisplayString() == "Unity.Entities.SystemAPI"))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool LooksLikeHasComponent(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var name = invocation.Expression switch
+        {
+            GenericNameSyntax generic => generic.Identifier.ValueText,
+            MemberAccessExpressionSyntax { Name: GenericNameSyntax generic } =>
+                generic.Identifier.ValueText,
+            _ => string.Empty,
+        };
+        if (name != "HasComponent")
+        {
+            return false;
+        }
+
+        var symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken);
+        if (symbolInfo.Symbol?.ContainingType?.ToDisplayString() == "Unity.Entities.SystemAPI" ||
+            symbolInfo.CandidateSymbols.Any(symbol =>
+                symbol.ContainingType?.ToDisplayString() == "Unity.Entities.SystemAPI"))
+        {
+            return true;
+        }
+
+        return invocation.Expression is MemberAccessExpressionSyntax member &&
+               member.Expression.ToString().EndsWith("SystemAPI", StringComparison.Ordinal);
+    }
+
+    private static string? TryFindCompatibleLookupLocal(
+        CSharpSyntaxNode body,
+        ITypeSymbol componentType,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var lookupDefinition = UnitySymbolCache.GetTypeByMetadataName(
+            semanticModel.Compilation,
+            "Unity.Entities.ComponentLookup`1");
+        foreach (var local in semanticModel.LookupSymbols(body.SpanStart).OfType<ILocalSymbol>())
+        {
+            if (local.Type is not INamedTypeSymbol namedType ||
+                lookupDefinition is null ||
+                !SymbolEqualityComparer.Default.Equals(namedType.OriginalDefinition, lookupDefinition) ||
+                namedType.TypeArguments.Length != 1 ||
+                !SymbolEqualityComparer.Default.Equals(namedType.TypeArguments[0], componentType))
+            {
+                continue;
+            }
+
+            var declarator = local.DeclaringSyntaxReferences.FirstOrDefault()
+                ?.GetSyntax(cancellationToken) as VariableDeclaratorSyntax;
+            if (declarator?.Initializer?.Value is not InvocationExpressionSyntax initializer ||
+                semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol is not IMethodSymbol method ||
+                method.Name != "GetComponentLookup" ||
+                method.ContainingType?.ToDisplayString() != "Unity.Entities.SystemAPI" ||
+                method.TypeArguments.Length != 1 ||
+                !SymbolEqualityComparer.Default.Equals(method.TypeArguments[0], componentType) ||
+                initializer.ArgumentList.Arguments.Count != 1 ||
+                semanticModel.GetConstantValue(
+                    initializer.ArgumentList.Arguments[0].Expression,
+                    cancellationToken) is not { HasValue: true, Value: true })
+            {
+                continue;
+            }
+
+            return local.Name;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetContainingMemberNames(CSharpSyntaxNode body) =>
+        body.FirstAncestorOrSelf<MemberDeclarationSyntax>()?
+            .DescendantTokens()
+            .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
+            .Select(token => token.ValueText) ?? Enumerable.Empty<string>();
+
+    private static string CreateUniqueLocalName(string baseName, ImmutableHashSet<string> usedNames)
+    {
+        var candidate = baseName;
+        for (var suffix = 2; usedNames.Contains(candidate); suffix++)
+        {
+            candidate = baseName + suffix;
+        }
+
+        return candidate;
     }
 
     private static bool TryGetSystemTimeMember(

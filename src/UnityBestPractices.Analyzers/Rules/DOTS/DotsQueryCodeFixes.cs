@@ -228,8 +228,35 @@ internal static class DotsQueryCodeFixes
                 "new " + jobName + initialization + "." + executionMode + "();")
             .WithTriviaFrom(sourceStatement)
             .WithAdditionalAnnotations(Formatter.Annotation);
-        var updatedType = containingType
-            .ReplaceNode(sourceStatement, executionStatement)
+        var preJobStatements = jobFields
+            .Where(field => field.PreJobDeclaration is not null)
+            .Select(field => SyntaxFactory.ParseStatement(field.PreJobDeclaration!))
+            .ToArray();
+        TypeDeclarationSyntax rewrittenType;
+        if (preJobStatements.Length != 0 && sourceStatement.Parent is BlockSyntax parentBlock)
+        {
+            preJobStatements[0] = preJobStatements[0]
+                .WithLeadingTrivia(sourceStatement.GetLeadingTrivia());
+            executionStatement = executionStatement.WithLeadingTrivia();
+            var statementIndex = parentBlock.Statements.IndexOf(sourceStatement);
+            var updatedBlock = parentBlock.WithStatements(parentBlock.Statements
+                .RemoveAt(statementIndex)
+                .InsertRange(statementIndex, preJobStatements.Append(executionStatement)));
+            rewrittenType = containingType.ReplaceNode(parentBlock, updatedBlock);
+        }
+        else if (preJobStatements.Length != 0)
+        {
+            var replacementBlock = SyntaxFactory.Block(
+                    preJobStatements.Append(executionStatement.WithLeadingTrivia()))
+                .WithTriviaFrom(sourceStatement);
+            rewrittenType = containingType.ReplaceNode(sourceStatement, replacementBlock);
+        }
+        else
+        {
+            rewrittenType = containingType.ReplaceNode(sourceStatement, executionStatement);
+        }
+
+        var updatedType = rewrittenType
             .AddMembers(jobDeclaration)
             .WithAdditionalAnnotations(Formatter.Annotation);
         return document.WithSyntaxRoot(root.ReplaceNode(containingType, updatedType));

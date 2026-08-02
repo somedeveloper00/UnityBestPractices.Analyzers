@@ -151,6 +151,11 @@ internal sealed partial class AnalyzerTests
             public interface IJobEntity { }
             public struct Entity { }
 
+            public struct ComponentLookup<T> where T : struct, IComponentData
+            {
+                public bool HasComponent(Entity entity) => false;
+            }
+
             public struct DynamicBuffer<T> where T : struct, IBufferElementData
             {
                 private T[] _items;
@@ -335,6 +340,10 @@ internal sealed partial class AnalyzerTests
             public static class SystemAPI
             {
                 public static TimeData Time => default;
+                public static bool HasComponent<T>(Entity entity)
+                    where T : struct, IComponentData => false;
+                public static ComponentLookup<T> GetComponentLookup<T>(bool isReadOnly = false)
+                    where T : struct, IComponentData => default;
                 public static RefRW<T> GetComponentRW<T>(Entity entity)
                     where T : struct, IComponentData => default;
                 public static RefRO<T> GetComponentRO<T>(Entity entity)
