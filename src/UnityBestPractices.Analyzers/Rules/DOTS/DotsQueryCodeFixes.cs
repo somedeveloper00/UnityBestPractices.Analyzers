@@ -1,4 +1,5 @@
 // DOTS query transformations and job extraction.
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,8 +52,10 @@ internal static class DotsQueryCodeFixes
                     query.CreateJobParameters(),
                     query.CreateJobAttributes(),
                     query.JobFields,
+                    query.DisposalCaptures,
+                    query.ExplicitDependency,
                     GetTargetExecutionMode(rule.Kind),
-                    semanticModel.Compilation)
+                    semanticModel)
                     : document;
         }
 
@@ -80,8 +83,10 @@ internal static class DotsQueryCodeFixes
                 query.CreateJobParameters(),
                 query.CreateJobAttributes(),
                 System.Collections.Immutable.ImmutableArray<DotsJobField>.Empty,
+                System.Collections.Immutable.ImmutableArray<string>.Empty,
+                null,
                 GetTargetExecutionMode(rule.Kind),
-                semanticModel.Compilation);
+                semanticModel);
         }
 
         var executionStatement = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true)
@@ -187,11 +192,19 @@ internal static class DotsQueryCodeFixes
         string jobParameters,
         string jobAttributes,
         System.Collections.Immutable.ImmutableArray<DotsJobField> jobFields,
+        System.Collections.Immutable.ImmutableArray<string> disposalCaptures,
+        string? explicitDependency,
         string executionMode,
-        Compilation compilation)
+        SemanticModel semanticModel)
     {
+        var needsHandleBookkeeping = executionMode != "Run" && !disposalCaptures.IsEmpty;
+        if (needsHandleBookkeeping && sourceStatement.Parent is not BlockSyntax)
+        {
+            return document;
+        }
+
         var burstAttribute = UnitySymbolCache.GetTypeByMetadataName(
-            compilation,
+            semanticModel.Compilation,
             "Unity.Burst.BurstCompileAttribute") is null
             ? string.Empty
             : "[Unity.Burst.BurstCompile]\n";
@@ -218,15 +231,84 @@ internal static class DotsQueryCodeFixes
               string.Join(",\n", jobFields.Select(field =>
                   "    " + field.Name + " = " + field.Initializer)) +
               "\n}";
-        var executionStatement = SyntaxFactory.ParseStatement(
-                "new " + jobName + initialization + "." + executionMode + "();")
-            .WithTriviaFrom(sourceStatement)
-            .WithAdditionalAnnotations(Formatter.Annotation);
-        var updatedType = containingType
-            .ReplaceNode(sourceStatement, executionStatement)
-            .AddMembers(jobDeclaration)
+        var invocation = "new " + jobName + initialization + "." + executionMode +
+            "(" + (explicitDependency ?? (needsHandleBookkeeping && IsSystemBase(containingType, semanticModel)
+                ? "Dependency"
+                : string.Empty)) + ")";
+        TypeDeclarationSyntax updatedType;
+        if (needsHandleBookkeeping && sourceStatement.Parent is BlockSyntax parentBlock)
+        {
+            var handleName = CreateUniqueLocalName(semanticModel, sourceStatement, "jobHandle");
+            var statementTexts = new System.Collections.Generic.List<string>
+            {
+                "var " + handleName + " = " + invocation + ";",
+            };
+            foreach (var capture in disposalCaptures)
+            {
+                statementTexts.Add(handleName + " = " + capture + ".Dispose(" + handleName + ");");
+            }
+
+            if (IsSystemBase(containingType, semanticModel))
+            {
+                statementTexts[statementTexts.Count - 1] =
+                    "Dependency = " + disposalCaptures[disposalCaptures.Length - 1] +
+                    ".Dispose(" + handleName + ");";
+            }
+
+            var statements = statementTexts.Select(SyntaxFactory.ParseStatement).ToArray();
+            statements[0] = statements[0].WithLeadingTrivia(sourceStatement.GetLeadingTrivia());
+            statements[statements.Length - 1] = statements[statements.Length - 1]
+                .WithTrailingTrivia(sourceStatement.GetTrailingTrivia());
+            var index = parentBlock.Statements.IndexOf(sourceStatement);
+            var replacementBlock = parentBlock.WithStatements(
+                parentBlock.Statements.RemoveAt(index).InsertRange(index, statements));
+            updatedType = containingType.ReplaceNode(parentBlock, replacementBlock).AddMembers(jobDeclaration);
+        }
+        else
+        {
+            var executionStatement = SyntaxFactory.ParseStatement(invocation + ";")
+                .WithTriviaFrom(sourceStatement);
+            updatedType = containingType.ReplaceNode(sourceStatement, executionStatement).AddMembers(jobDeclaration);
+        }
+
+        updatedType = updatedType
             .WithAdditionalAnnotations(Formatter.Annotation);
         return document.WithSyntaxRoot(root.ReplaceNode(containingType, updatedType));
+    }
+
+    private static bool IsSystemBase(TypeDeclarationSyntax containingType, SemanticModel semanticModel)
+    {
+        for (var type = semanticModel.GetDeclaredSymbol(containingType) as INamedTypeSymbol;
+             type is not null;
+             type = type.BaseType)
+        {
+            if (type.ToDisplayString() == "Unity.Entities.SystemBase")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string CreateUniqueLocalName(
+        SemanticModel semanticModel,
+        StatementSyntax statement,
+        string baseName)
+    {
+        var scope = statement.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>() as SyntaxNode ?? statement.Parent;
+        var names = scope?.DescendantTokens()
+            .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
+            .Select(token => token.ValueText)
+            .ToImmutableHashSet(System.StringComparer.Ordinal) ??
+            System.Collections.Immutable.ImmutableHashSet<string>.Empty;
+        var name = baseName;
+        for (var suffix = 2; names.Contains(name) || semanticModel.LookupSymbols(statement.SpanStart, name: name).Length != 0; suffix++)
+        {
+            name = baseName + suffix;
+        }
+
+        return name;
     }
 
     private static bool IsEntitiesForEachKind(DotsQueryQuickFixKind kind) =>
