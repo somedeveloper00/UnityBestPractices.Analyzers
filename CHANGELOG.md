@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added a macOS CI build and test lane, documented macOS installation and
+  development commands, and validation for the UPM package's macOS importer
+  settings.
+
 ## [0.4.33] - 2026-08-01
 
 ### Fixed

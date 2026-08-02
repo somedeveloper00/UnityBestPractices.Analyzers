@@ -6,7 +6,7 @@
 
 ## What this package does
 
-This package installs `UnityBestPractices.Analyzers.dll` as a Unity Roslyn analyzer for Rider and Visual Studio. The included `.meta` file:
+This package installs `UnityBestPractices.Analyzers.dll` as a Unity Roslyn analyzer for Rider, Visual Studio, and VS Code on Windows, macOS, and Linux. The included `.meta` file:
 
 - assigns the case-sensitive `RoslynAnalyzer` label;
 - disables platform loading; and
@@ -15,7 +15,7 @@ This package installs `UnityBestPractices.Analyzers.dll` as a Unity Roslyn analy
 ## After installation
 
 1. Regenerate the C# project files.
-2. Restart Rider or Visual Studio so its Roslyn host reloads the analyzer.
+2. Restart Rider, Visual Studio, or VS Code so its Roslyn host reloads the analyzer.
 3. Ensure Roslyn analyzers are enabled in the IDE.
 
 > [!NOTE]
