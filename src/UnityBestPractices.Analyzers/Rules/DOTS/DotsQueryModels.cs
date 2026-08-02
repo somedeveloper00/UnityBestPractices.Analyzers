@@ -925,8 +925,8 @@ internal sealed class EntitiesForEachQuery
                     semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol,
                     methodName))
             {
-                var expression = invocation.ArgumentList.Arguments[0].Expression;
-                var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+                var captureExpression = invocation.ArgumentList.Arguments[0].Expression;
+                var symbol = semanticModel.GetSymbolInfo(captureExpression, cancellationToken).Symbol;
                 if (symbol is not ILocalSymbol and not IParameterSymbol and not IFieldSymbol and not IPropertySymbol)
                 {
                     filters = default;
@@ -936,7 +936,7 @@ internal sealed class EntitiesForEachQuery
                     return false;
                 }
 
-                disposalBuilder.Insert(0, (symbol, expression.WithoutTrivia().ToFullString()));
+                disposalBuilder.Insert(0, (symbol, captureExpression.WithoutTrivia().ToFullString()));
                 current = access.Expression;
                 continue;
             }

@@ -255,7 +255,7 @@ internal static class DotsQueryCodeFixes
                     ".Dispose(" + handleName + ");";
             }
 
-            var statements = statementTexts.Select(SyntaxFactory.ParseStatement).ToArray();
+            var statements = statementTexts.Select(text => SyntaxFactory.ParseStatement(text)).ToArray();
             statements[0] = statements[0].WithLeadingTrivia(sourceStatement.GetLeadingTrivia());
             statements[statements.Length - 1] = statements[statements.Length - 1]
                 .WithTrailingTrivia(sourceStatement.GetTrailingTrivia());
