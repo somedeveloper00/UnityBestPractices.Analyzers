@@ -404,6 +404,7 @@ internal sealed partial class AnalyzerTests
                     where T : struct, IBufferElementData => default;
                 public static QueryEnumerable<T1> Query<T1>() => default;
                 public static QueryEnumerable<T1, T2> Query<T1, T2>() => default;
+                public static QueryEnumerable<T1, T2, T3, T4> Query<T1, T2, T3, T4>() => default;
                 public static QueryEnumerable<T1, T2, T3, T4, T5> Query<T1, T2, T3, T4, T5>() =>
                     default;
                 public static SystemAPIQueryBuilder QueryBuilder() => default;
@@ -488,6 +489,32 @@ internal sealed partial class AnalyzerTests
                 public struct Enumerator
                 {
                     public (T1, T2, T3, T4, T5) Current => default;
+                    public bool MoveNext() => false;
+                }
+            }
+
+            public struct QueryEnumerable<T1, T2, T3, T4>
+            {
+                public QueryEnumerable<T1, T2, T3, T4> WithAll<T>() => this;
+                public QueryEnumerable<T1, T2, T3, T4> WithAny<T>() => this;
+                public QueryEnumerable<T1, T2, T3, T4> WithNone<T>() => this;
+                public QueryEnumerable<T1, T2, T3, T4> WithChangeFilter<T>() => this;
+                public QueryEnumerable<T1, T2, T3, T4> WithOptions(EntityQueryOptions options) => this;
+                public QueryEnumerableWithEntity<T1, T2, T3, T4> WithEntityAccess() => default;
+                public Enumerator GetEnumerator() => default;
+                public struct Enumerator
+                {
+                    public (T1, T2, T3, T4) Current => default;
+                    public bool MoveNext() => false;
+                }
+            }
+
+            public struct QueryEnumerableWithEntity<T1, T2, T3, T4>
+            {
+                public Enumerator GetEnumerator() => default;
+                public struct Enumerator
+                {
+                    public (T1, T2, T3, T4, Entity) Current => default;
                     public bool MoveNext() => false;
                 }
             }

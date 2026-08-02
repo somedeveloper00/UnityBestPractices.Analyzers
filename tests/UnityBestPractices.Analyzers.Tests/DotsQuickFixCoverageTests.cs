@@ -677,7 +677,7 @@ internal sealed partial class AnalyzerTests
                 {
                     {
                         var entityInQueryIndexCounter = 0;
-                        foreach (var (characterStance, detectionData, detectedBuffer, perceptionData, input, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<CharacterStance>, Unity.Entities.RefRW<DetectionData>, DynamicBuffer<DetectedElement>, Unity.Entities.RefRO<PerceptionData>, Unity.Entities.RefRO<PlayerInputs>>().WithAll<PlayerTag>().WithEntityAccess())
+                        foreach (var (characterStance, detectionData, detectedBuffer, input, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<CharacterStance>, Unity.Entities.RefRW<DetectionData>, DynamicBuffer<DetectedElement>, Unity.Entities.RefRO<PlayerInputs>>().WithAll<PlayerTag>().WithAll<PerceptionData>().WithEntityAccess())
                         {
                             var entityInQueryIndex = entityInQueryIndexCounter++;
                             for (var i = 0; i < detectedBuffer.Length; i++)
