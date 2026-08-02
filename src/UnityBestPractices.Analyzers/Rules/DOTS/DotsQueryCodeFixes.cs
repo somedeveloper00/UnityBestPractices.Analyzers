@@ -115,9 +115,30 @@ internal static class DotsQueryCodeFixes
         if (!query.TryCreateSystemApiLoop(
                 semanticModel,
                 cancellationToken,
-                out var replacement))
+                out var replacement,
+                out var parallelEcbConversion))
         {
             return document;
+        }
+
+        if (parallelEcbConversion is not null &&
+            query.Statement.Parent is BlockSyntax ecbParentBlock &&
+            parallelEcbConversion.Declaration.Parent == ecbParentBlock)
+        {
+            var replacementStatement = replacement
+                .WithTriviaFrom(query.Statement)
+                .WithAdditionalAnnotations(Formatter.Annotation);
+            var updatedDeclaration = parallelEcbConversion.Declaration
+                .WithDeclaration(parallelEcbConversion.Declaration.Declaration.WithVariables(
+                    SyntaxFactory.SingletonSeparatedList(
+                        parallelEcbConversion.Declaration.Declaration.Variables[0]
+                            .WithIdentifier(SyntaxFactory.Identifier(parallelEcbConversion.NewName))
+                            .WithInitializer(SyntaxFactory.EqualsValueClause(parallelEcbConversion.Initializer)))))
+                .WithAdditionalAnnotations(Formatter.Annotation);
+            var updatedBlock = ecbParentBlock.ReplaceNodes(
+                new SyntaxNode[] { parallelEcbConversion.Declaration, query.Statement },
+                (original, _) => original == query.Statement ? replacementStatement : updatedDeclaration);
+            return document.WithSyntaxRoot(root.ReplaceNode(ecbParentBlock, updatedBlock));
         }
 
         if (query.InlineSystemApiReplacementBlock &&

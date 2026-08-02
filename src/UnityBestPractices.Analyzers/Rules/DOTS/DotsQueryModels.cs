@@ -366,9 +366,11 @@ internal sealed class EntitiesForEachQuery
     internal bool TryCreateSystemApiLoop(
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out StatementSyntax statement)
+        out StatementSyntax statement,
+        out ParallelEcbConversion? parallelEcbConversion)
     {
         statement = null!;
+        parallelEcbConversion = null;
         if (UnitySymbolCache.GetTypeByMetadataName(
                 semanticModel.Compilation,
                 "Unity.Entities.SystemAPI") is null ||
@@ -390,6 +392,14 @@ internal sealed class EntitiesForEachQuery
         var entityParameter = Parameters.FirstOrDefault(parameter => parameter.Access == DotsParameterAccess.Entity);
         var entityIndexParameter = Parameters.FirstOrDefault(
             parameter => parameter.Access == DotsParameterAccess.EntityIndexInQuery);
+        if (entityIndexParameter is not null)
+        {
+            TryCreateParallelEcbConversion(
+                semanticModel,
+                cancellationToken,
+                entityIndexParameter,
+                out parallelEcbConversion);
+        }
         if (componentParameters.Any(
                 parameter => parameter.Access == DotsParameterAccess.BufferReadOnly))
         {
@@ -494,6 +504,13 @@ internal sealed class EntitiesForEachQuery
                     .WithTriviaFrom(identifier);
             }));
         rewrittenBody = RewriteLambdaReturns(rewrittenBody);
+        if (parallelEcbConversion is not null)
+        {
+            rewrittenBody = (BlockSyntax)new ParallelEcbBodyRewriter(
+                parallelEcbConversion.OldName,
+                parallelEcbConversion.NewName,
+                entityIndexParameter!.Name).Visit(rewrittenBody)!;
+        }
 
         var variableNames = componentParameters.Select(parameter => parameter.Name).ToList();
         if (componentParameters.Length == 0)
@@ -512,7 +529,7 @@ internal sealed class EntitiesForEachQuery
         var loopText =
             "foreach (" + iterationVariable + " in " + queryText + ")\n" +
             rewrittenBody.ToFullString();
-        if (entityIndexParameter is null)
+        if (entityIndexParameter is null || parallelEcbConversion is not null)
         {
             statement = SyntaxFactory.ParseStatement(loopText);
             return !statement.ContainsDiagnostics;
@@ -531,6 +548,78 @@ internal sealed class EntitiesForEachQuery
             rewrittenBody.ToFullString() +
             "\n}");
         return !statement.ContainsDiagnostics;
+    }
+
+    private bool TryCreateParallelEcbConversion(
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        DotsQueryParameter entityIndexParameter,
+        out ParallelEcbConversion? conversion)
+    {
+        conversion = null;
+        var indexReferences = Lambda.Body.DescendantNodesAndSelf()
+            .OfType<IdentifierNameSyntax>()
+            .Where(identifier => SymbolEqualityComparer.Default.Equals(
+                semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                entityIndexParameter.Symbol))
+            .ToImmutableArray();
+        if (indexReferences.IsEmpty)
+        {
+            return false;
+        }
+
+        ILocalSymbol? writerSymbol = null;
+        foreach (var reference in indexReferences)
+        {
+            if (reference.Parent is not ArgumentSyntax argument ||
+                argument.Parent is not ArgumentListSyntax arguments ||
+                arguments.Arguments.FirstOrDefault() != argument ||
+                arguments.Parent is not InvocationExpressionSyntax invocation ||
+                invocation.Expression is not MemberAccessExpressionSyntax access ||
+                access.Expression is not IdentifierNameSyntax receiver ||
+                semanticModel.GetSymbolInfo(receiver, cancellationToken).Symbol is not ILocalSymbol local ||
+                (writerSymbol is not null && !SymbolEqualityComparer.Default.Equals(writerSymbol, local)))
+            {
+                return false;
+            }
+
+            writerSymbol = local;
+        }
+
+        if (writerSymbol?.DeclaringSyntaxReferences.SingleOrDefault()?.GetSyntax(cancellationToken)
+                is not VariableDeclaratorSyntax declarator ||
+            declarator.Parent is not VariableDeclarationSyntax declaration ||
+            declaration.Variables.Count != 1 ||
+            declaration.Parent is not LocalDeclarationStatementSyntax declarationStatement ||
+            declarator.Initializer?.Value is not InvocationExpressionSyntax asParallelWriter ||
+            asParallelWriter.ArgumentList.Arguments.Count != 0 ||
+            asParallelWriter.Expression is not MemberAccessExpressionSyntax parallelAccess ||
+            parallelAccess.Name.Identifier.ValueText != "AsParallelWriter")
+        {
+            return false;
+        }
+
+        var localReferences = declarationStatement.Parent!.DescendantNodes()
+            .OfType<IdentifierNameSyntax>()
+            .Where(identifier => SymbolEqualityComparer.Default.Equals(
+                semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                writerSymbol))
+            .ToImmutableArray();
+        if (localReferences.Any(reference => !Lambda.Body.Span.Contains(reference.Span)))
+        {
+            return false;
+        }
+
+        var oldName = writerSymbol.Name;
+        var newName = oldName.EndsWith("ParallelWriter", StringComparison.Ordinal)
+            ? oldName.Substring(0, oldName.Length - "ParallelWriter".Length)
+            : oldName + "CommandBuffer";
+        conversion = new ParallelEcbConversion(
+            declarationStatement,
+            oldName,
+            CreateUniqueLocalName(newName),
+            parallelAccess.Expression);
+        return true;
     }
 
     private static bool IsWrittenBufferElement(ElementAccessExpressionSyntax element)

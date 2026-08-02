@@ -145,6 +145,7 @@ internal static class DotsQueryRules
                 forEachQuery.TryCreateSystemApiLoop(
                     context.SemanticModel,
                     context.CancellationToken,
+                    out _,
                     out _))
             {
                 Report(context, DiagnosticIds.EntitiesForEachToSystemApiQuery, statement.GetLocation());
