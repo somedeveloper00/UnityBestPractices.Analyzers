@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.38] - 2026-08-02
+
+### Fixed
+
+- Added `SystemAPI.Exists` support to `Entities.ForEach` job conversions.
+
+
 ## [0.4.37] - 2026-08-02
 
 ### Fixed
