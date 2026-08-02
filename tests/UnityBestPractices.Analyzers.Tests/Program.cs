@@ -213,6 +213,7 @@ internal sealed partial class AnalyzerTests
                     where T : struct, IComponentData => default;
                 public void RemoveComponent<T>(Entity entity)
                     where T : struct, IComponentData { }
+                public void DestroyEntity(Entity entity) { }
             }
 
             public sealed class World
@@ -229,6 +230,7 @@ internal sealed partial class AnalyzerTests
                     where T : struct, IComponentData { }
                 public void RemoveComponent<T>(Entity entity)
                     where T : struct, IComponentData { }
+                public void DestroyEntity(Entity entity) { }
                 public void Playback(EntityManager entityManager) { }
                 public void Dispose() { }
 

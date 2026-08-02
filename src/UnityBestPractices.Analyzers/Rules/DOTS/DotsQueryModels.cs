@@ -504,6 +504,16 @@ internal sealed class EntitiesForEachQuery
                        TryCreateStructuralEntitySnapshot(semanticModel, out statement);
             }
 
+            if (TryCreateStructuralCommandBufferLoop(
+                    semanticModel,
+                    cancellationToken,
+                    componentParameters,
+                    entityParameter,
+                    out statement))
+            {
+                return true;
+            }
+
             return TryCreateStructuralComponentLoop(
                 semanticModel,
                 cancellationToken,
@@ -732,6 +742,108 @@ internal sealed class EntitiesForEachQuery
                argument.Expression == element &&
                (argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
                 argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword));
+    }
+
+    private bool TryCreateStructuralCommandBufferLoop(
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        ImmutableArray<DotsQueryParameter> componentParameters,
+        DotsQueryParameter? entityParameter,
+        out StatementSyntax statement)
+    {
+        statement = null!;
+        var compilation = semanticModel.Compilation;
+        if (UnitySymbolCache.GetTypeByMetadataName(
+                compilation,
+                "Unity.Entities.EntityCommandBuffer") is null ||
+            UnitySymbolCache.GetTypeByMetadataName(
+                compilation,
+                "Unity.Collections.Allocator") is null)
+        {
+            return false;
+        }
+
+        var destroyCalls = Lambda.Body.DescendantNodesAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .Where(invocation =>
+            {
+                if (invocation.Expression is not MemberAccessExpressionSyntax access ||
+                    access.Name.Identifier.ValueText != "DestroyEntity")
+                {
+                    return false;
+                }
+
+                return semanticModel.GetTypeInfo(access.Expression, cancellationToken)
+                    .Type?.ToDisplayString() == "Unity.Entities.EntityManager";
+            })
+            .ToImmutableArray();
+        if (destroyCalls.IsEmpty)
+        {
+            return false;
+        }
+
+        var commandBufferName = CreateUniqueLocalName("ecb");
+        var identifiers = Lambda.Body.DescendantNodesAndSelf()
+            .OfType<IdentifierNameSyntax>()
+            .Where(identifier => componentParameters.Any(parameter =>
+                parameter.Access != DotsParameterAccess.BufferReadOnly &&
+                parameter.Access != DotsParameterAccess.BufferReadWrite &&
+                SymbolEqualityComparer.Default.Equals(
+                    semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                    parameter.Symbol)))
+            .Cast<SyntaxNode>();
+        var nodesToRewrite = identifiers.Concat(destroyCalls).ToImmutableArray();
+        var rewrittenBody = DotsQuerySemanticHelpers.CreateBlock(
+            Lambda.Body.ReplaceNodes(nodesToRewrite, (original, rewritten) =>
+            {
+                if (original is InvocationExpressionSyntax)
+                {
+                    var invocation = (InvocationExpressionSyntax)rewritten;
+                    var access = (MemberAccessExpressionSyntax)invocation.Expression;
+                    return invocation.WithExpression(access.WithExpression(
+                        SyntaxFactory.IdentifierName(commandBufferName)));
+                }
+
+                var identifier = (IdentifierNameSyntax)original;
+                var parameter = componentParameters.First(item =>
+                    SymbolEqualityComparer.Default.Equals(
+                        semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                        item.Symbol));
+                var valueProperty = parameter.Access == DotsParameterAccess.ReadWrite
+                    ? "ValueRW"
+                    : "ValueRO";
+                return SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName(identifier.Identifier.WithoutTrivia()),
+                        SyntaxFactory.IdentifierName(valueProperty))
+                    .WithTriviaFrom(identifier);
+            }));
+        rewrittenBody = RewriteLambdaReturns(rewrittenBody);
+
+        var variableNames = componentParameters.Select(parameter => parameter.Name).ToList();
+        if (entityParameter is not null)
+        {
+            variableNames.Add(entityParameter.Name);
+        }
+
+        var iterationVariable = variableNames.Count == 1
+            ? "var " + variableNames[0]
+            : "var (" + string.Join(", ", variableNames) + ")";
+        var query =
+            "Unity.Entities.SystemAPI.Query<" +
+            string.Join(", ", componentParameters.Select(parameter => parameter.SystemApiType)) +
+            ">()" +
+            string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
+            (entityParameter is null ? string.Empty : ".WithEntityAccess()");
+        statement = SyntaxFactory.ParseStatement(
+            "{\n" +
+            "using var " + commandBufferName +
+            " = new Unity.Entities.EntityCommandBuffer(Unity.Collections.Allocator.Temp);\n" +
+            "foreach (" + iterationVariable + " in " + query + ")\n" +
+            rewrittenBody.ToFullString() + "\n" +
+            commandBufferName + ".Playback(EntityManager);\n" +
+            "}");
+        return !statement.ContainsDiagnostics;
     }
 
     private bool TryCreateStructuralComponentLoop(
