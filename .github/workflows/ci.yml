@@ -14,6 +14,43 @@ env:
   DOTNET_NOLOGO: "1"
 
 jobs:
+  macos:
+    name: macOS build and test
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore UnityBestPractices.sln
+
+      - name: Build
+        run: >
+          dotnet build UnityBestPractices.sln
+          --configuration Release
+          --no-restore
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Run regression tests
+        run: >
+          dotnet run
+          --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj
+          --configuration Release
+          --no-build
+
+      - name: Run xUnit integration tests
+        run: >
+          dotnet test
+          tests/UnityBestPractices.Analyzers.Tests.Xunit/UnityBestPractices.Analyzers.Tests.Xunit.csproj
+          --configuration Release
+          --no-build
+          --no-restore
+
   validate:
     name: Build, test, and package
     runs-on: ubuntu-latest

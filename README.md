@@ -2,7 +2,7 @@
 
 # Unity Best Practices Analyzer
 
-**Actionable Unity C# performance guidance, directly in Rider and Visual Studio.**
+**Actionable Unity C# performance guidance, directly in Rider, Visual Studio, and VS Code on Windows, macOS, and Linux.**
 
 Roslyn diagnostics · conservative quick fixes · Burst, Jobs, DOTS/ECS · Unity 2021.3+
 
@@ -19,7 +19,7 @@ Roslyn diagnostics · conservative quick fixes · Burst, Jobs, DOTS/ECS · Unity
 
 </div>
 
-**Find Unity C# performance problems before play mode.** Unity Best Practices Analyzer is a Roslyn analyzer and code-fix package for Unity 2021.3+, JetBrains Rider, and Visual Studio. It provides 74 low-noise diagnostics and 72 opt-in quick fixes for Unity, Burst, Jobs, DOTS/ECS, and high-performance C# practices that are not already covered by `Microsoft.Unity.Analyzers`.
+**Find Unity C# performance problems before play mode.** Unity Best Practices Analyzer is a cross-platform Roslyn analyzer and code-fix package for Unity 2021.3+, JetBrains Rider, Visual Studio, and VS Code. It provides 74 low-noise diagnostics and 72 opt-in quick fixes for Unity, Burst, Jobs, DOTS/ECS, and high-performance C# practices that are not already covered by `Microsoft.Unity.Analyzers`.
 
 Every diagnostic defaults to `Info`: your IDE can show a useful suggestion without introducing build warnings, errors, or Unity Console noise. Quick-fix labels follow the IDE's system UI language, including English, Japanese, Persian, and Russian.
 
@@ -301,8 +301,9 @@ If a Unity version does not retain imported labels, select `Packages/Unity Best 
 
 Stable releases contain `UnityBestPractices.Analyzers.<version>.nupkg` and a symbol package. Until NuGet.org publishing is enabled, download the package from GitHub Releases and add its directory as a local package source:
 
-```powershell
-dotnet nuget add source C:\path\to\downloaded-packages -n UnityBestPracticesLocal
+```sh
+# macOS/Linux (use C:\path\to\downloaded-packages on Windows)
+dotnet nuget add source ~/Downloads -n UnityBestPracticesLocal
 dotnet add package UnityBestPractices.Analyzers --version 0.4.0 --source UnityBestPracticesLocal
 ```
 
@@ -313,7 +314,7 @@ The `.nupkg` places the DLL under `analyzers/dotnet/cs` and includes the README,
 1. Download the standard-named `UnityBestPractices.Analyzers.dll` release asset.
 2. Copy it below the Unity project's `Assets` directory.
 3. In the Plugin Inspector, disable **Auto Reference**, **Validate References**, **Any Platform**, **Editor**, and **Standalone**, then add the exact `RoslynAnalyzer` asset label.
-4. Regenerate the C# project and restart Rider or Visual Studio. In Rider, enable Roslyn analyzers under **Settings > Editor > Inspection Settings > Roslyn Analyzers**.
+4. Regenerate the C# project and restart Rider, Visual Studio, or VS Code. In Rider, enable Roslyn analyzers under **Settings > Editor > Inspection Settings > Roslyn Analyzers**.
 5. Put the caret on the suggestion and invoke the IDE quick-action command (`Alt+Enter` in Rider).
 
 Unity performs analyzer loading for compilation while the IDE discovers the code-fix provider from the same assembly. `Microsoft.CodeAnalysis.Workspaces` and `System.Composition` are IDE-host dependencies, so Unity asset-reference validation must remain disabled.
@@ -341,12 +342,15 @@ The analyzer targets `netstandard2.0` and Roslyn 3.8, which is the conservative 
 | Oldest base Unity family | Unity 2021.3 LTS |
 | Oldest DOTS family | Unity 2022.3, Entities 1.0.11, Collections 2.1.4, Burst 1.8.2 |
 | Current LTS family | Unity 6.3 LTS manifest fixture |
+| Development host | Windows, macOS, and Linux (.NET 8) |
 
 The current-LTS DOTS matrix is not claimed until Unity publishes and the project tests a verified package set for that editor. See the [integration fixture process](tests/UnityIntegration/README.md).
 
 ## Build and test
 
-```powershell
+The commands below are shell-independent and can be run from Terminal on macOS or Linux, or PowerShell on Windows:
+
+```sh
 dotnet restore UnityBestPractices.sln
 dotnet build UnityBestPractices.sln -c Release --no-restore
 dotnet run --project tests/UnityBestPractices.Analyzers.Tests -c Release --no-build

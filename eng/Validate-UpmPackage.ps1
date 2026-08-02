@@ -41,4 +41,8 @@ if ($meta -notmatch '(?m)^\s*validateReferences:\s*0\s*$') {
     throw 'Analyzer .meta file must disable Unity reference validation.'
 }
 
+if ($meta -notmatch '(?ms)^\s*- first:\s*\r?\n\s*Standalone: OSXUniversal\s*\r?\n\s*second:\s*\r?\n\s*enabled: 0\s*$') {
+    throw 'Analyzer .meta file must explicitly disable macOS player loading.'
+}
+
 Write-Host "Validated UPM package '$($manifest.name)' version '$($manifest.version)'."
