@@ -208,6 +208,9 @@ internal sealed partial class AnalyzerTests
             {
                 public EntityCommandBuffer(Unity.Collections.Allocator allocator) { }
                 public ParallelWriter AsParallelWriter() => default;
+                public Entity CreateEntity() => default;
+                public void AddComponent<T>(Entity entity, T component)
+                    where T : struct, IComponentData { }
                 public void RemoveComponent<T>(Entity entity)
                     where T : struct, IComponentData { }
                 public void Playback(EntityManager entityManager) { }
@@ -215,6 +218,7 @@ internal sealed partial class AnalyzerTests
 
                 public struct ParallelWriter
                 {
+                    public Entity CreateEntity(int sortKey) => default;
                     public void AddComponent<T>(int sortKey, Entity entity, T component)
                         where T : struct, IComponentData { }
                 }

@@ -323,19 +323,14 @@ internal sealed partial class AnalyzerTests
             {
                 void Update()
                 {
-                    var ecbParallelWriter = new EntityCommandBuffer().AsParallelWriter();
+                    var ecb = new EntityCommandBuffer();
+                    foreach (var (characterStance, detectionData, detectedBuffer, perceptionData, input, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<CharacterStance>, Unity.Entities.RefRW<DetectionData>, DynamicBuffer<DetectedElement>, Unity.Entities.RefRO<PerceptionData>, Unity.Entities.RefRO<PlayerInputs>>().WithAll<PlayerTag>().WithEntityAccess())
                     {
-                        var entityInQueryIndexCounter = 0;
-                        foreach (var (characterStance, detectionData, detectedBuffer, perceptionData, input, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<CharacterStance>, Unity.Entities.RefRW<DetectionData>, DynamicBuffer<DetectedElement>, Unity.Entities.RefRO<PerceptionData>, Unity.Entities.RefRO<PlayerInputs>>().WithAll<PlayerTag>().WithEntityAccess())
-                        {
-                            var entityInQueryIndex = entityInQueryIndexCounter++;
-                            characterStance.ValueRW.Mode += input.ValueRO.Toggle;
-                            detectionData.ValueRW.Count += detectedBuffer.Length + perceptionData.ValueRO.Value;
-                            ecbParallelWriter.AddComponent(
-                                entityInQueryIndex,
-                                playerEntity,
-                                new Result());
-                        }
+                        characterStance.ValueRW.Mode += input.ValueRO.Toggle;
+                        detectionData.ValueRW.Count += detectedBuffer.Length + perceptionData.ValueRO.Value;
+                        ecb.AddComponent(
+                            playerEntity,
+                            new Result());
                     }
                 }
             }
@@ -347,6 +342,48 @@ internal sealed partial class AnalyzerTests
             struct PerceptionData : IComponentData { public int Value; }
             struct PlayerInputs : IComponentData { public int Toggle; }
             struct Result : IComponentData { }
+            """);
+
+        await VerifyFixAsync(
+            """
+            using Unity.Entities;
+
+            partial class RpcSystem : SystemBase
+            {
+                void Update()
+                {
+                    var ecbParallelWriter = new EntityCommandBuffer(default).AsParallelWriter();
+                    Entities.WithAll<PlayerTag>().ForEach(
+                        (Entity playerEntity, int entityInQueryIndex, in PlayerTag playerTag) =>
+                        {
+                            var rpcEntity = ecbParallelWriter.CreateEntity(entityInQueryIndex);
+                            ecbParallelWriter.AddComponent(entityInQueryIndex, rpcEntity, new Rpc());
+                        }).Run();
+                }
+            }
+
+            struct PlayerTag : IComponentData { }
+            struct Rpc : IComponentData { }
+            """,
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            """
+            using Unity.Entities;
+
+            partial class RpcSystem : SystemBase
+            {
+                void Update()
+                {
+                    var ecb = new EntityCommandBuffer(default);
+                    foreach (var (playerTag, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRO<PlayerTag>>().WithAll<PlayerTag>().WithEntityAccess())
+                    {
+                        var rpcEntity = ecb.CreateEntity();
+                        ecb.AddComponent(rpcEntity, new Rpc());
+                    }
+                }
+            }
+
+            struct PlayerTag : IComponentData { }
+            struct Rpc : IComponentData { }
             """);
 
         await VerifyFixAsync(
