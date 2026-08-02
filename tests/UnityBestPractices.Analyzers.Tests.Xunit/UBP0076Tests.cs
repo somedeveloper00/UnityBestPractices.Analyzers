@@ -1,5 +1,7 @@
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Testing;
+using Microsoft.CodeAnalysis.Testing.Verifiers;
 using UnityBestPractices.Analyzers;
 using Xunit;
 
@@ -34,7 +36,7 @@ public sealed class UBP0076Tests
             }
             """ + "\n" + TestSources.Transform;
 
-        await VerifyCS.VerifyCodeFixAsync(
+        await VerifyIndividualCodeFixAsync(
             source,
             new DiagnosticResult(DiagnosticIds.CombineLocalPositionAndRotation, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
                 .WithLocation(0),
@@ -103,7 +105,7 @@ public sealed class UBP0076Tests
             }
             """ + "\n" + TestSources.Transform;
 
-        await VerifyCS.VerifyCodeFixAsync(
+        await VerifyIndividualCodeFixAsync(
             source,
             new DiagnosticResult(DiagnosticIds.CombineLocalPositionAndRotation, Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
                 .WithLocation(0),
@@ -299,5 +301,23 @@ public sealed class UBP0076Tests
             """ + "\n" + TestSources.Transform;
 
         await VerifyCS.VerifyAnalyzerAsync(source);
+    }
+
+    private static async Task VerifyIndividualCodeFixAsync(
+        string source,
+        DiagnosticResult diagnostic,
+        string fixedSource)
+    {
+        var test = new CSharpCodeFixTest<
+            UnityBestPracticesAnalyzer,
+            UnityBestPracticesCodeFixProvider,
+            DefaultVerifier>
+        {
+            TestCode = source,
+            FixedCode = fixedSource,
+            CodeFixTestBehaviors = CodeFixTestBehaviors.SkipFixAllCheck,
+        };
+        test.ExpectedDiagnostics.Add(diagnostic);
+        await test.RunAsync();
     }
 }

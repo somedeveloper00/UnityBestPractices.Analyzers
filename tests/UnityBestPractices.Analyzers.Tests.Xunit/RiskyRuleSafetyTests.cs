@@ -16,7 +16,7 @@ public sealed class RiskyRuleSafetyTests
         "UBP0010", "UBP0011", "UBP0027", "UBP0038", "UBP0039", "UBP0040", "UBP0041",
         "UBP0042", "UBP0057", "UBP0058", "UBP0059", "UBP0060", "UBP0061", "UBP0062",
         "UBP0063", "UBP0064", "UBP0065", "UBP0066", "UBP0067", "UBP0068", "UBP0069",
-        "UBP0070", "UBP0075",
+        "UBP0070", "UBP0075", "UBP0076",
     };
 
     public static IEnumerable<object[]> ReviewRequiredIds =>

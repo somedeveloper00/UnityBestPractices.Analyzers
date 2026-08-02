@@ -14,7 +14,7 @@
 
 </div>
 
-یک تحلیل‌گر تکمیلی Roslyn با ۷۴ تشخیص کم‌مزاحمت و ۷۲ اصلاح سریع اختیاری برای بهترین روش‌های Unity و C# پربازده که هنوز توسط `Microsoft.Unity.Analyzers` پوشش داده نشده‌اند. شدت پیش‌فرض همهٔ تشخیص‌ها `Info` است تا Rider و Visual Studio اکشن‌ها را نمایش دهند، بدون آن‌که Build خطا یا هشدار تولید کند یا Unity Console شلوغ شود.
+یک تحلیل‌گر تکمیلی Roslyn با ۷۸ تشخیص کم‌مزاحمت و ۷۶ اصلاح سریع اختیاری برای بهترین روش‌های Unity و C# پربازده که هنوز توسط `Microsoft.Unity.Analyzers` پوشش داده نشده‌اند. شدت پیش‌فرض همهٔ تشخیص‌ها `Info` است تا Rider و Visual Studio اکشن‌ها را نمایش دهند، بدون آن‌که Build خطا یا هشدار تولید کند یا Unity Console شلوغ شود.
 
 > **پیوندهای سریع:** [نصب](README.md#installation) · [فهرست قواعد](docs/rules/index.md) · [پیکربندی](docs/configuration.md) · [ایمنی](docs/safety.md) · [راهنمای مستندات](docs/README.md)
 
@@ -144,7 +144,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.Tests
 dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 ```
 
-تست‌ها هر ۷۴ Descriptor، قواعد دارای اصلاح، مستندات، سیاست Fix All، Referenceهای کل Solution، همهٔ تبدیل‌های DOTS، موارد منفی محافظه‌کارانه، محتوای Package، سازگاری و آستانه‌های کلی Performance را بررسی می‌کنند.
+تست‌ها هر ۷۸ Descriptor، قواعد دارای اصلاح، مستندات، سیاست Fix All، Referenceهای کل Solution، همهٔ تبدیل‌های DOTS، موارد منفی محافظه‌کارانه، محتوای Package، سازگاری و آستانه‌های کلی Performance را بررسی می‌کنند.
 
 ### Release خودکار
 

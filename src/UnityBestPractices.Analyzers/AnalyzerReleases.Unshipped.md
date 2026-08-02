@@ -8,7 +8,7 @@ UBP0071 | Unity.Correctness | Info | Preserve a discarded scheduled JobHandle
 UBP0072 | Unity.Correctness | Info | Detect a narrowly provable undisposed persistent NativeArray
 UBP0073 | Unity.Correctness | Info | Detect a temporary NativeArray lifetime escape
 UBP0074 | Unity.Performance.Safe | Info | Cache repeated Shader.PropertyToID calls
-UBP0076 | Unity.Performance.Safe | Info | Combine adjacent local position and rotation assignments
+UBP0076 | Unity.Performance.Review | Info | Combine adjacent local position and rotation assignments
 UBP0077 | Unity.Performance.Safe | Info | Remove unused SystemAPI.Query entity access
 UBP0078 | Unity.Performance.Safe | Info | Replace obsolete Unity object find APIs with their modern equivalents
 

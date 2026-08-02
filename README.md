@@ -19,7 +19,7 @@ Roslyn diagnostics · conservative quick fixes · Burst, Jobs, DOTS/ECS · Unity
 
 </div>
 
-**Find Unity C# performance problems before play mode.** Unity Best Practices Analyzer is a cross-platform Roslyn analyzer and code-fix package for Unity 2021.3+, JetBrains Rider, Visual Studio, and VS Code. It provides 74 low-noise diagnostics and 72 opt-in quick fixes for Unity, Burst, Jobs, DOTS/ECS, and high-performance C# practices that are not already covered by `Microsoft.Unity.Analyzers`.
+**Find Unity C# performance problems before play mode.** Unity Best Practices Analyzer is a cross-platform Roslyn analyzer and code-fix package for Unity 2021.3+, JetBrains Rider, Visual Studio, and VS Code. It provides 78 low-noise diagnostics and 76 opt-in quick fixes for Unity, Burst, Jobs, DOTS/ECS, and high-performance C# practices that are not already covered by `Microsoft.Unity.Analyzers`.
 
 Every diagnostic defaults to `Info`: your IDE can show a useful suggestion without introducing build warnings, errors, or Unity Console noise. Quick-fix labels follow the IDE's system UI language, including English, German, Japanese, Polish, Persian, and Russian.
 

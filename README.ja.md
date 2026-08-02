@@ -14,7 +14,7 @@ Roslyn 診断 · 控えめなクイックフィックス · Burst、Jobs、DOTS/
 
 </div>
 
-`Microsoft.Unity.Analyzers` ではまだ扱われていない Unity および高性能 C# のベストプラクティスを対象に、74 個の低ノイズ診断と 72 個の任意適用クイックフィックスを提供する Roslyn アナライザーです。すべての診断の既定重大度は `Info` です。Rider と Visual Studio はアクションを提示できますが、ビルドエラーや警告は発生せず、Unity Console に余計なメッセージも表示されません。
+`Microsoft.Unity.Analyzers` ではまだ扱われていない Unity および高性能 C# のベストプラクティスを対象に、78 個の低ノイズ診断と 76 個の任意適用クイックフィックスを提供する Roslyn アナライザーです。すべての診断の既定重大度は `Info` です。Rider と Visual Studio はアクションを提示できますが、ビルドエラーや警告は発生せず、Unity Console に余計なメッセージも表示されません。
 
 > **クイックリンク:** [インストール](README.md#installation) · [ルール一覧](docs/rules/index.md) · [設定](docs/configuration.md) · [安全性](docs/safety.md) · [ドキュメント案内](docs/README.md)
 
@@ -144,7 +144,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.Tests
 dotnet pack src/UnityBestPractices.Analyzers -c Release -o artifacts
 ```
 
-テストは 74 個すべての記述子、修正可能ルール、ドキュメント、Fix All 方針、ソリューション全体の参照、DOTS の全変換先、保守的な除外、パッケージ内容、互換性、および広い性能回帰しきい値を検証します。
+テストは 78 個すべての記述子、修正可能ルール、ドキュメント、Fix All 方針、ソリューション全体の参照、DOTS の全変換先、保守的な除外、パッケージ内容、互換性、および広い性能回帰しきい値を検証します。
 
 ### 自動リリース
 

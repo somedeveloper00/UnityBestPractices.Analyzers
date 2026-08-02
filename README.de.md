@@ -14,7 +14,7 @@ Roslyn-Diagnosen · konservative Schnellkorrekturen · Burst, Jobs, DOTS/ECS · 
 
 </div>
 
-Ein ergänzender Roslyn-Analyzer mit 74 rauscharmen Diagnosen und 72 optionalen Schnellkorrekturen für Unity und leistungsorientiertes C#, die `Microsoft.Unity.Analyzers` noch nicht abdeckt. Alle Diagnosen haben standardmäßig den Schweregrad `Info`: Rider, Visual Studio und VS Code zeigen hilfreiche Aktionen an, ohne Build-Warnungen, Fehler oder Meldungen in der Unity Console zu erzeugen.
+Ein ergänzender Roslyn-Analyzer mit 78 rauscharmen Diagnosen und 76 optionalen Schnellkorrekturen für Unity und leistungsorientiertes C#, die `Microsoft.Unity.Analyzers` noch nicht abdeckt. Alle Diagnosen haben standardmäßig den Schweregrad `Info`: Rider, Visual Studio und VS Code zeigen hilfreiche Aktionen an, ohne Build-Warnungen, Fehler oder Meldungen in der Unity Console zu erzeugen.
 
 > **Direktlinks:** [Installation](README.md#installation) · [Regelübersicht](docs/rules/index.md) · [Konfiguration](docs/configuration.md) · [Sicherheit](docs/safety.md) · [Dokumentationsübersicht](docs/README.md)
 
