@@ -4,7 +4,7 @@
     <AssemblyName>UnityBestPractices.Analyzers</AssemblyName>
     <RootNamespace>UnityBestPractices.Analyzers</RootNamespace>
     <PackageId>UnityBestPractices.Analyzers</PackageId>
-    <Version>0.4.38</Version>
+    <Version>0.4.39</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>

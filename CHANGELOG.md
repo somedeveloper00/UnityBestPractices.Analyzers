@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.39] - 2026-08-02
+
+### Added
+
+- Extended the `SystemBase` to `ISystem` refactoring to migrate compatible instance member access.
+
+
 ## [0.4.38] - 2026-08-02
 
 ### Fixed
