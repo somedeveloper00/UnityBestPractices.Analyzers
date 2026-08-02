@@ -51,6 +51,7 @@ internal static class DotsQueryCodeFixes
                     query.CreateJobParameters(),
                     query.CreateJobAttributes(),
                     query.JobFields,
+                    query.DisposalCaptures,
                     GetTargetExecutionMode(rule.Kind),
                     semanticModel.Compilation)
                     : document;
@@ -80,6 +81,7 @@ internal static class DotsQueryCodeFixes
                 query.CreateJobParameters(),
                 query.CreateJobAttributes(),
                 System.Collections.Immutable.ImmutableArray<DotsJobField>.Empty,
+                System.Collections.Immutable.ImmutableArray<DotsDisposalCapture>.Empty,
                 GetTargetExecutionMode(rule.Kind),
                 semanticModel.Compilation);
         }
@@ -187,6 +189,7 @@ internal static class DotsQueryCodeFixes
         string jobParameters,
         string jobAttributes,
         System.Collections.Immutable.ImmutableArray<DotsJobField> jobFields,
+        System.Collections.Immutable.ImmutableArray<DotsDisposalCapture> disposalCaptures,
         string executionMode,
         Compilation compilation)
     {
@@ -202,6 +205,9 @@ internal static class DotsQueryCodeFixes
             "{\n" +
             string.Concat(jobFields.Select(field =>
                 (field.IsReadOnly ? "    [Unity.Collections.ReadOnly]\n" : string.Empty) +
+                (disposalCaptures.Any(capture => ReferenceEquals(capture.JobField, field))
+                    ? "    [Unity.Collections.DeallocateOnJobCompletion]\n"
+                    : string.Empty) +
                 "    public " + field.TypeName + " " + field.Name + ";\n")) +
             "    public void Execute(" + jobParameters + ")\n" +
             jobBody.WithoutTrivia().ToFullString() + "\n" +

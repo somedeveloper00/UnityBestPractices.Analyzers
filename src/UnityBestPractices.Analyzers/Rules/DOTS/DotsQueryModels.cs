@@ -83,6 +83,19 @@ internal sealed class DotsJobField
     internal bool IsReadOnly { get; set; }
 }
 
+internal sealed class DotsDisposalCapture
+{
+    internal DotsDisposalCapture(ISymbol symbol, DotsJobField? jobField)
+    {
+        Symbol = symbol;
+        JobField = jobField;
+    }
+
+    internal ISymbol Symbol { get; }
+
+    internal DotsJobField? JobField { get; }
+}
+
 internal sealed class DotsQueryFilter
 {
     internal DotsQueryFilter(string name, ImmutableArray<string> typeNames, string? argument)
@@ -129,6 +142,7 @@ internal sealed class EntitiesForEachQuery
         AnonymousFunctionExpressionSyntax lambda,
         ImmutableArray<DotsQueryParameter> parameters,
         ImmutableArray<DotsQueryFilter> filters,
+        ImmutableArray<DotsDisposalCapture> disposalCaptures,
         bool hasStructuralChanges,
         bool hasWithoutBurst,
         bool hasUnsupportedCaptures,
@@ -142,6 +156,7 @@ internal sealed class EntitiesForEachQuery
         Lambda = lambda;
         Parameters = parameters;
         Filters = filters;
+        DisposalCaptures = disposalCaptures;
         HasStructuralChanges = hasStructuralChanges;
         HasWithoutBurst = hasWithoutBurst;
         HasUnsupportedCaptures = hasUnsupportedCaptures;
@@ -160,6 +175,8 @@ internal sealed class EntitiesForEachQuery
     internal ImmutableArray<DotsQueryParameter> Parameters { get; }
 
     internal ImmutableArray<DotsQueryFilter> Filters { get; }
+
+    internal ImmutableArray<DotsDisposalCapture> DisposalCaptures { get; }
 
     internal bool HasStructuralChanges { get; }
 
@@ -230,6 +247,7 @@ internal sealed class EntitiesForEachQuery
                 out var hasStructuralChanges,
                 out var hasWithoutBurst,
                 out var readOnlyCaptures,
+                out var disposalCaptureSymbols,
                 out var entitiesExpression) ||
             !DotsQuerySemanticHelpers.IsEntitiesBuilderExpression(
                 entitiesExpression,
@@ -357,12 +375,40 @@ internal sealed class EntitiesForEachQuery
         {
             field.IsReadOnly = field.SourceSymbol is not null && readOnlyCaptures.Contains(field.SourceSymbol);
         }
+        var disposalCaptures = ImmutableArray.CreateBuilder<DotsDisposalCapture>();
+        foreach (var symbol in disposalCaptureSymbols)
+        {
+            var captureType = symbol switch
+            {
+                ILocalSymbol local => local.Type,
+                IParameterSymbol parameter => parameter.Type,
+                IFieldSymbol field => field.Type,
+                IPropertySymbol property => property.Type,
+                _ => null,
+            };
+            var matchingFields = jobFields.Where(field =>
+                field.SourceSymbol is not null &&
+                SymbolEqualityComparer.Default.Equals(field.SourceSymbol, symbol)).ToImmutableArray();
+            if (captureType is null || !captureType.IsValueType || !captureType.IsUnmanagedType ||
+                matchingFields.Length != 1 ||
+                UnitySymbolCache.GetTypeByMetadataName(
+                    semanticModel.Compilation,
+                    "Unity.Collections.DeallocateOnJobCompletionAttribute") is null)
+            {
+                hasUnsupportedCaptures = true;
+            }
+
+            disposalCaptures.Add(new DotsDisposalCapture(
+                symbol,
+                matchingFields.Length == 1 ? matchingFields[0] : null));
+        }
         query = new EntitiesForEachQuery(
             statement,
             containingType,
             lambda,
             parameters.ToImmutable(),
             filters,
+            disposalCaptures.ToImmutable(),
             hasStructuralChanges,
             hasWithoutBurst,
             hasUnsupportedCaptures,
@@ -381,7 +427,7 @@ internal sealed class EntitiesForEachQuery
     {
         statement = null!;
         parallelEcbConversion = null;
-        if (UnitySymbolCache.GetTypeByMetadataName(
+        if (!DisposalCaptures.IsEmpty || UnitySymbolCache.GetTypeByMetadataName(
                 semanticModel.Compilation,
                 "Unity.Entities.SystemAPI") is null ||
             UnitySymbolCache.GetTypeByMetadataName(
@@ -892,17 +938,47 @@ internal sealed class EntitiesForEachQuery
         out bool hasStructuralChanges,
         out bool hasWithoutBurst,
         out ImmutableHashSet<ISymbol> readOnlyCaptures,
+        out ImmutableArray<ISymbol> disposalCaptures,
         out ExpressionSyntax entitiesExpression)
     {
         var builder = ImmutableArray.CreateBuilder<DotsQueryFilter>();
         hasStructuralChanges = false;
         hasWithoutBurst = false;
         var readOnlyBuilder = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+        var disposalBuilder = ImmutableArray.CreateBuilder<ISymbol>();
         var current = expression;
         while (current is InvocationExpressionSyntax invocation &&
                invocation.Expression is MemberAccessExpressionSyntax access)
         {
             var methodName = access.Name.Identifier.ValueText;
+            if (methodName == "WithDisposeOnCompletion")
+            {
+                var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+                var symbol = invocation.ArgumentList.Arguments.Count == 1
+                    ? semanticModel.GetSymbolInfo(
+                        invocation.ArgumentList.Arguments[0].Expression,
+                        cancellationToken).Symbol
+                    : null;
+                if (method is null ||
+                    !DotsQuerySemanticHelpers.IsUnityEntitiesMethod(method, methodName) ||
+                    (method.ContainingType.Name != "ForEachDescription" &&
+                     method.ReceiverType?.Name != "ForEachDescription") ||
+                    symbol is not ILocalSymbol and not IParameterSymbol and not IFieldSymbol and not IPropertySymbol ||
+                    disposalBuilder.Any(item => SymbolEqualityComparer.Default.Equals(item, symbol)) ||
+                    readOnlyBuilder.Contains(symbol))
+                {
+                    filters = default;
+                    readOnlyCaptures = ImmutableHashSet<ISymbol>.Empty;
+                    disposalCaptures = default;
+                    entitiesExpression = null!;
+                    return false;
+                }
+
+                disposalBuilder.Add(symbol);
+                current = access.Expression;
+                continue;
+            }
+
             if (methodName == "WithReadOnly" &&
                 invocation.ArgumentList.Arguments.Count == 1 &&
                 DotsQuerySemanticHelpers.IsUnityEntitiesMethod(
@@ -912,10 +988,12 @@ internal sealed class EntitiesForEachQuery
                 var symbol = semanticModel.GetSymbolInfo(
                     invocation.ArgumentList.Arguments[0].Expression,
                     cancellationToken).Symbol;
-                if (symbol is not ILocalSymbol and not IParameterSymbol and not IFieldSymbol and not IPropertySymbol)
+                if (symbol is not ILocalSymbol and not IParameterSymbol and not IFieldSymbol and not IPropertySymbol ||
+                    disposalBuilder.Any(item => SymbolEqualityComparer.Default.Equals(item, symbol)))
                 {
                     filters = default;
                     readOnlyCaptures = ImmutableHashSet<ISymbol>.Empty;
+                    disposalCaptures = default;
                     entitiesExpression = null!;
                     return false;
                 }
@@ -947,6 +1025,7 @@ internal sealed class EntitiesForEachQuery
                 hasStructuralChanges = false;
                 hasWithoutBurst = false;
                 readOnlyCaptures = ImmutableHashSet<ISymbol>.Empty;
+                disposalCaptures = default;
                 entitiesExpression = null!;
                 return false;
             }
@@ -957,6 +1036,7 @@ internal sealed class EntitiesForEachQuery
 
         filters = builder.ToImmutable();
         readOnlyCaptures = readOnlyBuilder.ToImmutable();
+        disposalCaptures = disposalBuilder.ToImmutable();
         entitiesExpression = current;
         return true;
     }
