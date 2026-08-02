@@ -366,10 +366,7 @@ internal sealed class EntitiesForEachQuery
         }
 
         if (parameters.Count(item => item.Access == DotsParameterAccess.Entity) > 1 ||
-            parameters.Count(item => item.Access == DotsParameterAccess.EntityIndexInQuery) > 1 ||
-            parameters.Count(item =>
-                item.Access != DotsParameterAccess.Entity &&
-                item.Access != DotsParameterAccess.EntityIndexInQuery) > 7)
+            parameters.Count(item => item.Access == DotsParameterAccess.EntityIndexInQuery) > 1)
         {
             return false;
         }
@@ -522,8 +519,51 @@ internal sealed class EntitiesForEachQuery
                 out statement);
         }
 
+        // An `in` component which is never referenced by the lambda is a query
+        // constraint, rather than data that the generated loop needs to retrieve.
+        // Keep writable parameters: dropping a RefRW would change the dependency
+        // and write-access semantics even when the value is not read by the body.
+        var referencedParameterSymbols = Lambda.Body.DescendantNodesAndSelf()
+            .OfType<IdentifierNameSyntax>()
+            .Select(identifier => semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol)
+            .OfType<ISymbol>()
+            .ToImmutableHashSet(SymbolEqualityComparer.Default);
+        var constraintParameters = componentParameters
+            .Where(parameter =>
+                parameter.Access == DotsParameterAccess.ReadOnly &&
+                !referencedParameterSymbols.Contains(parameter.Symbol))
+            .ToImmutableArray();
+        componentParameters = componentParameters
+            .Except(constraintParameters)
+            .ToImmutableArray();
+
+        // SystemAPI.Query has overloads for at most seven query elements. Apply
+        // that limit after constraint-only parameters have been removed.
+        if (componentParameters.Length > 7)
+        {
+            return false;
+        }
+
+        var existingWithAllTypes = Filters
+            .Where(filter => filter.Name == "WithAll")
+            .SelectMany(filter => filter.TypeNames)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        var additionalWithAllTypes = constraintParameters
+            .Select(parameter => parameter.TypeName)
+            .Where(typeName => !existingWithAllTypes.Contains(typeName))
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+        var queryFilters = Filters;
+        if (!additionalWithAllTypes.IsEmpty)
+        {
+            queryFilters = queryFilters.Add(new DotsQueryFilter(
+                "WithAll",
+                additionalWithAllTypes,
+                argument: null));
+        }
+
         var entityOnlyQueryType = componentParameters.Length == 0
-            ? Filters
+            ? queryFilters
                 .Where(filter => filter.Name == "WithAll")
                 .SelectMany(filter => filter.TypeNames)
                 .FirstOrDefault()
@@ -539,7 +579,7 @@ internal sealed class EntitiesForEachQuery
                 ? string.Join(", ", componentParameters.Select(parameter => parameter.SystemApiType))
                 : "Unity.Entities.RefRO<" + entityOnlyQueryType + ">") +
             ">()" +
-            string.Concat(Filters.Select(filter => filter.ToSystemApiSuffix())) +
+            string.Concat(queryFilters.Select(filter => filter.ToSystemApiSuffix())) +
             (entityParameter is null ? string.Empty : ".WithEntityAccess()");
 
         // Query and rewrite the original in-tree lambda body; wrapping an expression

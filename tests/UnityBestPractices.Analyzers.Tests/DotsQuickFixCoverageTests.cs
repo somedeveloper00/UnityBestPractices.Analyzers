@@ -516,6 +516,33 @@ internal sealed partial class AnalyzerTests
             """);
 
         await VerifyFixAsync(
+            "using Unity.Entities; partial class ConstraintSystem : SystemBase { void Update() { " +
+            "var lookup = SystemAPI.GetComponentLookup<LookupData>(true); " +
+            "var buffer = default(DynamicBuffer<BufferItem>); " +
+            "var ecbParallelWriter = new EntityCommandBuffer().AsParallelWriter(); " +
+            "Entities.WithAll<MagiNPCTag>().WithoutBurst().ForEach((Entity entity, int entityInQueryIndex, " +
+            "in AIIsTransforming transforming, in ReadA a, in ReadB b, in ReadC c, in ReadD d, in ReadE e) => { " +
+            "if (lookup.HasComponent(entity)) buffer.Clear(); var created = ecbParallelWriter.CreateEntity(entityInQueryIndex); " +
+            "ecbParallelWriter.AddComponent(entityInQueryIndex, created, new Result { Value = a.Value + b.Value + c.Value + d.Value + e.Value }); }).Run(); } } " +
+            "struct MagiNPCTag : IComponentData { } struct AIIsTransforming : IComponentData { } " +
+            "struct ReadA : IComponentData { public int Value; } struct ReadB : IComponentData { public int Value; } " +
+            "struct ReadC : IComponentData { public int Value; } struct ReadD : IComponentData { public int Value; } " +
+            "struct ReadE : IComponentData { public int Value; } struct LookupData : IComponentData { } " +
+            "struct BufferItem : IBufferElementData { } struct Result : IComponentData { public int Value; }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class ConstraintSystem : SystemBase { void Update() { " +
+            "var lookup = SystemAPI.GetComponentLookup<LookupData>(true); " +
+            "var buffer = default(DynamicBuffer<BufferItem>); var ecb = new EntityCommandBuffer(); " +
+            "foreach (var (a, b, c, d, e, entity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRO<ReadA>, Unity.Entities.RefRO<ReadB>, Unity.Entities.RefRO<ReadC>, Unity.Entities.RefRO<ReadD>, Unity.Entities.RefRO<ReadE>>().WithAll<MagiNPCTag>().WithAll<AIIsTransforming>().WithEntityAccess()) { " +
+            "if (lookup.HasComponent(entity)) buffer.Clear(); var created = ecb.CreateEntity(); " +
+            "ecb.AddComponent(created, new Result { Value = a.ValueRO.Value + b.ValueRO.Value + c.ValueRO.Value + d.ValueRO.Value + e.ValueRO.Value }); } } } " +
+            "struct MagiNPCTag : IComponentData { } struct AIIsTransforming : IComponentData { } " +
+            "struct ReadA : IComponentData { public int Value; } struct ReadB : IComponentData { public int Value; } " +
+            "struct ReadC : IComponentData { public int Value; } struct ReadD : IComponentData { public int Value; } " +
+            "struct ReadE : IComponentData { public int Value; } struct LookupData : IComponentData { } " +
+            "struct BufferItem : IBufferElementData { } struct Result : IComponentData { public int Value; }");
+
+        await VerifyFixAsync(
             """
             using Unity.Entities;
 
@@ -545,7 +572,7 @@ internal sealed partial class AnalyzerTests
                 void Update()
                 {
                     var ecb = new EntityCommandBuffer(default);
-                    foreach (var (playerTag, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRO<PlayerTag>>().WithAll<PlayerTag>().WithEntityAccess())
+                    foreach (var (_, playerEntity) in Unity.Entities.SystemAPI.Query<Unity.Entities.RefRO<PlayerTag>>().WithAll<PlayerTag>().WithEntityAccess())
                     {
                         var rpcEntity = ecb.CreateEntity();
                         ecb.AddComponent(rpcEntity, new Rpc());

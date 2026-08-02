@@ -282,6 +282,12 @@ internal sealed partial class AnalyzerTests
                 int entityInQueryIndex,
                 in T value)
                 where T : struct, IComponentData;
+            public delegate void EntityIndexSixInAction<T1, T2, T3, T4, T5, T6>(
+                Entity entity, int entityInQueryIndex, in T1 first, in T2 second,
+                in T3 third, in T4 fourth, in T5 fifth, in T6 sixth)
+                where T1 : struct, IComponentData where T2 : struct, IComponentData
+                where T3 : struct, IComponentData where T4 : struct, IComponentData
+                where T5 : struct, IComponentData where T6 : struct, IComponentData;
             public delegate void EntityIndexComponentsBufferAction<T1, T2, TBuffer, T3, T4>(
                 Entity entity,
                 int entityInQueryIndex,
@@ -340,6 +346,11 @@ internal sealed partial class AnalyzerTests
                     where T2 : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(EntityIndexInAction<T> action)
                     where T : struct, IComponentData => default;
+                public ForEachDescription ForEach<T1, T2, T3, T4, T5, T6>(
+                    EntityIndexSixInAction<T1, T2, T3, T4, T5, T6> action)
+                    where T1 : struct, IComponentData where T2 : struct, IComponentData
+                    where T3 : struct, IComponentData where T4 : struct, IComponentData
+                    where T5 : struct, IComponentData where T6 : struct, IComponentData => default;
                 public ForEachDescription ForEach<T1, T2, TBuffer, T3, T4>(
                     EntityIndexComponentsBufferAction<T1, T2, TBuffer, T3, T4> action)
                     where T1 : struct, IComponentData
