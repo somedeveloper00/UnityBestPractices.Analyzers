@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Allowed `Entities.ForEach` job conversions with large lambda signatures to
+  preserve unmanaged captures passed by `ref`, including read-only query data
+  and dispose-on-completion containers.
+
 ## [0.4.36] - 2026-08-02
 
 ### Fixed

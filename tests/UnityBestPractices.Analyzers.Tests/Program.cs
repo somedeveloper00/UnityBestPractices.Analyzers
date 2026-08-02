@@ -295,6 +295,22 @@ internal sealed partial class AnalyzerTests
                 where TBuffer : struct, IBufferElementData
                 where T3 : struct, IComponentData
                 where T4 : struct, IComponentData;
+            public delegate void EntityFourBuffersThreeComponentsAction<TBuffer1, TBuffer2, TBuffer3, TBuffer4, T1, T2, T3>(
+                Entity entity,
+                ref DynamicBuffer<TBuffer1> buffer1,
+                ref DynamicBuffer<TBuffer2> buffer2,
+                ref DynamicBuffer<TBuffer3> buffer3,
+                ref DynamicBuffer<TBuffer4> buffer4,
+                ref T1 first,
+                ref T2 second,
+                in T3 third)
+                where TBuffer1 : struct, IBufferElementData
+                where TBuffer2 : struct, IBufferElementData
+                where TBuffer3 : struct, IBufferElementData
+                where TBuffer4 : struct, IBufferElementData
+                where T1 : struct, IComponentData
+                where T2 : struct, IComponentData
+                where T3 : struct, IComponentData;
 
             public struct EntitiesBuilder
             {
@@ -331,6 +347,15 @@ internal sealed partial class AnalyzerTests
                     where TBuffer : struct, IBufferElementData
                     where T3 : struct, IComponentData
                     where T4 : struct, IComponentData => default;
+                public ForEachDescription ForEach<TBuffer1, TBuffer2, TBuffer3, TBuffer4, T1, T2, T3>(
+                    EntityFourBuffersThreeComponentsAction<TBuffer1, TBuffer2, TBuffer3, TBuffer4, T1, T2, T3> action)
+                    where TBuffer1 : struct, IBufferElementData
+                    where TBuffer2 : struct, IBufferElementData
+                    where TBuffer3 : struct, IBufferElementData
+                    where TBuffer4 : struct, IBufferElementData
+                    where T1 : struct, IComponentData
+                    where T2 : struct, IComponentData
+                    where T3 : struct, IComponentData => default;
             }
 
             public struct ForEachDescription
