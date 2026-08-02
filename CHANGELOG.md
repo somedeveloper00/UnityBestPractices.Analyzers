@@ -7,7 +7,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.35] - 2026-08-02
+
 ### Added
+
+- Added a refactoring that converts fieldless Unity `SystemBase` classes to `ISystem` structs and updates their lifecycle method signatures.
 
 - Added `WithReadOnly` support to `Entities.ForEach` migrations, preserving
   read-only captured job data with `Unity.Collections.ReadOnly` when extracting

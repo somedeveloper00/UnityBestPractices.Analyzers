@@ -123,7 +123,7 @@ internal sealed partial class AnalyzerTests
 
     // Keep this matrix deliberately data-driven: every entry still compares the complete
     // source produced by the fixer, while making it inexpensive to add a regression for a
-    // new capture shape. Together with the rejected matrix below this contributes 32 cases.
+    // new capture shape. Together with the rejected matrix below this contributes 30 cases.
     private async Task VerifyRequestedDotsExtractionCoverageAsync()
     {
         var positiveCases = new[]
@@ -182,15 +182,13 @@ internal sealed partial class AnalyzerTests
             "if (flag) Entities.WithDisposeOnCompletion(values).ForEach((ref Position p) => { p.Value++; }).Schedule();",
             "Entities.WithDisposeOnCompletion(values).ForEach((ref Position p) => { p.Value++; }).ScheduleParallel();",
             "Entities.WithDisposeOnCompletion(@event).ForEach((ref Position p) => { p.Value++; }).Schedule();",
-            "Entities.ForEach((Entity entity, ref Position p) => { SystemAPI.HasComponent<Tag>(entity); SystemAPI.HasComponent<Velocity>(entity); }).Schedule();",
-            "Entities.ForEach((Entity entity, ref Position p) => { SystemAPI.HasComponent<Tag>(entity); SystemAPI.HasComponent<Velocity>(entity); SystemAPI.HasComponent<Position>(entity); }).Schedule();",
         };
         foreach (var body in rejectedBodies)
         {
             await VerifyNoDiagnosticAsync("using System; using Unity.Entities; using Unity.Collections; partial class RejectedCoverage : SystemBase { " +
-                "bool flag; NativeList<int> values, first, second; NativeList<int> @event; IDisposable managed; NativeList<int> Create() => default; " +
+                "bool flag; NativeList<int> values, first, second; NativeList<int> @event; ManagedDisposable managed; NativeList<int> Create() => default; " +
                 "void Update() { " + body + " } } static class FakeSystemAPI { public static bool HasComponent<T>(Entity e) => false; } " +
-                "static class Fake { public static EntitiesBuilder WithDisposeOnCompletion<T>(T value) where T : struct => default; } " + CoverageDeclarations);
+                "struct ManagedDisposable { public IDisposable Value; } static class Fake { public static EntitiesBuilder WithDisposeOnCompletion<T>(T value) where T : struct => default; } " + CoverageDeclarations);
         }
     }
 
@@ -200,6 +198,79 @@ internal sealed partial class AnalyzerTests
 
     private async Task VerifyEntitiesForEachRegressionCasesAsync()
     {
+        await VerifyFixAsync(
+            "using Unity.Entities; using Unity.Jobs; partial class DependencyDisposalSystem : SystemBase { " +
+            "void Update() { var hits = new Disposable(); Entities.WithDisposeOnCompletion(hits).ForEach(" +
+            "(ref Position p) => { p.Value += hits.Value; }).Schedule(); } } " +
+            "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            "using Unity.Entities; using Unity.Jobs; partial class DependencyDisposalSystem : SystemBase { " +
+            "void Update() { var hits = new Disposable(); var jobHandle = new EntitiesForEachJob { Hits = hits }" +
+            ".Schedule(Dependency); Dependency = hits.Dispose(jobHandle); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "public global::Disposable Hits; public void Execute(ref Position p) { p.Value += Hits.Value; } } } " +
+            "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; using Unity.Jobs; partial class DisposalSystem : SystemBase { " +
+            "void Update() { var hits = new Disposable { Value = 1f }; var misses = new Disposable(); " +
+            "var dependency = default(JobHandle); var jobHandle = default(JobHandle); " +
+            "// retain scheduling trivia\nEntities.WithReadOnly(hits).WithDisposeOnCompletion(hits)" +
+            ".WithDisposeOnCompletion(misses).ForEach((ref Position p) => { " +
+            "p.Value += hits.Value + misses.Value; }).Schedule(dependency); } } " +
+            "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            "using Unity.Entities; using Unity.Jobs; partial class DisposalSystem : SystemBase { " +
+            "void Update() { var hits = new Disposable { Value = 1f }; var misses = new Disposable(); " +
+            "var dependency = default(JobHandle); var jobHandle = default(JobHandle); " +
+            "// retain scheduling trivia\nvar jobHandle2 = new EntitiesForEachJob { Hits = hits, Misses = misses }.Schedule(dependency); " +
+            "jobHandle2 = hits.Dispose(jobHandle2); Dependency = misses.Dispose(jobHandle2); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "public global::Disposable Hits; public global::Disposable Misses; public void Execute(ref Position p) { " +
+            "p.Value += Hits.Value + Misses.Value; } } } " +
+            "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class LookupSystem : SystemBase { void Update() { " +
+            "var aircraftDataLookup = 1; Entities.ForEach((Entity entity, ref Position p) => { " +
+            "if (SystemAPI.HasComponent<AircraftData>(entity) && " +
+            "SystemAPI.HasComponent<AircraftData>(entity)) p.Value++; }).Schedule(); } } " +
+            "struct Position : IComponentData { public float Value; } " +
+            "struct AircraftData : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            "using Unity.Entities; partial class LookupSystem : SystemBase { void Update() { " +
+            "var aircraftDataLookup = 1; var aircraftDataLookup2 = " +
+            "Unity.Entities.SystemAPI.GetComponentLookup<global::AircraftData>(true); " +
+            "new EntitiesForEachJob { AircraftDataLookup = aircraftDataLookup2 }.Schedule(); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "[Unity.Collections.ReadOnly] public Unity.Entities.ComponentLookup<global::AircraftData> " +
+            "AircraftDataLookup; public void Execute(Entity entity, ref Position p) { " +
+            "if (AircraftDataLookup.HasComponent(entity) && AircraftDataLookup.HasComponent(entity)) " +
+            "p.Value++; } } } struct Position : IComponentData { public float Value; } " +
+            "struct AircraftData : IComponentData { }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class ReuseLookupSystem : SystemBase { void Update() { " +
+            "var aircraftDataLookup = SystemAPI.GetComponentLookup<AircraftData>(true); " +
+            "Entities.ForEach((Entity entity, ref Position p) => { " +
+            "if (SystemAPI.HasComponent<AircraftData>(entity)) p.Value++; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; } " +
+            "struct AircraftData : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            "using Unity.Entities; partial class ReuseLookupSystem : SystemBase { void Update() { " +
+            "var aircraftDataLookup = SystemAPI.GetComponentLookup<AircraftData>(true); " +
+            "new EntitiesForEachJob { AircraftDataLookup = aircraftDataLookup }.Run(); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "[Unity.Collections.ReadOnly] public Unity.Entities.ComponentLookup<global::AircraftData> " +
+            "AircraftDataLookup; public void Execute(Entity entity, ref Position p) { " +
+            "if (AircraftDataLookup.HasComponent(entity)) p.Value++; } } } " +
+            "struct Position : IComponentData { public float Value; } " +
+            "struct AircraftData : IComponentData { }");
+
         const string readOnlySource =
             "using Unity.Entities; partial class ReadOnlySystem : SystemBase { void Update() { " +
             "var lookup = new Lookup { Value = 2f }; Entities.WithReadOnly(lookup).ForEach(" +
@@ -623,6 +694,22 @@ internal sealed partial class AnalyzerTests
             ".Query<Unity.Entities.RefRO<Tag>>().WithAll<Tag>().WithEntityAccess()) " +
             "{ entitiesSnapshot.Add(entity); } foreach (var entity in entitiesSnapshot) " +
             "{ var hash = entity.GetHashCode(); } } } } } struct Tag : IComponentData { }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; using Unity.Collections; partial class BalanceSystem : SystemBase { " +
+            "BalanceVariables varsToRead; void Update() { Entities.WithStructuralChanges().WithoutBurst()" +
+            ".ForEach((Entity entity, in BalanceVariables vars, in BalanceVariablesUpdateRequest request) => " +
+            "{ varsToRead = vars; EntityManager.DestroyEntity(entity); }).Run(); } } " +
+            "struct BalanceVariables : IComponentData { } " +
+            "struct BalanceVariablesUpdateRequest : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; using Unity.Collections; partial class BalanceSystem : SystemBase { " +
+            "BalanceVariables varsToRead; void Update() { using var ecb = new Unity.Entities.EntityCommandBuffer" +
+            "(Unity.Collections.Allocator.Temp); foreach (var (vars, request, entity) in Unity.Entities.SystemAPI" +
+            ".Query<Unity.Entities.RefRO<BalanceVariables>, Unity.Entities.RefRO<BalanceVariablesUpdateRequest>>()" +
+            ".WithEntityAccess()) { varsToRead = vars.ValueRO; ecb.DestroyEntity(entity); } " +
+            "ecb.Playback(EntityManager); } } struct BalanceVariables : IComponentData { } " +
+            "struct BalanceVariablesUpdateRequest : IComponentData { }");
 
         await VerifyFixAsync(
             """
