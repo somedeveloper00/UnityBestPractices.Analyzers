@@ -2109,8 +2109,14 @@ internal static class DotsQuerySemanticHelpers
                 return true;
             }
 
+            // Captured unmanaged values are copied into fields on both the original
+            // lambda job and the generated IJobEntity. Passing that field by `ref`
+            // (or `in`) therefore preserves the original behavior and is required by
+            // APIs such as CollisionWorld queries and NativeContainer helpers. An
+            // `out` argument is different: it definitely replaces the capture and is
+            // intentionally kept unsupported with the other direct writes above.
             if (current.Parent is ArgumentSyntax argument &&
-                !argument.RefKindKeyword.IsKind(SyntaxKind.None))
+                argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword))
             {
                 return true;
             }

@@ -198,6 +198,28 @@ internal sealed partial class AnalyzerTests
 
     private async Task VerifyEntitiesForEachRegressionCasesAsync()
     {
+        await VerifyExactDotsDiagnosticsAsync(
+            "using Unity.Entities; using Unity.Jobs; partial class LargeCaptureSystem : SystemBase { " +
+            "void Update() { var collisionWorld = new Capture(); var slots = new Capture(); " +
+            "var transforms = new Capture(); var characters = new Capture(); var slotMap = new DisposableCapture(); " +
+            "var hits = new DisposableCapture(); Entities.WithAll<Tag>().WithReadOnly(collisionWorld)" +
+            ".WithReadOnly(slots).WithReadOnly(transforms).WithDisposeOnCompletion(slotMap)" +
+            ".WithReadOnly(characters).WithDisposeOnCompletion(hits).ForEach((Entity entity, " +
+            "ref DynamicBuffer<BufferA> a, ref DynamicBuffer<BufferB> b, ref DynamicBuffer<BufferC> c, " +
+            "ref DynamicBuffer<BufferD> d, ref State first, ref StateTwo second, in Initial initial) => { " +
+            "Helper.Read(ref collisionWorld, ref slots); Helper.Update(ref slotMap, ref hits); " +
+            "first.Value += transforms.Value + characters.Value + initial.Value + entity.GetHashCode(); }).Schedule(); } } " +
+            "static class Helper { public static void Read(ref Capture first, ref Capture second) { } " +
+            "public static void Update(ref DisposableCapture first, ref DisposableCapture second) { } } " +
+            "struct Capture { public int Value; } struct DisposableCapture { public JobHandle Dispose(JobHandle input) => default; } " +
+            "struct BufferA : IBufferElementData { } struct BufferB : IBufferElementData { } " +
+            "struct BufferC : IBufferElementData { } struct BufferD : IBufferElementData { } " +
+            "struct State : IComponentData { public int Value; } struct StateTwo : IComponentData { public int Value; } " +
+            "struct Initial : IComponentData { public int Value; } struct Tag : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel);
+
         await VerifyFixAsync(
             "using Unity.Entities; using Unity.Jobs; partial class DependencyDisposalSystem : SystemBase { " +
             "void Update() { var hits = new Disposable(); Entities.WithDisposeOnCompletion(hits).ForEach(" +
