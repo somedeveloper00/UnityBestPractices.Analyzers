@@ -122,6 +122,35 @@ internal sealed partial class AnalyzerTests
 
     private async Task VerifyEntitiesForEachRegressionCasesAsync()
     {
+        const string readOnlySource =
+            "using Unity.Entities; partial class ReadOnlySystem : SystemBase { void Update() { " +
+            "var lookup = new Lookup { Value = 2f }; Entities.WithReadOnly(lookup).ForEach(" +
+            "(ref Position p) => { p.Value += lookup.Value; }).Schedule(); } } " +
+            "struct Lookup { public float Value; } struct Position : IComponentData { public float Value; }";
+        await VerifyFixAsync(
+            readOnlySource,
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            "using Unity.Entities; partial class ReadOnlySystem : SystemBase { void Update() { " +
+            "var lookup = new Lookup { Value = 2f }; new EntitiesForEachJob { Lookup = lookup }.Schedule(); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "[Unity.Collections.ReadOnly] public global::Lookup Lookup; public void Execute(ref Position p) " +
+            "{ p.Value += Lookup.Value; } } } struct Lookup { public float Value; } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        const string readOnlyRunSource =
+            "using Unity.Entities; partial class ReadOnlyRunSystem : SystemBase { void Update() { " +
+            "var lookup = new Lookup { Value = 2f }; Entities.WithReadOnly(lookup).ForEach(" +
+            "(ref Position p) => { p.Value += lookup.Value; }).Run(); } } " +
+            "struct Lookup { public float Value; } struct Position : IComponentData { public float Value; }";
+        await VerifyFixAsync(
+            readOnlyRunSource,
+            DiagnosticIds.EntitiesForEachToSystemApiQuery,
+            "using Unity.Entities; partial class ReadOnlyRunSystem : SystemBase { void Update() { " +
+            "var lookup = new Lookup { Value = 2f }; foreach (var p in " +
+            "Unity.Entities.SystemAPI.Query<Unity.Entities.RefRW<Position>>()) " +
+            "{ p.ValueRW.Value += lookup.Value; } } } struct Lookup { public float Value; } " +
+            "struct Position : IComponentData { public float Value; }");
+
         await VerifyFixAsync(
             "using Unity.Entities; partial class ReturnSystem : SystemBase { void Update() { " +
             "Entities.ForEach((ref Position p) => { if (p.Value == 0) return; p.Value++; }).Run(); } } " +

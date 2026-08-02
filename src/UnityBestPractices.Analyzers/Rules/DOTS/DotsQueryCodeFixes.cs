@@ -180,6 +180,7 @@ internal static class DotsQueryCodeFixes
             "private partial struct " + jobName + " : Unity.Entities.IJobEntity\n" +
             "{\n" +
             string.Concat(jobFields.Select(field =>
+                (field.IsReadOnly ? "    [Unity.Collections.ReadOnly]\n" : string.Empty) +
                 "    public " + field.TypeName + " " + field.Name + ";\n")) +
             "    public void Execute(" + jobParameters + ")\n" +
             jobBody.WithoutTrivia().ToFullString() + "\n" +

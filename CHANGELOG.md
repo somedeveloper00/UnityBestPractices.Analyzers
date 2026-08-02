@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added `WithReadOnly` support to `Entities.ForEach` migrations, preserving
+  read-only captured job data with `Unity.Collections.ReadOnly` when extracting
+  an `IJobEntity`.
+
 ## [0.4.34] - 2026-08-02
 
 ### Added
