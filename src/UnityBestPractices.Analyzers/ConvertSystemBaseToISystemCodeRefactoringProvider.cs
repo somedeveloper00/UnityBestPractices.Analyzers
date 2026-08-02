@@ -21,6 +21,25 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
 {
     public const string Title = "Convert SystemBase to ISystem";
 
+    // These SystemBase members have direct equivalents on SystemState. Keep this
+    // list explicit: members such as Entities and Time require a different
+    // migration and changing them to state.Entities/state.Time would generate
+    // invalid Entities code.
+    private static readonly HashSet<string> SystemStateMemberNames = new HashSet<string>
+    {
+        "CompleteDependency",
+        "Dependency",
+        "Enabled",
+        "EntityManager",
+        "GetEntityQuery",
+        "LastSystemVersion",
+        "RequireForUpdate",
+        "ShouldRunSystem",
+        "World",
+        "WorldUnmanaged",
+        "WorldUpdateAllocator",
+    };
+
     public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
@@ -34,7 +53,7 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
 
         context.RegisterRefactoring(CodeAction.Create(
             Title,
-            cancellationToken => ConvertAsync(context.Document, declaration, cancellationToken),
+            cancellationToken => ConvertAsync(context.Document, declaration, semanticModel, cancellationToken),
             Title));
     }
 
@@ -96,6 +115,7 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
     private static async Task<Document> ConvertAsync(
         Document document,
         ClassDeclarationSyntax declaration,
+        SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
@@ -104,11 +124,12 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
             return document;
         }
 
+        var memberRewriter = new SystemBaseMemberRewriter(semanticModel, cancellationToken);
         var members = declaration.Members.Select(member =>
             member is MethodDeclarationSyntax method &&
             method.Modifiers.Any(SyntaxKind.OverrideKeyword) &&
             IsLifecycleMethod(method)
-                ? ConvertLifecycleMethod(method)
+                ? ConvertLifecycleMethod((MethodDeclarationSyntax)memberRewriter.Visit(method)!)
                 : member);
         var baseType = declaration.BaseList!.Types[0];
         var replacement = SyntaxFactory.StructDeclaration(
@@ -153,5 +174,90 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
         return method
             .WithModifiers(SyntaxFactory.TokenList(modifiers))
             .WithParameterList(method.ParameterList.AddParameters(parameter));
+    }
+
+    private sealed class SystemBaseMemberRewriter : CSharpSyntaxRewriter
+    {
+        private readonly SemanticModel _semanticModel;
+        private readonly CancellationToken _cancellationToken;
+
+        public SystemBaseMemberRewriter(SemanticModel semanticModel, CancellationToken cancellationToken)
+        {
+            _semanticModel = semanticModel;
+            _cancellationToken = cancellationToken;
+        }
+
+        public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
+        {
+            // Replace the whole expression so `this.EntityManager` does not turn
+            // into the nonsensical `this.state.EntityManager`.
+            if (node.Expression is ThisExpressionSyntax && IsConvertibleMember(node))
+            {
+                return StateMember(node.Name).WithTriviaFrom(node);
+            }
+
+            return base.VisitMemberAccessExpression(node);
+        }
+
+        public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
+        {
+            if (node.Parent is MemberAccessExpressionSyntax memberAccess &&
+                memberAccess.Name == node)
+            {
+                return base.VisitIdentifierName(node);
+            }
+
+            if (IsConvertibleMember(node))
+            {
+                return StateMember(node).WithTriviaFrom(node);
+            }
+
+            return base.VisitIdentifierName(node);
+        }
+
+        public override SyntaxNode? VisitGenericName(GenericNameSyntax node)
+        {
+            if (node.Parent is MemberAccessExpressionSyntax memberAccess &&
+                memberAccess.Name == node)
+            {
+                return base.VisitGenericName(node);
+            }
+
+            if (IsConvertibleMember(node))
+            {
+                return StateMember(node).WithTriviaFrom(node);
+            }
+
+            return base.VisitGenericName(node);
+        }
+
+        private bool IsConvertibleMember(ExpressionSyntax expression)
+        {
+            var symbol = _semanticModel.GetSymbolInfo(expression, _cancellationToken).Symbol;
+            return symbol is not null &&
+                SystemStateMemberNames.Contains(symbol.Name) &&
+                IsSystemBase(symbol.ContainingType);
+        }
+
+        private static bool IsSystemBase(INamedTypeSymbol? type)
+        {
+            while (type is not null)
+            {
+                if (type.ToDisplayString() == "Unity.Entities.SystemBase")
+                {
+                    return true;
+                }
+
+                type = type.BaseType;
+            }
+
+            return false;
+        }
+
+        private static MemberAccessExpressionSyntax StateMember(SimpleNameSyntax member) =>
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                SyntaxFactory.IdentifierName("state"),
+                member.WithoutTrivia());
     }
 }
