@@ -16,10 +16,35 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProviderTests
     private const string UnityTypes = """
         namespace Unity.Entities
         {
-            public struct SystemState { }
+            public struct SystemState
+            {
+                public EntityManager EntityManager;
+                public World World;
+                public object Dependency { get; set; }
+                public bool Enabled { get; set; }
+                public uint LastSystemVersion => 0;
+                public void RequireForUpdate<T>() { }
+                public void RequireForUpdate(EntityQuery query) { }
+                public EntityQuery GetEntityQuery(object builder) => default;
+                public void CompleteDependency() { }
+                public bool ShouldRunSystem() => true;
+            }
+            public struct EntityManager { }
+            public struct EntityQuery { }
+            public sealed class World { }
             public interface ISystem { }
             public abstract class SystemBase
             {
+                protected EntityManager EntityManager => default;
+                protected World World => default;
+                protected object Dependency { get; set; }
+                protected bool Enabled { get; set; }
+                protected uint LastSystemVersion => 0;
+                protected void RequireForUpdate<T>() { }
+                protected void RequireForUpdate(EntityQuery query) { }
+                protected EntityQuery GetEntityQuery(object builder) => default;
+                protected void CompleteDependency() { }
+                protected bool ShouldRunSystem() => true;
                 protected virtual void OnCreate() { }
                 protected virtual void OnUpdate() { }
                 protected virtual void OnDestroy() { }
@@ -44,6 +69,81 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProviderTests
         Assert.Contains("public void OnCreate(ref SystemState state)", Normalize(changed));
         Assert.Contains("public void OnUpdate(ref SystemState state)", Normalize(changed));
         Assert.Contains("public void OnDestroy(ref SystemState state)", Normalize(changed));
+    }
+
+    [Fact]
+    public async Task RewritesEntityManagerWorldAndQuerySetupInLifecycleMethods()
+    {
+        var changed = Normalize(await ApplyAsync("""
+            using Unity.Entities;
+            partial class $$SpawnerSystem : SystemBase
+            {
+                protected override void OnCreate()
+                {
+                    var builder = new object();
+                    RequireForUpdate(GetEntityQuery(builder));
+                    RequireForUpdate<int>();
+                }
+
+                protected override void OnUpdate()
+                {
+                    Use(EntityManager, World);
+                }
+
+                private static void Use(EntityManager entityManager, World world) { }
+            }
+            """));
+
+        Assert.Contains("state.RequireForUpdate(state.GetEntityQuery(builder));", changed);
+        Assert.Contains("state.RequireForUpdate<int>();", changed);
+        Assert.Contains("Use(state.EntityManager, state.World);", changed);
+    }
+
+    [Fact]
+    public async Task RewritesDependencyAndOtherDirectSystemStateMembers()
+    {
+        var changed = Normalize(await ApplyAsync("""
+            using Unity.Entities;
+            partial class $$SchedulingSystem : SystemBase
+            {
+                protected override void OnUpdate()
+                {
+                    Dependency = Schedule(Dependency);
+                    Enabled = ShouldRunSystem();
+                    var version = LastSystemVersion;
+                    CompleteDependency();
+                }
+
+                private static object Schedule(object dependency) => dependency;
+            }
+            """));
+
+        Assert.Contains("state.Dependency = Schedule(state.Dependency);", changed);
+        Assert.Contains("state.Enabled = state.ShouldRunSystem();", changed);
+        Assert.Contains("var version = state.LastSystemVersion;", changed);
+        Assert.Contains("state.CompleteDependency();", changed);
+    }
+
+    [Fact]
+    public async Task RewritesExplicitThisAccessAndLeavesUnrelatedLocalsAlone()
+    {
+        var changed = Normalize(await ApplyAsync("""
+            using Unity.Entities;
+            partial class $$ExplicitAccessSystem : SystemBase
+            {
+                protected override void OnUpdate()
+                {
+                    var manager = this.EntityManager;
+                    var worldNumber = 42;
+                    Use(worldNumber, this.World);
+                }
+
+                private static void Use(int value, World world) { }
+            }
+            """));
+
+        Assert.Contains("var manager = state.EntityManager;", changed);
+        Assert.Contains("Use(worldNumber, state.World);", changed);
     }
 
     [Theory]
