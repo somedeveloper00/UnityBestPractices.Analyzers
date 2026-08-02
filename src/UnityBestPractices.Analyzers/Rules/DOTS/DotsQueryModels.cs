@@ -1580,6 +1580,22 @@ internal static class DotsQuerySemanticHelpers
     {
         jobBody = CreateBlock(body);
         jobFields = ImmutableArray<DotsJobField>.Empty;
+        // Generic method names are GenericNameSyntax, so the identifier-based
+        // unsupported-SystemAPI check below does not see calls such as
+        // GetComponentRW<T>. HasComponent<T> is the only invocation explicitly
+        // lowered by this conversion.
+        if (body.DescendantNodesAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .Select(invocation =>
+                semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol)
+            .Any(method =>
+                method is not null &&
+                method.Name != "HasComponent" &&
+                method.ContainingType.ToDisplayString() == "Unity.Entities.SystemAPI"))
+        {
+            return false;
+        }
+
         if (body.DescendantNodesAndSelf().Any(node =>
                 node is AnonymousFunctionExpressionSyntax ||
                 node is LocalFunctionStatementSyntax ||

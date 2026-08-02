@@ -118,7 +118,83 @@ internal sealed partial class AnalyzerTests
         await VerifyDotsDiagnosticSetsAsync();
         await VerifyEntitiesForEachRegressionCasesAsync();
         await VerifyRejectedDotsMigrationsAsync();
+        await VerifyRequestedDotsExtractionCoverageAsync();
     }
+
+    // Keep this matrix deliberately data-driven: every entry still compares the complete
+    // source produced by the fixer, while making it inexpensive to add a regression for a
+    // new capture shape. Together with the rejected matrix below this contributes 30 cases.
+    private async Task VerifyRequestedDotsExtractionCoverageAsync()
+    {
+        var positiveCases = new[]
+        {
+            ("CompactSchedule", "var scale = 2f;", "", "p.Value *= scale;", "Scale", "float", "scale", false, "Schedule"),
+            ("CompactRun", "var scale = 2f;", "", "p.Value *= scale;", "Scale", "float", "scale", false, "Run"),
+            ("ReadOnlyOne", "var data = new Sample { Value = 2f };", ".WithReadOnly(data)", "p.Value += data.Value;", "Data", "global::Sample", "data", true, "Schedule"),
+            ("ReadOnlyTwoA", "var alpha = new Sample { Value = 2f };", ".WithReadOnly(alpha)", "p.Value += alpha.Value;", "Alpha", "global::Sample", "alpha", true, "Schedule"),
+            ("ReadOnlyTwoB", "var beta = new Sample { Value = 3f };", ".WithReadOnly(beta)", "p.Value += beta.Value;", "Beta", "global::Sample", "beta", true, "Schedule"),
+            ("ReadOnlySeveral", "var gamma = new Sample { Value = 4f };", ".WithReadOnly(gamma)", "p.Value += gamma.Value;", "Gamma", "global::Sample", "gamma", true, "Schedule"),
+            ("JobHandleName", "var jobHandle = 2f;", "", "p.Value += jobHandle;", "JobHandle", "float", "jobHandle", false, "Schedule"),
+            ("JobHandle2Name", "var jobHandle2 = 2f;", "", "p.Value += jobHandle2;", "JobHandle2", "float", "jobHandle2", false, "Schedule"),
+            ("LookupCase", "var aircraftDataLookup = new Sample();", ".WithReadOnly(aircraftDataLookup)", "p.Value += aircraftDataLookup.Value;", "AircraftDataLookup", "global::Sample", "aircraftDataLookup", true, "Schedule"),
+            ("LookupSimilarCase", "var AircraftDataLookup = new Sample();", ".WithReadOnly(AircraftDataLookup)", "p.Value += AircraftDataLookup.Value;", "AircraftDataLookup2", "global::Sample", "AircraftDataLookup", true, "Schedule"),
+            ("Conditional", "var amount = true ? 1f : 2f;", "", "p.Value += amount;", "Amount", "float", "amount", false, "Schedule"),
+            ("NestedBlock", "var amount = 1f;", "", "if (p.Value > 0) { p.Value += amount; }", "Amount", "float", "amount", false, "Schedule"),
+            ("LoopCondition", "var limit = 3f;", "", "while (p.Value < limit) p.Value++;", "Limit", "float", "limit", false, "Schedule"),
+            ("EntityParameter", "var amount = 1f;", "", "p.Value += amount + entity.GetHashCode();", "Amount", "float", "amount", false, "Schedule"),
+            ("FormattingTrivia", "var amount = 1f;", "", "p.Value += amount;", "Amount", "float", "amount", false, "Schedule"),
+            ("JobTypeCollision", "var amount = 1f;", "", "p.Value += amount;", "Amount", "float", "amount", false, "Schedule"),
+            ("FieldCollision", "var amount = 1f;", "", "p.Value += amount;", "Amount", "float", "amount", false, "Run"),
+            ("ParallelBehavior", "var amount = 1f;", "", "p.Value += amount;", "Amount", "float", "amount", false, "ScheduleParallel"),
+        };
+
+        foreach (var item in positiveCases)
+        {
+            var entityParameter = item.Item1 == "EntityParameter" ? "Entity entity, " : string.Empty;
+            var existingMember = item.Item1 == "JobTypeCollision" ? "private struct EntitiesForEachJob { } " : string.Empty;
+            var jobName = item.Item1 == "JobTypeCollision" ? "EntitiesForEachJob2" : "EntitiesForEachJob";
+            var source = "using Unity.Entities; partial class " + item.Item1 + "System : SystemBase { void Update() { " +
+                item.Item2 + " Entities" + item.Item3 + ".ForEach((" + entityParameter + "ref Position p) => { " +
+                item.Item4 + " })." + item.Rest.Item2 + "(); } " + existingMember + "} " + CoverageDeclarations;
+            var attribute = item.Rest.Item1 ? "[Unity.Collections.ReadOnly] " : string.Empty;
+            var fixedSource = "using Unity.Entities; partial class " + item.Item1 + "System : SystemBase { void Update() { " +
+                item.Item2 + " new " + jobName + " { " + item.Item5 + " = " + item.Item7 + " }." + item.Rest.Item2 + "(); } " +
+                existingMember + "[Unity.Burst.BurstCompile] private partial struct " + jobName +
+                " : Unity.Entities.IJobEntity { " + attribute + "public " + item.Item6 + " " + item.Item5 +
+                "; public void Execute(" + entityParameter + "ref Position p) { " +
+                item.Item4.Replace(item.Item7, item.Item5, StringComparison.Ordinal) + " } } } " + CoverageDeclarations;
+            await VerifyFixAsync(source, item.Rest.Item2 == "Run" ? DiagnosticIds.EntitiesForEachToJobEntityRun :
+                item.Rest.Item2 == "ScheduleParallel" ? DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel :
+                DiagnosticIds.EntitiesForEachToJobEntitySchedule, fixedSource);
+        }
+
+        var rejectedBodies = new[]
+        {
+            "Entities.WithDisposeOnCompletion(Create()).ForEach((ref Position p) => { p.Value++; }).Schedule();",
+            "Entities.WithDisposeOnCompletion(flag ? first : second).ForEach((ref Position p) => { p.Value++; }).Schedule();",
+            "Entities.WithReadOnly(values).WithDisposeOnCompletion(values).ForEach((ref Position p) => { p.Value++; }).Schedule();",
+            "Entities.WithDisposeOnCompletion(managed).ForEach((ref Position p) => { p.Value++; }).Schedule();",
+            "Fake.WithDisposeOnCompletion(values).ForEach((ref Position p) => { p.Value++; }).Schedule();",
+            "Entities.ForEach((Entity entity, ref Position p) => { FakeSystemAPI.HasComponent<Tag>(entity); }).Schedule();",
+            "Entities.ForEach((Entity entity, ref Position p) => { SystemAPI.GetComponentRW<Tag>(entity); SystemAPI.HasComponent<Tag>(entity); }).Schedule();",
+            "Entities.ForEach((Entity entity, ref Position p) => { System.Func<bool> f = () => SystemAPI.HasComponent<Tag>(entity); }).Schedule();",
+            "Entities.ForEach((Entity entity, ref Position p) => { bool Local() => SystemAPI.HasComponent<Tag>(entity); }).Schedule();",
+            "if (flag) Entities.WithDisposeOnCompletion(values).ForEach((ref Position p) => { p.Value++; }).Schedule();",
+            "Entities.WithDisposeOnCompletion(values).ForEach((ref Position p) => { p.Value++; }).ScheduleParallel();",
+            "Entities.WithDisposeOnCompletion(@event).ForEach((ref Position p) => { p.Value++; }).Schedule();",
+        };
+        foreach (var body in rejectedBodies)
+        {
+            await VerifyNoDiagnosticAsync("using System; using Unity.Entities; using Unity.Collections; partial class RejectedCoverage : SystemBase { " +
+                "bool flag; NativeList<int> values, first, second; NativeList<int> @event; ManagedDisposable managed; NativeList<int> Create() => default; " +
+                "void Update() { " + body + " } } static class FakeSystemAPI { public static bool HasComponent<T>(Entity e) => false; } " +
+                "struct ManagedDisposable { public IDisposable Value; } static class Fake { public static EntitiesBuilder WithDisposeOnCompletion<T>(T value) where T : struct => default; } " + CoverageDeclarations);
+        }
+    }
+
+    private const string CoverageDeclarations =
+        "struct Sample { public float Value; } struct Position : IComponentData { public float Value; } " +
+        "struct Velocity : IComponentData { public float Value; } struct Tag : IComponentData { }";
 
     private async Task VerifyEntitiesForEachRegressionCasesAsync()
     {
