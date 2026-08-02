@@ -1364,6 +1364,35 @@ internal static class DotsQuerySemanticHelpers
     {
         jobBody = CreateBlock(body);
         jobFields = ImmutableArray<DotsJobField>.Empty;
+        // A method merely named HasComponent is not interchangeable with DOTS
+        // SystemAPI.HasComponent.  In particular, extracting a user helper into a
+        // Burst job can change both receiver state and dispatch semantics.
+        if (body.DescendantNodesAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .Any(invocation =>
+                invocation.Expression is MemberAccessExpressionSyntax
+                {
+                    Name.Identifier.ValueText: "HasComponent"
+                } &&
+                !IsUnityEntitiesSystemApiMethod(
+                    semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol,
+                    "HasComponent")))
+        {
+            return false;
+        }
+
+        // SystemAPI methods require an explicit job-safe rewrite.  Do not allow
+        // generic method names (which are GenericNameSyntax rather than
+        // IdentifierNameSyntax) to bypass the unsupported-SystemAPI check below.
+        if (body.DescendantNodesAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .Any(invocation =>
+                (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol)?
+                    .ContainingType.ToDisplayString() == "Unity.Entities.SystemAPI"))
+        {
+            return false;
+        }
+
         if (body.DescendantNodesAndSelf().Any(node =>
                 node is AnonymousFunctionExpressionSyntax ||
                 node is LocalFunctionStatementSyntax ||

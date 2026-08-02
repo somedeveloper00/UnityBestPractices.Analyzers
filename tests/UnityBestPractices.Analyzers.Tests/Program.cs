@@ -303,7 +303,7 @@ internal sealed partial class AnalyzerTests
                 public EntitiesBuilder WithStructuralChanges() => this;
                 public EntitiesBuilder WithoutBurst() => this;
                 public EntitiesBuilder WithReadOnly<T>(T value) where T : struct => this;
-                public EntitiesBuilder WithDisposeOnCompletion<T>(T value) where T : struct => this;
+                public EntitiesBuilder WithDisposeOnCompletion<T>(T value) => this;
                 public ForEachDescription ForEach(EntityAction action) => default;
                 public ForEachDescription ForEach<T>(RefAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(InAction<T> action) where T : struct, IComponentData => default;
