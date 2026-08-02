@@ -165,7 +165,8 @@ internal static class RuleMetadataFactory
         DiagnosticIds.JobEntityScheduleToScheduleParallel or
         DiagnosticIds.JobEntityScheduleParallelToRun or
         DiagnosticIds.JobEntityScheduleParallelToSchedule or
-        DiagnosticIds.MatchFolderNamespace => RuleSafety.ReviewRequired,
+        DiagnosticIds.MatchFolderNamespace or
+        DiagnosticIds.CombineLocalPositionAndRotation => RuleSafety.ReviewRequired,
         _ => RuleSafety.Safe,
     };
 

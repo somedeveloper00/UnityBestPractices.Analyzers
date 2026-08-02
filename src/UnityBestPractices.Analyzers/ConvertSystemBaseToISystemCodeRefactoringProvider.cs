@@ -104,7 +104,22 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
             }
         }
 
-        return true;
+        return !declaration.DescendantNodes().OfType<SimpleNameSyntax>().Any(name =>
+        {
+            var symbol = semanticModel.GetSymbolInfo(name, cancellationToken).Symbol;
+            if (symbol is null ||
+                SymbolEqualityComparer.Default.Equals(symbol.ContainingType, type) ||
+                !IsSystemBase(symbol.ContainingType))
+            {
+                return false;
+            }
+
+            var lifecycleMethod = name.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
+            return lifecycleMethod is null ||
+                !lifecycleMethod.Modifiers.Any(SyntaxKind.OverrideKeyword) ||
+                !IsLifecycleMethod(lifecycleMethod) ||
+                !SystemStateMemberNames.Contains(symbol.Name);
+        });
     }
 
     private static bool IsLifecycleMethod(MethodDeclarationSyntax method) =>
@@ -124,12 +139,11 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
             return document;
         }
 
-        var memberRewriter = new SystemBaseMemberRewriter(semanticModel, cancellationToken);
         var members = declaration.Members.Select(member =>
             member is MethodDeclarationSyntax method &&
             method.Modifiers.Any(SyntaxKind.OverrideKeyword) &&
             IsLifecycleMethod(method)
-                ? ConvertLifecycleMethod((MethodDeclarationSyntax)memberRewriter.Visit(method)!)
+                ? ConvertLifecycleMethod(method, semanticModel, cancellationToken)
                 : member);
         var baseType = declaration.BaseList!.Types[0];
         var replacement = SyntaxFactory.StructDeclaration(
@@ -151,8 +165,17 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
         return document.WithSyntaxRoot(root.ReplaceNode(declaration, replacement));
     }
 
-    private static MethodDeclarationSyntax ConvertLifecycleMethod(MethodDeclarationSyntax method)
+    private static MethodDeclarationSyntax ConvertLifecycleMethod(
+        MethodDeclarationSyntax method,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
+        var stateParameterName = GetUniqueStateParameterName(method, semanticModel, cancellationToken);
+        var memberRewriter = new SystemBaseMemberRewriter(
+            semanticModel,
+            cancellationToken,
+            stateParameterName);
+        method = (MethodDeclarationSyntax)memberRewriter.Visit(method)!;
         var modifiers = new List<SyntaxToken>(method.Modifiers.Count);
         foreach (var modifier in method.Modifiers)
         {
@@ -168,7 +191,7 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
         }
 
         modifiers.Insert(0, SyntaxFactory.Token(SyntaxKind.PublicKeyword));
-        var parameter = SyntaxFactory.Parameter(SyntaxFactory.Identifier("state"))
+        var parameter = SyntaxFactory.Parameter(SyntaxFactory.Identifier(stateParameterName))
             .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.RefKeyword)))
             .WithType(SyntaxFactory.IdentifierName("SystemState"));
         return method
@@ -176,15 +199,60 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
             .WithParameterList(method.ParameterList.AddParameters(parameter));
     }
 
+    private static string GetUniqueStateParameterName(
+        MethodDeclarationSyntax method,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var names = new HashSet<string>(
+            semanticModel.LookupSymbols(method.SpanStart).Select(symbol => symbol.Name));
+        foreach (var node in method.DescendantNodesAndSelf())
+        {
+            var symbol = semanticModel.GetDeclaredSymbol(node, cancellationToken);
+            if (symbol is not null)
+            {
+                names.Add(symbol.Name);
+            }
+        }
+
+        var candidate = "state";
+        for (var suffix = 2; names.Contains(candidate); suffix++)
+        {
+            candidate = "state" + suffix;
+        }
+
+        return candidate;
+    }
+
+    private static bool IsSystemBase(INamedTypeSymbol? type)
+    {
+        while (type is not null)
+        {
+            if (type.ToDisplayString() == "Unity.Entities.SystemBase")
+            {
+                return true;
+            }
+
+            type = type.BaseType;
+        }
+
+        return false;
+    }
+
     private sealed class SystemBaseMemberRewriter : CSharpSyntaxRewriter
     {
         private readonly SemanticModel _semanticModel;
         private readonly CancellationToken _cancellationToken;
+        private readonly string _stateParameterName;
 
-        public SystemBaseMemberRewriter(SemanticModel semanticModel, CancellationToken cancellationToken)
+        public SystemBaseMemberRewriter(
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            string stateParameterName)
         {
             _semanticModel = semanticModel;
             _cancellationToken = cancellationToken;
+            _stateParameterName = stateParameterName;
         }
 
         public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
@@ -239,25 +307,10 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
                 IsSystemBase(symbol.ContainingType);
         }
 
-        private static bool IsSystemBase(INamedTypeSymbol? type)
-        {
-            while (type is not null)
-            {
-                if (type.ToDisplayString() == "Unity.Entities.SystemBase")
-                {
-                    return true;
-                }
-
-                type = type.BaseType;
-            }
-
-            return false;
-        }
-
-        private static MemberAccessExpressionSyntax StateMember(SimpleNameSyntax member) =>
+        private MemberAccessExpressionSyntax StateMember(SimpleNameSyntax member) =>
             SyntaxFactory.MemberAccessExpression(
                 SyntaxKind.SimpleMemberAccessExpression,
-                SyntaxFactory.IdentifierName("state"),
+                SyntaxFactory.IdentifierName(_stateParameterName),
                 member.WithoutTrivia());
     }
 }

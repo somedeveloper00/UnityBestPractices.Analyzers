@@ -73,10 +73,10 @@ internal static class AdvancedUnityRules
         "Set local position and rotation with one Transform call",
         "SetLocalPositionAndRotation updates both local transform values in one native call.",
         "Use SetLocalPositionAndRotation",
-        RuleCategories.UnityPerformanceSafe,
-        RuleSafety.Safe,
+        RuleCategories.UnityPerformanceReview,
+        RuleSafety.ReviewRequired,
         hasCodeFix: true,
-        supportsFixAll: true,
+        supportsFixAll: false,
         "UnityEngine.Transform");
 
     internal static ImmutableArray<RuleMetadata> Metadata { get; } = ImmutableArray.Create(

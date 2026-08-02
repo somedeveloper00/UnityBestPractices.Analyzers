@@ -14,7 +14,7 @@ Diagnostyka Roslyn · zachowawcze szybkie poprawki · Burst, Jobs, DOTS/ECS · U
 
 </div>
 
-Uzupełniający analizator Roslyn udostępniający 74 mało uciążliwe reguły diagnostyczne i 72 opcjonalne szybkie poprawki dla Unity oraz wydajnego C#, których nie obejmuje jeszcze `Microsoft.Unity.Analyzers`. Domyślny poziom każdej diagnozy to `Info`, dzięki czemu Rider, Visual Studio i VS Code pokazują przydatne akcje bez ostrzeżeń kompilacji, błędów ani zbędnych komunikatów w Unity Console.
+Uzupełniający analizator Roslyn udostępniający 78 mało uciążliwych reguł diagnostycznych i 76 opcjonalnych szybkich poprawek dla Unity oraz wydajnego C#, których nie obejmuje jeszcze `Microsoft.Unity.Analyzers`. Domyślny poziom każdej diagnozy to `Info`, dzięki czemu Rider, Visual Studio i VS Code pokazują przydatne akcje bez ostrzeżeń kompilacji, błędów ani zbędnych komunikatów w Unity Console.
 
 > **Szybkie odnośniki:** [instalacja](README.md#installation) · [indeks reguł](docs/rules/index.md) · [konfiguracja](docs/configuration.md) · [bezpieczeństwo](docs/safety.md) · [mapa dokumentacji](docs/README.md)
 

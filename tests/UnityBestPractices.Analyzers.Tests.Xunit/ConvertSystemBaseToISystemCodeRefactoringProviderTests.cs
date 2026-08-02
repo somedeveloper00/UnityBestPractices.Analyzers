@@ -35,6 +35,8 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProviderTests
             public interface ISystem { }
             public abstract class SystemBase
             {
+                protected object Entities => default;
+                protected object Time => default;
                 protected EntityManager EntityManager => default;
                 protected World World => default;
                 protected object Dependency { get; set; }
@@ -181,6 +183,57 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProviderTests
                 protected override void OnStartRunning() { }
             }
             """, "protected virtual void OnStartRunning() { }"));
+    }
+
+    [Theory]
+    [InlineData("Entities")]
+    [InlineData("Time")]
+    public async Task DoesNotOfferForUnsupportedInheritedMembers(string member)
+    {
+        Assert.Empty(await GetActionsAsync($$"""
+            using Unity.Entities;
+            partial class $$Example : SystemBase
+            {
+                protected override void OnUpdate()
+                {
+                    _ = {{member}};
+                }
+            }
+            """));
+    }
+
+    [Fact]
+    public async Task DoesNotOfferWhenAHelperUsesAnInheritedMember()
+    {
+        Assert.Empty(await GetActionsAsync("""
+            using Unity.Entities;
+            partial class $$Example : SystemBase
+            {
+                protected override void OnUpdate() => CreateQuery();
+                private EntityQuery CreateQuery() => GetEntityQuery(new object());
+            }
+            """));
+    }
+
+    [Fact]
+    public async Task GeneratesACollisionSafeSystemStateParameterName()
+    {
+        var changed = Normalize(await ApplyAsync("""
+            using Unity.Entities;
+            partial class $$Example : SystemBase
+            {
+                protected override void OnUpdate()
+                {
+                    var state = new object();
+                    Use(state, EntityManager);
+                }
+
+                private static void Use(object value, EntityManager manager) { }
+            }
+            """));
+
+        Assert.Contains("OnUpdate(ref SystemState state2)", changed);
+        Assert.Contains("Use(state, state2.EntityManager);", changed);
     }
 
     private static async Task<string> ApplyAsync(string source)
