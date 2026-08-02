@@ -151,6 +151,12 @@ internal sealed partial class AnalyzerTests
             public interface IJobEntity { }
             public struct Entity { }
 
+            public struct ComponentLookup<T> where T : struct, IComponentData
+            {
+                public bool HasComponent(Entity entity) => false;
+                public T this[Entity entity] { get => default; set { } }
+            }
+
             public struct DynamicBuffer<T> where T : struct, IBufferElementData
             {
                 private T[] _items;
@@ -252,6 +258,8 @@ internal sealed partial class AnalyzerTests
                 protected EntitiesBuilder Entities => default;
                 protected EntityManager EntityManager => default;
                 protected World World => default;
+                protected ComponentLookup<T> GetComponentLookup<T>(bool isReadOnly = false)
+                    where T : struct, IComponentData => default;
             }
 
             public delegate void RefAction<T>(ref T value) where T : struct, IComponentData;
@@ -295,6 +303,7 @@ internal sealed partial class AnalyzerTests
                 public EntitiesBuilder WithStructuralChanges() => this;
                 public EntitiesBuilder WithoutBurst() => this;
                 public EntitiesBuilder WithReadOnly<T>(T value) where T : struct => this;
+                public EntitiesBuilder WithDisposeOnCompletion<T>(T value) where T : struct => this;
                 public ForEachDescription ForEach(EntityAction action) => default;
                 public ForEachDescription ForEach<T>(RefAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(InAction<T> action) where T : struct, IComponentData => default;
@@ -322,13 +331,17 @@ internal sealed partial class AnalyzerTests
             {
                 public void Run() { }
                 public void Schedule() { }
+                public Unity.Jobs.JobHandle Schedule(Unity.Jobs.JobHandle dependency) => default;
                 public void ScheduleParallel() { }
+                public Unity.Jobs.JobHandle ScheduleParallel(Unity.Jobs.JobHandle dependency) => default;
             }
 
             public static class IJobEntityExtensions
             {
                 public static void Run<T>(this T job) where T : struct, IJobEntity { }
                 public static void Schedule<T>(this T job) where T : struct, IJobEntity { }
+                public static Unity.Jobs.JobHandle Schedule<T>(this T job, Unity.Jobs.JobHandle dependency)
+                    where T : struct, IJobEntity => default;
                 public static void ScheduleParallel<T>(this T job) where T : struct, IJobEntity { }
             }
 
@@ -341,6 +354,8 @@ internal sealed partial class AnalyzerTests
                     where T : struct, IComponentData => default;
                 public static DynamicBuffer<T> GetBuffer<T>(Entity entity)
                     where T : struct, IBufferElementData => default;
+                public static bool HasComponent<T>(Entity entity)
+                    where T : struct, IComponentData => false;
                 public static QueryEnumerable<T1> Query<T1>() => default;
                 public static QueryEnumerable<T1, T2> Query<T1, T2>() => default;
                 public static QueryEnumerable<T1, T2, T3, T4, T5> Query<T1, T2, T3, T4, T5>() =>
@@ -473,6 +488,7 @@ internal sealed partial class AnalyzerTests
 
                 public System.Span<T> AsSpan() => _items;
                 public void Dispose() { }
+                public Unity.Jobs.JobHandle Dispose(Unity.Jobs.JobHandle dependency) => default;
                 public Enumerator GetEnumerator() => default;
                 public struct Enumerator
                 {
@@ -494,6 +510,7 @@ internal sealed partial class AnalyzerTests
 
                 public ref T ElementAt(int index) => ref _items[index];
                 public void Dispose() { }
+                public Unity.Jobs.JobHandle Dispose(Unity.Jobs.JobHandle dependency) => default;
                 public Enumerator GetEnumerator() => default;
                 public struct Enumerator
                 {
