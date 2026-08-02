@@ -42,7 +42,7 @@ Poprawka `UBP0001` jest dostępna tylko wtedy, gdy analiza odwołań w całym ro
 | Projekt API | bezpieczna hermetyzacja serializowanych pól i ujednolicanie przestrzeni nazw |
 | Refaktoryzacje | przenoszenie parametrów i instrukcji, rozwijanie metod, usuwanie symboli |
 
-Pełna lista reguł od `UBP0001` do `UBP0077`, wraz z warunkami, przykładami i klasą bezpieczeństwa, znajduje się w [indeksie reguł](docs/rules/index.md). Tytuły szybkich poprawek są dopasowane do języka interfejsu IDE, także po polsku.
+Pełna lista reguł od `UBP0001` do `UBP0078`, wraz z warunkami, przykładami i klasą bezpieczeństwa, znajduje się w [indeksie reguł](docs/rules/index.md). Tytuły szybkich poprawek są dopasowane do języka interfejsu IDE, także po polsku.
 
 ## Instalacja
 

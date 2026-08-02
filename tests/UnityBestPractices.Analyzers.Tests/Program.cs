@@ -28,7 +28,18 @@ internal sealed partial class AnalyzerTests
         namespace UnityEngine
         {
             public sealed class SerializeField : System.Attribute { }
-            public class Object { }
+            public enum FindObjectsSortMode { None, InstanceID }
+            public class Object
+            {
+                public static T FindObjectOfType<T>() => default;
+                public static Object FindObjectOfType(System.Type type) => default;
+                public static T[] FindObjectsOfType<T>() => default;
+                public static Object[] FindObjectsOfType(System.Type type) => default;
+                public static T FindFirstObjectByType<T>() => default;
+                public static Object FindFirstObjectByType(System.Type type) => default;
+                public static T[] FindObjectsByType<T>(FindObjectsSortMode sortMode) => default;
+                public static Object[] FindObjectsByType(System.Type type, FindObjectsSortMode sortMode) => default;
+            }
             public class ScriptableObject : Object { }
             public class Component : Object { }
             public class MonoBehaviour : Component { }
@@ -502,6 +513,7 @@ internal sealed partial class AnalyzerTests
         await VerifyFixAllScopesAsync();
         await VerifyNamespaceConsistencyAsync();
         await VerifyUnusedEntityAccessFixesAsync();
+        await VerifyModernObjectFindFixesAsync();
 
         await VerifyFixAsync(
             """
@@ -1451,20 +1463,50 @@ internal sealed partial class AnalyzerTests
         }
     }
 
+    private async Task VerifyModernObjectFindFixesAsync()
+    {
+        var cases = new[]
+        {
+            (
+                "UnityEngine.Object.FindObjectOfType<UnityEngine.Component>()",
+                "UnityEngine.Object.FindFirstObjectByType<UnityEngine.Component>()"),
+            (
+                "UnityEngine.Object.FindObjectOfType(typeof(UnityEngine.Component))",
+                "UnityEngine.Object.FindFirstObjectByType(typeof(UnityEngine.Component))"),
+            (
+                "UnityEngine.Object.FindObjectsOfType<UnityEngine.Component>()",
+                "UnityEngine.Object.FindObjectsByType<UnityEngine.Component>(global::UnityEngine.FindObjectsSortMode.InstanceID)"),
+            (
+                "UnityEngine.Object.FindObjectsOfType(typeof(UnityEngine.Component))",
+                "UnityEngine.Object.FindObjectsByType(typeof(UnityEngine.Component), global::UnityEngine.FindObjectsSortMode.InstanceID)"),
+        };
+
+        foreach (var (invocation, replacement) in cases)
+        {
+            await VerifyFixAsync(
+                $"class ObjectFinder {{ object Find() => {invocation}; }}",
+                DiagnosticIds.UseModernObjectFindApi,
+                $"class ObjectFinder {{ object Find() => {replacement}; }}");
+        }
+    }
+
     private void VerifyCatalogIntegrity()
     {
         var descriptors = _analyzer.SupportedDiagnostics;
-        if (descriptors.Length != 77)
+        const int expectedDiagnosticCount = 78;
+        if (descriptors.Length != expectedDiagnosticCount)
         {
-            throw new InvalidOperationException($"Expected 77 diagnostics, got {descriptors.Length}.");
+            throw new InvalidOperationException(
+                $"Expected {expectedDiagnosticCount} diagnostics, got {descriptors.Length}.");
         }
 
-        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() != 77)
+        if (descriptors.Select(descriptor => descriptor.Id).Distinct(StringComparer.Ordinal).Count() !=
+            expectedDiagnosticCount)
         {
             throw new InvalidOperationException("Diagnostic IDs must be unique.");
         }
 
-        var expectedIds = Enumerable.Range(1, 77)
+        var expectedIds = Enumerable.Range(1, expectedDiagnosticCount)
             .Select(number => $"UBP{number:0000}")
             .ToArray();
         var actualIds = descriptors
