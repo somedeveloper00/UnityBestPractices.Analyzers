@@ -628,11 +628,11 @@ internal sealed partial class AnalyzerTests
             "struct BalanceVariablesUpdateRequest : IComponentData { }",
             DiagnosticIds.EntitiesForEachToSystemApiQuery,
             "using Unity.Entities; using Unity.Collections; partial class BalanceSystem : SystemBase { " +
-            "BalanceVariables varsToRead; void Update() { { using var ecb = new Unity.Entities.EntityCommandBuffer" +
+            "BalanceVariables varsToRead; void Update() { using var ecb = new Unity.Entities.EntityCommandBuffer" +
             "(Unity.Collections.Allocator.Temp); foreach (var (vars, request, entity) in Unity.Entities.SystemAPI" +
             ".Query<Unity.Entities.RefRO<BalanceVariables>, Unity.Entities.RefRO<BalanceVariablesUpdateRequest>>()" +
             ".WithEntityAccess()) { varsToRead = vars.ValueRO; ecb.DestroyEntity(entity); } " +
-            "ecb.Playback(EntityManager); } } } struct BalanceVariables : IComponentData { } " +
+            "ecb.Playback(EntityManager); } } struct BalanceVariables : IComponentData { } " +
             "struct BalanceVariablesUpdateRequest : IComponentData { }");
 
         await VerifyFixAsync(
