@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.40] - 2026-08-02
+
+### Fixed
+
+- Hardened the `SystemBase` to `ISystem` refactoring by rejecting unsafe inherited API usage and avoiding generated `SystemState` parameter name collisions.
+- Reclassified UBP0076 as review-required and limited its quick fix to individual applications.
+
+
 ## [0.4.39] - 2026-08-02
 
 ### Added
