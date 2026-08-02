@@ -7,6 +7,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.36] - 2026-08-02
+
+### Fixed
+
+- Improved structural `Entities.ForEach` conversions by using an
+  `EntityCommandBuffer` for entity destruction and rejecting unsupported
+  generic `SystemAPI` calls during job extraction.
+- Expanded conflict-safe DOTS quick-fix coverage for query and job conversions.
+
 ## [0.4.35] - 2026-08-02
 
 ### Added
