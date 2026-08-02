@@ -64,11 +64,12 @@ internal sealed class DotsQueryParameter
 
 internal sealed class DotsJobField
 {
-    internal DotsJobField(string name, string typeName, string initializer)
+    internal DotsJobField(string name, string typeName, string initializer, ISymbol? sourceSymbol = null)
     {
         Name = name;
         TypeName = typeName;
         Initializer = initializer;
+        SourceSymbol = sourceSymbol;
     }
 
     internal string Name { get; }
@@ -76,6 +77,10 @@ internal sealed class DotsJobField
     internal string TypeName { get; }
 
     internal string Initializer { get; }
+
+    internal ISymbol? SourceSymbol { get; }
+
+    internal bool IsReadOnly { get; set; }
 }
 
 internal sealed class DotsQueryFilter
@@ -224,6 +229,7 @@ internal sealed class EntitiesForEachQuery
                 out var filters,
                 out var hasStructuralChanges,
                 out var hasWithoutBurst,
+                out var readOnlyCaptures,
                 out var entitiesExpression) ||
             !DotsQuerySemanticHelpers.IsEntitiesBuilderExpression(
                 entitiesExpression,
@@ -347,6 +353,10 @@ internal sealed class EntitiesForEachQuery
             cancellationToken,
             out var jobBody,
             out var jobFields);
+        foreach (var field in jobFields)
+        {
+            field.IsReadOnly = field.SourceSymbol is not null && readOnlyCaptures.Contains(field.SourceSymbol);
+        }
         query = new EntitiesForEachQuery(
             statement,
             containingType,
@@ -792,16 +802,40 @@ internal sealed class EntitiesForEachQuery
         out ImmutableArray<DotsQueryFilter> filters,
         out bool hasStructuralChanges,
         out bool hasWithoutBurst,
+        out ImmutableHashSet<ISymbol> readOnlyCaptures,
         out ExpressionSyntax entitiesExpression)
     {
         var builder = ImmutableArray.CreateBuilder<DotsQueryFilter>();
         hasStructuralChanges = false;
         hasWithoutBurst = false;
+        var readOnlyBuilder = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
         var current = expression;
         while (current is InvocationExpressionSyntax invocation &&
                invocation.Expression is MemberAccessExpressionSyntax access)
         {
             var methodName = access.Name.Identifier.ValueText;
+            if (methodName == "WithReadOnly" &&
+                invocation.ArgumentList.Arguments.Count == 1 &&
+                DotsQuerySemanticHelpers.IsUnityEntitiesMethod(
+                    semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol,
+                    methodName))
+            {
+                var symbol = semanticModel.GetSymbolInfo(
+                    invocation.ArgumentList.Arguments[0].Expression,
+                    cancellationToken).Symbol;
+                if (symbol is not ILocalSymbol and not IParameterSymbol and not IFieldSymbol and not IPropertySymbol)
+                {
+                    filters = default;
+                    readOnlyCaptures = ImmutableHashSet<ISymbol>.Empty;
+                    entitiesExpression = null!;
+                    return false;
+                }
+
+                readOnlyBuilder.Add(symbol);
+                current = access.Expression;
+                continue;
+            }
+
             if ((methodName == "WithStructuralChanges" || methodName == "WithoutBurst") &&
                 invocation.ArgumentList.Arguments.Count == 0 &&
                 DotsQuerySemanticHelpers.IsUnityEntitiesMethod(
@@ -823,6 +857,7 @@ internal sealed class EntitiesForEachQuery
                 filters = default;
                 hasStructuralChanges = false;
                 hasWithoutBurst = false;
+                readOnlyCaptures = ImmutableHashSet<ISymbol>.Empty;
                 entitiesExpression = null!;
                 return false;
             }
@@ -832,6 +867,7 @@ internal sealed class EntitiesForEachQuery
         }
 
         filters = builder.ToImmutable();
+        readOnlyCaptures = readOnlyBuilder.ToImmutable();
         entitiesExpression = current;
         return true;
     }
@@ -1305,7 +1341,8 @@ internal static class DotsQuerySemanticHelpers
                     fields.Add(new DotsJobField(
                         fieldName,
                         captureType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                        EscapeIdentifier(symbol.Name)));
+                        EscapeIdentifier(symbol.Name),
+                        symbol));
                 }
 
                 replacements.Add(identifier, fieldName);
@@ -1343,7 +1380,8 @@ internal static class DotsQuerySemanticHelpers
                         fields.Add(new DotsJobField(
                             fieldName,
                             captureType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                            "this." + EscapeIdentifier(symbol.Name)));
+                            "this." + EscapeIdentifier(symbol.Name),
+                            symbol));
                     }
 
                     replacements.Add(identifier, fieldName);
