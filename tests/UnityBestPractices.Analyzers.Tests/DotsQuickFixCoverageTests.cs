@@ -123,6 +123,42 @@ internal sealed partial class AnalyzerTests
     private async Task VerifyEntitiesForEachRegressionCasesAsync()
     {
         await VerifyFixAsync(
+            "using Unity.Entities; using Unity.Jobs; partial class DependencyDisposalSystem : SystemBase { " +
+            "void Update() { var hits = new Disposable(); Entities.WithDisposeOnCompletion(hits).ForEach(" +
+            "(ref Position p) => { p.Value += hits.Value; }).Schedule(); } } " +
+            "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            "using Unity.Entities; using Unity.Jobs; partial class DependencyDisposalSystem : SystemBase { " +
+            "void Update() { var hits = new Disposable(); var jobHandle = new EntitiesForEachJob { Hits = hits }" +
+            ".Schedule(Dependency); Dependency = hits.Dispose(jobHandle); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "public global::Disposable Hits; public void Execute(ref Position p) { p.Value += Hits.Value; } } } " +
+            "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; using Unity.Jobs; partial class DisposalSystem : SystemBase { " +
+            "void Update() { var hits = new Disposable { Value = 1f }; var misses = new Disposable(); " +
+            "var dependency = default(JobHandle); var jobHandle = default(JobHandle); " +
+            "// retain scheduling trivia\nEntities.WithReadOnly(hits).WithDisposeOnCompletion(hits)" +
+            ".WithDisposeOnCompletion(misses).ForEach((ref Position p) => { " +
+            "p.Value += hits.Value + misses.Value; }).Schedule(dependency); } } " +
+            "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
+            "struct Position : IComponentData { public float Value; }",
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            "using Unity.Entities; using Unity.Jobs; partial class DisposalSystem : SystemBase { " +
+            "void Update() { var hits = new Disposable { Value = 1f }; var misses = new Disposable(); " +
+            "var dependency = default(JobHandle); var jobHandle = default(JobHandle); " +
+            "// retain scheduling trivia\nvar jobHandle2 = new EntitiesForEachJob { Hits = hits, Misses = misses }.Schedule(dependency); " +
+            "jobHandle2 = hits.Dispose(jobHandle2); Dependency = misses.Dispose(jobHandle2); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "public global::Disposable Hits; public global::Disposable Misses; public void Execute(ref Position p) { " +
+            "p.Value += Hits.Value + Misses.Value; } } } " +
+            "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
+            "struct Position : IComponentData { public float Value; }");
+
+        await VerifyFixAsync(
             "using Unity.Entities; partial class LookupSystem : SystemBase { void Update() { " +
             "var aircraftDataLookup = 1; Entities.ForEach((Entity entity, ref Position p) => { " +
             "if (SystemAPI.HasComponent<AircraftData>(entity) && " +

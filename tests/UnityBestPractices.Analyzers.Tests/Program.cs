@@ -257,6 +257,7 @@ internal sealed partial class AnalyzerTests
                 protected EntitiesBuilder Entities => default;
                 protected EntityManager EntityManager => default;
                 protected World World => default;
+                protected Unity.Jobs.JobHandle Dependency { get; set; }
             }
 
             public delegate void RefAction<T>(ref T value) where T : struct, IComponentData;
@@ -300,6 +301,7 @@ internal sealed partial class AnalyzerTests
                 public EntitiesBuilder WithStructuralChanges() => this;
                 public EntitiesBuilder WithoutBurst() => this;
                 public EntitiesBuilder WithReadOnly<T>(T value) where T : struct => this;
+                public EntitiesBuilder WithDisposeOnCompletion<T>(T value) where T : struct => this;
                 public ForEachDescription ForEach(EntityAction action) => default;
                 public ForEachDescription ForEach<T>(RefAction<T> action) where T : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(InAction<T> action) where T : struct, IComponentData => default;
@@ -326,15 +328,21 @@ internal sealed partial class AnalyzerTests
             public struct ForEachDescription
             {
                 public void Run() { }
-                public void Schedule() { }
-                public void ScheduleParallel() { }
+                public Unity.Jobs.JobHandle Schedule() => default;
+                public Unity.Jobs.JobHandle Schedule(Unity.Jobs.JobHandle dependency) => default;
+                public Unity.Jobs.JobHandle ScheduleParallel() => default;
+                public Unity.Jobs.JobHandle ScheduleParallel(Unity.Jobs.JobHandle dependency) => default;
             }
 
             public static class IJobEntityExtensions
             {
                 public static void Run<T>(this T job) where T : struct, IJobEntity { }
-                public static void Schedule<T>(this T job) where T : struct, IJobEntity { }
-                public static void ScheduleParallel<T>(this T job) where T : struct, IJobEntity { }
+                public static Unity.Jobs.JobHandle Schedule<T>(this T job) where T : struct, IJobEntity => default;
+                public static Unity.Jobs.JobHandle Schedule<T>(this T job, Unity.Jobs.JobHandle dependency)
+                    where T : struct, IJobEntity => default;
+                public static Unity.Jobs.JobHandle ScheduleParallel<T>(this T job) where T : struct, IJobEntity => default;
+                public static Unity.Jobs.JobHandle ScheduleParallel<T>(this T job, Unity.Jobs.JobHandle dependency)
+                    where T : struct, IJobEntity => default;
             }
 
             public static class SystemAPI

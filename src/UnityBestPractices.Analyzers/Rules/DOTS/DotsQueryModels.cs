@@ -94,15 +94,18 @@ internal sealed class DotsJobField
 
 internal sealed class DotsDisposalCapture
 {
-    internal DotsDisposalCapture(ISymbol symbol, DotsJobField? jobField)
+    internal DotsDisposalCapture(ISymbol symbol, DotsJobField? jobField, string expression)
     {
         Symbol = symbol;
         JobField = jobField;
+        Expression = expression;
     }
 
     internal ISymbol Symbol { get; }
 
     internal DotsJobField? JobField { get; }
+
+    internal string Expression { get; }
 }
 
 internal sealed class DotsQueryFilter
@@ -152,6 +155,7 @@ internal sealed class EntitiesForEachQuery
         ImmutableArray<DotsQueryParameter> parameters,
         ImmutableArray<DotsQueryFilter> filters,
         ImmutableArray<DotsDisposalCapture> disposalCaptures,
+        string? explicitDependency,
         bool hasStructuralChanges,
         bool hasWithoutBurst,
         bool hasUnsupportedCaptures,
@@ -166,6 +170,7 @@ internal sealed class EntitiesForEachQuery
         Parameters = parameters;
         Filters = filters;
         DisposalCaptures = disposalCaptures;
+        ExplicitDependency = explicitDependency;
         HasStructuralChanges = hasStructuralChanges;
         HasWithoutBurst = hasWithoutBurst;
         HasUnsupportedCaptures = hasUnsupportedCaptures;
@@ -186,6 +191,8 @@ internal sealed class EntitiesForEachQuery
     internal ImmutableArray<DotsQueryFilter> Filters { get; }
 
     internal ImmutableArray<DotsDisposalCapture> DisposalCaptures { get; }
+
+    internal string? ExplicitDependency { get; }
 
     internal bool HasStructuralChanges { get; }
 
@@ -218,7 +225,7 @@ internal sealed class EntitiesForEachQuery
     {
         query = null!;
         if (statement.Expression is not InvocationExpressionSyntax terminalInvocation ||
-            terminalInvocation.ArgumentList.Arguments.Count != 0 ||
+            terminalInvocation.ArgumentList.Arguments.Count > 1 ||
             terminalInvocation.Expression is not MemberAccessExpressionSyntax terminalAccess)
         {
             return false;
@@ -388,8 +395,16 @@ internal sealed class EntitiesForEachQuery
             }
         }
         var disposalCaptures = ImmutableArray.CreateBuilder<DotsDisposalCapture>();
-        foreach (var symbol in disposalCaptureSymbols)
+        foreach (var capture in disposalCaptureSymbols)
         {
+            var symbol = capture.Symbol;
+            foreach (var field in jobFields.Where(field =>
+                         field.SourceSymbol is not null &&
+                         SymbolEqualityComparer.Default.Equals(field.SourceSymbol, symbol)))
+            {
+                field.IsReadOnly = false;
+            }
+
             var captureType = symbol switch
             {
                 ILocalSymbol local => local.Type,
@@ -402,17 +417,15 @@ internal sealed class EntitiesForEachQuery
                 field.SourceSymbol is not null &&
                 SymbolEqualityComparer.Default.Equals(field.SourceSymbol, symbol)).ToImmutableArray();
             if (captureType is null || !captureType.IsValueType || !captureType.IsUnmanagedType ||
-                matchingFields.Length != 1 ||
-                UnitySymbolCache.GetTypeByMetadataName(
-                    semanticModel.Compilation,
-                    "Unity.Collections.DeallocateOnJobCompletionAttribute") is null)
+                matchingFields.Length != 1)
             {
                 hasUnsupportedCaptures = true;
             }
 
             disposalCaptures.Add(new DotsDisposalCapture(
                 symbol,
-                matchingFields.Length == 1 ? matchingFields[0] : null));
+                matchingFields.Length == 1 ? matchingFields[0] : null,
+                capture.Expression));
         }
         query = new EntitiesForEachQuery(
             statement,
@@ -421,6 +434,7 @@ internal sealed class EntitiesForEachQuery
             parameters.ToImmutable(),
             filters,
             disposalCaptures.ToImmutable(),
+            terminalInvocation.ArgumentList.Arguments.FirstOrDefault()?.Expression.WithoutTrivia().ToFullString(),
             hasStructuralChanges,
             hasWithoutBurst,
             hasUnsupportedCaptures,
@@ -950,14 +964,14 @@ internal sealed class EntitiesForEachQuery
         out bool hasStructuralChanges,
         out bool hasWithoutBurst,
         out ImmutableHashSet<ISymbol> readOnlyCaptures,
-        out ImmutableArray<ISymbol> disposalCaptures,
+        out ImmutableArray<(ISymbol Symbol, string Expression)> disposalCaptures,
         out ExpressionSyntax entitiesExpression)
     {
         var builder = ImmutableArray.CreateBuilder<DotsQueryFilter>();
         hasStructuralChanges = false;
         hasWithoutBurst = false;
         var readOnlyBuilder = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
-        var disposalBuilder = ImmutableArray.CreateBuilder<ISymbol>();
+        var disposalBuilder = ImmutableArray.CreateBuilder<(ISymbol Symbol, string Expression)>();
         var current = expression;
         while (current is InvocationExpressionSyntax invocation &&
                invocation.Expression is MemberAccessExpressionSyntax access)
@@ -973,11 +987,8 @@ internal sealed class EntitiesForEachQuery
                     : null;
                 if (method is null ||
                     !DotsQuerySemanticHelpers.IsUnityEntitiesMethod(method, methodName) ||
-                    (method.ContainingType.Name != "ForEachDescription" &&
-                     method.ReceiverType?.Name != "ForEachDescription") ||
                     symbol is not ILocalSymbol and not IParameterSymbol and not IFieldSymbol and not IPropertySymbol ||
-                    disposalBuilder.Any(item => SymbolEqualityComparer.Default.Equals(item, symbol)) ||
-                    readOnlyBuilder.Contains(symbol))
+                    disposalBuilder.Any(item => SymbolEqualityComparer.Default.Equals(item.Symbol, symbol)))
                 {
                     filters = default;
                     readOnlyCaptures = ImmutableHashSet<ISymbol>.Empty;
@@ -986,7 +997,9 @@ internal sealed class EntitiesForEachQuery
                     return false;
                 }
 
-                disposalBuilder.Add(symbol);
+                disposalBuilder.Insert(0, (
+                    symbol,
+                    invocation.ArgumentList.Arguments[0].Expression.WithoutTrivia().ToFullString()));
                 current = access.Expression;
                 continue;
             }
@@ -1000,8 +1013,7 @@ internal sealed class EntitiesForEachQuery
                 var symbol = semanticModel.GetSymbolInfo(
                     invocation.ArgumentList.Arguments[0].Expression,
                     cancellationToken).Symbol;
-                if (symbol is not ILocalSymbol and not IParameterSymbol and not IFieldSymbol and not IPropertySymbol ||
-                    disposalBuilder.Any(item => SymbolEqualityComparer.Default.Equals(item, symbol)))
+                if (symbol is not ILocalSymbol and not IParameterSymbol and not IFieldSymbol and not IPropertySymbol)
                 {
                     filters = default;
                     readOnlyCaptures = ImmutableHashSet<ISymbol>.Empty;
