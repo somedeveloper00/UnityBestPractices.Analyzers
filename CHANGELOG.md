@@ -7,6 +7,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.37] - 2026-08-02
+
 ### Fixed
 
 - Allowed `Entities.ForEach` job conversions with large lambda signatures to
