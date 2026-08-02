@@ -213,6 +213,7 @@ internal sealed partial class AnalyzerTests
                     where T : struct, IComponentData => default;
                 public void RemoveComponent<T>(Entity entity)
                     where T : struct, IComponentData { }
+                public void DestroyEntity(Entity entity) { }
             }
 
             public sealed class World
@@ -229,6 +230,7 @@ internal sealed partial class AnalyzerTests
                     where T : struct, IComponentData { }
                 public void RemoveComponent<T>(Entity entity)
                     where T : struct, IComponentData { }
+                public void DestroyEntity(Entity entity) { }
                 public void Playback(EntityManager entityManager) { }
                 public void Dispose() { }
 
@@ -272,6 +274,9 @@ internal sealed partial class AnalyzerTests
             public delegate void EntityRefInAction<T1, T2>(Entity entity, ref T1 first, in T2 second)
                 where T1 : struct, IComponentData
                 where T2 : struct, IComponentData;
+            public delegate void EntityInInAction<T1, T2>(Entity entity, in T1 first, in T2 second)
+                where T1 : struct, IComponentData
+                where T2 : struct, IComponentData;
             public delegate void EntityIndexInAction<T>(
                 Entity entity,
                 int entityInQueryIndex,
@@ -312,6 +317,9 @@ internal sealed partial class AnalyzerTests
                     where T1 : struct, IComponentData
                     where T2 : struct, IComponentData => default;
                 public ForEachDescription ForEach<T1, T2>(EntityRefInAction<T1, T2> action)
+                    where T1 : struct, IComponentData
+                    where T2 : struct, IComponentData => default;
+                public ForEachDescription ForEach<T1, T2>(EntityInInAction<T1, T2> action)
                     where T1 : struct, IComponentData
                     where T2 : struct, IComponentData => default;
                 public ForEachDescription ForEach<T>(EntityIndexInAction<T> action)
