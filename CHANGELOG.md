@@ -9,6 +9,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added German and Polish README translations and localized quick-fix and
+  refactoring titles for IDEs using either language.
 - Added a macOS CI build and test lane, documented macOS installation and
   development commands, and validation for the UPM package's macOS importer
   settings.

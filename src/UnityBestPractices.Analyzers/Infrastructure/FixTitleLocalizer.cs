@@ -54,6 +54,16 @@ internal static class FixTitleLocalizer
             return TranslateRussian(diagnosticId, englishTitle);
         }
 
+        if (language == "de")
+        {
+            return TranslateGerman(diagnosticId, englishTitle);
+        }
+
+        if (language == "pl")
+        {
+            return TranslatePolish(diagnosticId, englishTitle);
+        }
+
         return englishTitle;
     }
 
@@ -83,7 +93,7 @@ internal static class FixTitleLocalizer
     private static bool IsLocalized(CultureInfo culture)
     {
         var language = culture.TwoLetterISOLanguageName;
-        return language == "ja" || language == "fa" || language == "ru";
+        return language == "ja" || language == "fa" || language == "ru" || language == "de" || language == "pl";
     }
 
     private static string TranslateJapanese(string diagnosticId, string englishTitle) => diagnosticId switch
@@ -180,6 +190,70 @@ internal static class FixTitleLocalizer
         DiagnosticIds.CacheShaderPropertyId => "Кэшировать результат Shader.PropertyToID",
         DiagnosticIds.RemoveUnusedEntityAccess => "Удалить неиспользуемый доступ к сущности",
         _ => TranslateUse(englishTitle, "Использовать "),
+    };
+
+    private static string TranslateGerman(string diagnosticId, string englishTitle) => diagnosticId switch
+    {
+        ConvertStringLiteralToNameof => "Zeichenfolgenliteral durch nameof ersetzen",
+        InlineMethod => "Methode inline erweitern",
+        MoveParameterLeft => "Parameter nach links verschieben",
+        MoveParameterRight => "Parameter nach rechts verschieben",
+        MoveStatementUp => "Anweisung nach oben verschieben",
+        MoveStatementDown => "Anweisung nach unten verschieben",
+        RemoveParameter => "Parameter entfernen",
+        RemoveDoubleEmptyLines => "Doppelte Leerzeilen entfernen",
+        RemoveSymbol => "Symbol und alle Verwendungen entfernen",
+        DiagnosticIds.EncapsulateSerializedField => "Feld als private festlegen und SerializeField hinzufügen",
+        DiagnosticIds.YieldNull => "null mit yield zurückgeben",
+        DiagnosticIds.AddBurstCompile => "BurstCompile hinzufügen",
+        DiagnosticIds.MarkNativeArrayReadOnly => "NativeArray als ReadOnly markieren",
+        DiagnosticIds.UseRefLocal => "Über eine lokale ref-Variable ändern",
+        DiagnosticIds.CacheCameraMain => "Camera.main in diesem Block zwischenspeichern",
+        DiagnosticIds.PreallocateList => "List-Kapazität vorab zuweisen",
+        DiagnosticIds.UseMultiplicationForSquare => "Wert mit sich selbst multiplizieren",
+        DiagnosticIds.EntitiesForEachToSystemApiQuery => "In eine SystemAPI.Query-foreach-Schleife konvertieren",
+        DiagnosticIds.EntitiesForEachToJobEntityRun or DiagnosticIds.SystemApiQueryToJobEntityRun => "In IJobEntity.Run konvertieren",
+        DiagnosticIds.EntitiesForEachToJobEntitySchedule or DiagnosticIds.SystemApiQueryToJobEntitySchedule => "In IJobEntity.Schedule konvertieren",
+        DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel or DiagnosticIds.SystemApiQueryToJobEntityScheduleParallel => "In IJobEntity.ScheduleParallel konvertieren",
+        DiagnosticIds.JobEntityRunToSchedule or DiagnosticIds.JobEntityScheduleParallelToSchedule => "Schedule-Ausführung verwenden",
+        DiagnosticIds.JobEntityRunToScheduleParallel or DiagnosticIds.JobEntityScheduleToScheduleParallel => "ScheduleParallel-Ausführung verwenden",
+        DiagnosticIds.JobEntityScheduleToRun or DiagnosticIds.JobEntityScheduleParallelToRun => "Run-Ausführung verwenden",
+        DiagnosticIds.DiscardedScheduledJobHandle => "Geplantes JobHandle zuweisen",
+        DiagnosticIds.CacheShaderPropertyId => "Ergebnis von Shader.PropertyToID zwischenspeichern",
+        DiagnosticIds.RemoveUnusedEntityAccess => "Nicht verwendeten Entitätszugriff entfernen",
+        _ => TranslateUse(englishTitle, "Verwenden: "),
+    };
+
+    private static string TranslatePolish(string diagnosticId, string englishTitle) => diagnosticId switch
+    {
+        ConvertStringLiteralToNameof => "Zastąp literał ciągu operatorem nameof",
+        InlineMethod => "Rozwiń metodę w miejscu wywołania",
+        MoveParameterLeft => "Przenieś parametr w lewo",
+        MoveParameterRight => "Przenieś parametr w prawo",
+        MoveStatementUp => "Przenieś instrukcję w górę",
+        MoveStatementDown => "Przenieś instrukcję w dół",
+        RemoveParameter => "Usuń parametr",
+        RemoveDoubleEmptyLines => "Usuń powtarzające się puste wiersze",
+        RemoveSymbol => "Usuń symbol i wszystkie jego użycia",
+        DiagnosticIds.EncapsulateSerializedField => "Ustaw pole jako private i dodaj SerializeField",
+        DiagnosticIds.YieldNull => "Zwróć null za pomocą yield",
+        DiagnosticIds.AddBurstCompile => "Dodaj BurstCompile",
+        DiagnosticIds.MarkNativeArrayReadOnly => "Oznacz NativeArray jako ReadOnly",
+        DiagnosticIds.UseRefLocal => "Modyfikuj przez lokalną zmienną ref",
+        DiagnosticIds.CacheCameraMain => "Buforuj Camera.main w tym bloku",
+        DiagnosticIds.PreallocateList => "Wstępnie przydziel pojemność List",
+        DiagnosticIds.UseMultiplicationForSquare => "Pomnóż wartość przez nią samą",
+        DiagnosticIds.EntitiesForEachToSystemApiQuery => "Przekonwertuj na pętlę foreach z SystemAPI.Query",
+        DiagnosticIds.EntitiesForEachToJobEntityRun or DiagnosticIds.SystemApiQueryToJobEntityRun => "Przekonwertuj na IJobEntity.Run",
+        DiagnosticIds.EntitiesForEachToJobEntitySchedule or DiagnosticIds.SystemApiQueryToJobEntitySchedule => "Przekonwertuj na IJobEntity.Schedule",
+        DiagnosticIds.EntitiesForEachToJobEntityScheduleParallel or DiagnosticIds.SystemApiQueryToJobEntityScheduleParallel => "Przekonwertuj na IJobEntity.ScheduleParallel",
+        DiagnosticIds.JobEntityRunToSchedule or DiagnosticIds.JobEntityScheduleParallelToSchedule => "Użyj wykonywania Schedule",
+        DiagnosticIds.JobEntityRunToScheduleParallel or DiagnosticIds.JobEntityScheduleToScheduleParallel => "Użyj wykonywania ScheduleParallel",
+        DiagnosticIds.JobEntityScheduleToRun or DiagnosticIds.JobEntityScheduleParallelToRun => "Użyj wykonywania Run",
+        DiagnosticIds.DiscardedScheduledJobHandle => "Przypisz zaplanowany JobHandle",
+        DiagnosticIds.CacheShaderPropertyId => "Buforuj wynik Shader.PropertyToID",
+        DiagnosticIds.RemoveUnusedEntityAccess => "Usuń nieużywany dostęp do encji",
+        _ => TranslateUse(englishTitle, "Użyj: "),
     };
 
     private static string TranslateUse(string englishTitle, string prefix) =>

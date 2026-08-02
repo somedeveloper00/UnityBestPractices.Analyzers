@@ -10,6 +10,8 @@ public sealed class FixTitleLocalizerTests
         CultureInfo.GetCultureInfo("ja-JP"),
         CultureInfo.GetCultureInfo("fa-IR"),
         CultureInfo.GetCultureInfo("ru-RU"),
+        CultureInfo.GetCultureInfo("de-DE"),
+        CultureInfo.GetCultureInfo("pl-PL"),
     };
 
     [Fact]
@@ -109,5 +111,18 @@ public sealed class FixTitleLocalizerTests
         {
             Assert.Equal(japaneseTitle, FixTitleLocalizer.Get(key, englishTitle, culture));
         }
+    }
+
+    [Theory]
+    [InlineData("de-DE", "null mit yield zurückgeben")]
+    [InlineData("pl-PL", "Zwróć null za pomocą yield")]
+    public void NewCulturesUseLocalizedDisplayTitles(string cultureName, string expectedTitle)
+    {
+        Assert.Equal(
+            expectedTitle,
+            FixTitleLocalizer.Get(
+                DiagnosticIds.YieldNull,
+                "Yield null",
+                CultureInfo.GetCultureInfo(cultureName)));
     }
 }
