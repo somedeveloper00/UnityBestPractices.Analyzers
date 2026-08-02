@@ -158,6 +158,43 @@ internal sealed partial class AnalyzerTests
             "struct Disposable { public float Value; public JobHandle Dispose(JobHandle dependency) => default; } " +
             "struct Position : IComponentData { public float Value; }");
 
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class LookupSystem : SystemBase { void Update() { " +
+            "var aircraftDataLookup = 1; Entities.ForEach((Entity entity, ref Position p) => { " +
+            "if (SystemAPI.HasComponent<AircraftData>(entity) && " +
+            "SystemAPI.HasComponent<AircraftData>(entity)) p.Value++; }).Schedule(); } } " +
+            "struct Position : IComponentData { public float Value; } " +
+            "struct AircraftData : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToJobEntitySchedule,
+            "using Unity.Entities; partial class LookupSystem : SystemBase { void Update() { " +
+            "var aircraftDataLookup = 1; var aircraftDataLookup2 = " +
+            "Unity.Entities.SystemAPI.GetComponentLookup<global::AircraftData>(true); " +
+            "new EntitiesForEachJob { AircraftDataLookup = aircraftDataLookup2 }.Schedule(); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "[Unity.Collections.ReadOnly] public Unity.Entities.ComponentLookup<global::AircraftData> " +
+            "AircraftDataLookup; public void Execute(Entity entity, ref Position p) { " +
+            "if (AircraftDataLookup.HasComponent(entity) && AircraftDataLookup.HasComponent(entity)) " +
+            "p.Value++; } } } struct Position : IComponentData { public float Value; } " +
+            "struct AircraftData : IComponentData { }");
+
+        await VerifyFixAsync(
+            "using Unity.Entities; partial class ReuseLookupSystem : SystemBase { void Update() { " +
+            "var aircraftDataLookup = SystemAPI.GetComponentLookup<AircraftData>(true); " +
+            "Entities.ForEach((Entity entity, ref Position p) => { " +
+            "if (SystemAPI.HasComponent<AircraftData>(entity)) p.Value++; }).Run(); } } " +
+            "struct Position : IComponentData { public float Value; } " +
+            "struct AircraftData : IComponentData { }",
+            DiagnosticIds.EntitiesForEachToJobEntityRun,
+            "using Unity.Entities; partial class ReuseLookupSystem : SystemBase { void Update() { " +
+            "var aircraftDataLookup = SystemAPI.GetComponentLookup<AircraftData>(true); " +
+            "new EntitiesForEachJob { AircraftDataLookup = aircraftDataLookup }.Run(); } " +
+            "[Unity.Burst.BurstCompile] private partial struct EntitiesForEachJob : Unity.Entities.IJobEntity { " +
+            "[Unity.Collections.ReadOnly] public Unity.Entities.ComponentLookup<global::AircraftData> " +
+            "AircraftDataLookup; public void Execute(Entity entity, ref Position p) { " +
+            "if (AircraftDataLookup.HasComponent(entity)) p.Value++; } } } " +
+            "struct Position : IComponentData { public float Value; } " +
+            "struct AircraftData : IComponentData { }");
+
         const string readOnlySource =
             "using Unity.Entities; partial class ReadOnlySystem : SystemBase { void Update() { " +
             "var lookup = new Lookup { Value = 2f }; Entities.WithReadOnly(lookup).ForEach(" +

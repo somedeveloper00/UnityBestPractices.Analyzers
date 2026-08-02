@@ -83,7 +83,7 @@ internal static class DotsQueryCodeFixes
                 query.CreateJobParameters(),
                 query.CreateJobAttributes(),
                 System.Collections.Immutable.ImmutableArray<DotsJobField>.Empty,
-                System.Collections.Immutable.ImmutableArray<string>.Empty,
+                System.Collections.Immutable.ImmutableArray<DotsDisposalCapture>.Empty,
                 null,
                 GetTargetExecutionMode(rule.Kind),
                 semanticModel);
@@ -191,8 +191,8 @@ internal static class DotsQueryCodeFixes
         BlockSyntax jobBody,
         string jobParameters,
         string jobAttributes,
-        System.Collections.Immutable.ImmutableArray<DotsJobField> jobFields,
-        System.Collections.Immutable.ImmutableArray<string> disposalCaptures,
+        ImmutableArray<DotsJobField> jobFields,
+        ImmutableArray<DotsDisposalCapture> disposalCaptures,
         string? explicitDependency,
         string executionMode,
         SemanticModel semanticModel)
@@ -215,6 +215,9 @@ internal static class DotsQueryCodeFixes
             "{\n" +
             string.Concat(jobFields.Select(field =>
                 (field.IsReadOnly ? "    [Unity.Collections.ReadOnly]\n" : string.Empty) +
+                (executionMode == "Run" && disposalCaptures.Any(capture => ReferenceEquals(capture.JobField, field))
+                    ? "    [Unity.Collections.DeallocateOnJobCompletion]\n"
+                    : string.Empty) +
                 "    public " + field.TypeName + " " + field.Name + ";\n")) +
             "    public void Execute(" + jobParameters + ")\n" +
             jobBody.WithoutTrivia().ToFullString() + "\n" +
@@ -235,43 +238,60 @@ internal static class DotsQueryCodeFixes
             "(" + (explicitDependency ?? (needsHandleBookkeeping && IsSystemBase(containingType, semanticModel)
                 ? "Dependency"
                 : string.Empty)) + ")";
-        TypeDeclarationSyntax updatedType;
-        if (needsHandleBookkeeping && sourceStatement.Parent is BlockSyntax parentBlock)
+        var executionStatement = SyntaxFactory.ParseStatement(invocation + ";")
+            .WithTriviaFrom(sourceStatement)
+            .WithAdditionalAnnotations(Formatter.Annotation);
+        var preJobStatements = jobFields
+            .Where(field => field.PreJobDeclaration is not null)
+            .Select(field => SyntaxFactory.ParseStatement(field.PreJobDeclaration!))
+            .ToArray();
+        TypeDeclarationSyntax rewrittenType;
+        if (needsHandleBookkeeping && sourceStatement.Parent is BlockSyntax bookkeepingBlock)
         {
             var handleName = CreateUniqueLocalName(semanticModel, sourceStatement, "jobHandle");
-            var statementTexts = new System.Collections.Generic.List<string>
-            {
-                "var " + handleName + " = " + invocation + ";",
-            };
-            foreach (var capture in disposalCaptures)
-            {
-                statementTexts.Add(handleName + " = " + capture + ".Dispose(" + handleName + ");");
-            }
-
-            if (IsSystemBase(containingType, semanticModel))
-            {
-                statementTexts[statementTexts.Count - 1] =
-                    "Dependency = " + disposalCaptures[disposalCaptures.Length - 1] +
-                    ".Dispose(" + handleName + ");";
-            }
-
-            var statements = statementTexts.Select(text => SyntaxFactory.ParseStatement(text)).ToArray();
-            statements[0] = statements[0].WithLeadingTrivia(sourceStatement.GetLeadingTrivia());
-            statements[statements.Length - 1] = statements[statements.Length - 1]
-                .WithTrailingTrivia(sourceStatement.GetTrailingTrivia());
-            var index = parentBlock.Statements.IndexOf(sourceStatement);
-            var replacementBlock = parentBlock.WithStatements(
-                parentBlock.Statements.RemoveAt(index).InsertRange(index, statements));
-            updatedType = containingType.ReplaceNode(parentBlock, replacementBlock).AddMembers(jobDeclaration);
+            var generatedStatements = preJobStatements
+                .Append(SyntaxFactory.ParseStatement("var " + handleName + " = " + invocation + ";"))
+                .Concat(disposalCaptures.Select((capture, index) => SyntaxFactory.ParseStatement(
+                    IsSystemBase(containingType, semanticModel) && index == disposalCaptures.Length - 1
+                        ? "Dependency = " + capture.Expression + ".Dispose(" + handleName + ");"
+                        : handleName + " = " + capture.Expression + ".Dispose(" + handleName + ");")))
+                .ToArray();
+            generatedStatements[0] = generatedStatements[0]
+                .WithLeadingTrivia(sourceStatement.GetLeadingTrivia());
+            generatedStatements[generatedStatements.Length - 1] =
+                generatedStatements[generatedStatements.Length - 1]
+                    .WithTrailingTrivia(sourceStatement.GetTrailingTrivia());
+            var statementIndex = bookkeepingBlock.Statements.IndexOf(sourceStatement);
+            var updatedBlock = bookkeepingBlock.WithStatements(bookkeepingBlock.Statements
+                .RemoveAt(statementIndex)
+                .InsertRange(statementIndex, generatedStatements));
+            rewrittenType = containingType.ReplaceNode(bookkeepingBlock, updatedBlock);
+        }
+        else if (preJobStatements.Length != 0 && sourceStatement.Parent is BlockSyntax parentBlock)
+        {
+            preJobStatements[0] = preJobStatements[0]
+                .WithLeadingTrivia(sourceStatement.GetLeadingTrivia());
+            executionStatement = executionStatement.WithLeadingTrivia();
+            var statementIndex = parentBlock.Statements.IndexOf(sourceStatement);
+            var updatedBlock = parentBlock.WithStatements(parentBlock.Statements
+                .RemoveAt(statementIndex)
+                .InsertRange(statementIndex, preJobStatements.Append(executionStatement)));
+            rewrittenType = containingType.ReplaceNode(parentBlock, updatedBlock);
+        }
+        else if (preJobStatements.Length != 0)
+        {
+            var replacementBlock = SyntaxFactory.Block(
+                    preJobStatements.Append(executionStatement.WithLeadingTrivia()))
+                .WithTriviaFrom(sourceStatement);
+            rewrittenType = containingType.ReplaceNode(sourceStatement, replacementBlock);
         }
         else
         {
-            var executionStatement = SyntaxFactory.ParseStatement(invocation + ";")
-                .WithTriviaFrom(sourceStatement);
-            updatedType = containingType.ReplaceNode(sourceStatement, executionStatement).AddMembers(jobDeclaration);
+            rewrittenType = containingType.ReplaceNode(sourceStatement, executionStatement);
         }
 
-        updatedType = updatedType
+        var updatedType = rewrittenType
+            .AddMembers(jobDeclaration)
             .WithAdditionalAnnotations(Formatter.Annotation);
         return document.WithSyntaxRoot(root.ReplaceNode(containingType, updatedType));
     }
@@ -300,10 +320,11 @@ internal static class DotsQueryCodeFixes
         var names = scope?.DescendantTokens()
             .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
             .Select(token => token.ValueText)
-            .ToImmutableHashSet(System.StringComparer.Ordinal) ??
-            System.Collections.Immutable.ImmutableHashSet<string>.Empty;
+            .ToImmutableHashSet(System.StringComparer.Ordinal) ?? ImmutableHashSet<string>.Empty;
         var name = baseName;
-        for (var suffix = 2; names.Contains(name) || semanticModel.LookupSymbols(statement.SpanStart, name: name).Length != 0; suffix++)
+        for (var suffix = 2;
+             names.Contains(name) || semanticModel.LookupSymbols(statement.SpanStart, name: name).Length != 0;
+             suffix++)
         {
             name = baseName + suffix;
         }
