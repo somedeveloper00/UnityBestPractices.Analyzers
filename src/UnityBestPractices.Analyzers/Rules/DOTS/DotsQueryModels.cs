@@ -1554,7 +1554,7 @@ internal static class DotsQuerySemanticHelpers
             replacements.Add(access, fieldName);
         }
 
-        foreach (var group in hasComponentCalls.GroupBy(
+        foreach (var group in hasComponentCalls.GroupBy<HasComponentCall, ITypeSymbol>(
                      call => call.ComponentType,
                      SymbolEqualityComparer.Default))
         {
@@ -1734,7 +1734,7 @@ internal static class DotsQuerySemanticHelpers
             method.Parameters[0].Type.ToDisplayString() != "Unity.Entities.Entity" ||
             method.ReturnType.SpecialType != SpecialType.System_Boolean ||
             invocation.ArgumentList.Arguments.Count != 1 ||
-            invocation.ArgumentList.Arguments[0].RefKindKeyword.Kind() != SyntaxKind.None)
+            !invocation.ArgumentList.Arguments[0].RefKindKeyword.IsKind(SyntaxKind.None))
         {
             return false;
         }
