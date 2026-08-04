@@ -34,25 +34,9 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor UninitializedNativeArrayRule =
         DiagnosticCatalog.Get(DiagnosticIds.UseUninitializedNativeArray).Descriptor;
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(
-            EncapsulateSerializedFieldRule,
-            YieldNullRule,
-            SquaredMagnitudeRule,
-            BurstCompileRule,
-            ReadOnlyNativeArrayRule,
-            StackallocRule,
-            RefLocalRule,
-            CacheCameraMainRule,
-            PreallocateListRule,
-            MultiplySquareRule,
-            UninitializedNativeArrayRule)
-        .AddRange(ExpressionQuickFixRegistry.Descriptors)
-        .AddRange(DotsQueryRules.Descriptors)
-        .AddRange(AdvancedUnityRules.Descriptors)
-        .Add(NamespaceConsistencyRules.Descriptor)
-        .Add(DiagnosticCatalog.Get(DiagnosticIds.RemoveUnusedEntityAccess).Descriptor)
-        .Add(DiagnosticCatalog.Get(DiagnosticIds.UseModernObjectFindApi).Descriptor);
+    // Catalog is authoritative; keep static field descriptors above for zero-allocation report sites.
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
+        DiagnosticCatalog.All.Select(metadata => metadata.Descriptor).ToImmutableArray();
 
     public override void Initialize(AnalysisContext context)
     {

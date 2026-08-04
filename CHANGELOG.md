@@ -7,6 +7,26 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.41] - 2026-08-04
+
+### Changed
+
+- Unified quick-fix registration so fixable IDs come from the diagnostic catalog,
+  every code action uses the diagnostic ID as its equivalence key, and titles are
+  resolved only through catalog metadata plus the localizer.
+- Analyzer `SupportedDiagnostics` is now catalog-driven to prevent descriptor drift.
+- Moved UBP0001–UBP0011 apply paths into `LegacyCoreCodeFixes` and replaced several
+  string-parsed rewrites (stackalloc, ref local, Camera.main cache, shader property
+  field, uninitialized NativeArray option) with structured `SyntaxFactory` trees.
+- Split the monolithic DOTS query model file into shared models, Entities.ForEach,
+  SystemAPI.Query, IJobEntity execution, and semantic helper modules.
+
+### Added
+
+- Shared code-fix registration and document helpers for consistent fix wiring.
+- Catalog/provider invariant tests covering fixable-ID parity, diagnostic-only
+  exclusion, equivalence keys, and Safe Fix All exceptions.
+
 ## [0.4.40] - 2026-08-02
 
 ### Fixed
