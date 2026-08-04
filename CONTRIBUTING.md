@@ -20,6 +20,14 @@ Every diagnostic must have a unique stable ID, central `RuleMetadata`, an `Info`
 
 Keep the dependency-light regression harness at the existing coverage floor: four distinct positive quick-fix cases for every rule and ten for complicated transformations. Add focused xUnit tests under a file named for the diagnostic when changing symbol, solution, or Fix All behavior.
 
+### Quick fixes
+
+- Register every fix through `CodeFixRegistration.Register`. The equivalence key must be the diagnostic ID; titles come from `RuleMetadata.FixTitle` via `FixTitleLocalizer`.
+- `UnityBestPracticesCodeFixProvider.FixableDiagnosticIds` is catalog-driven (`HasCodeFix`). Do not maintain a separate ID list.
+- Prefer structured `SyntaxFactory` rewrites over `ParseExpression` / `ParseStatement` / `ParseMemberDeclaration` for multi-statement or type-member generation. Revalidate matchers on apply.
+- Put apply logic next to the rule family under `Rules/` (for example `LegacyCoreCodeFixes`, expression rules, DOTS builders). Keep the code-fix provider as thin dispatch.
+- Catalog/provider parity, equivalence keys, and Safe Fix All exceptions are enforced by `CodeFixCatalogInvariantTests`.
+
 After changing catalog metadata, regenerate rule pages:
 
 ```powershell

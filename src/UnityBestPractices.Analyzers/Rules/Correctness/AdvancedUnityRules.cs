@@ -620,14 +620,29 @@ internal static class AdvancedUnityRules
         var replacedDeclaration = declaration.ReplaceNodes(
             matchingCalls,
             (original, _) => SyntaxFactory.IdentifierName(fieldName).WithTriviaFrom(original));
-        var literal = matchingCalls[0].ArgumentList.Arguments[0].Expression.ToString();
-        var field = SyntaxFactory.ParseMemberDeclaration(
-                $"private static readonly int {fieldName} = UnityEngine.Shader.PropertyToID({literal});")
-            ?.WithAdditionalAnnotations(Formatter.Annotation);
-        if (field is null)
-        {
-            return document;
-        }
+        var propertyNameExpression = matchingCalls[0].ArgumentList.Arguments[0].Expression.WithoutTrivia();
+        var propertyToId = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("UnityEngine"),
+                    SyntaxFactory.IdentifierName("Shader")),
+                SyntaxFactory.IdentifierName("PropertyToID")),
+            SyntaxFactory.ArgumentList(
+                SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(propertyNameExpression))));
+        var field = SyntaxFactory.FieldDeclaration(
+                SyntaxFactory.VariableDeclaration(
+                        SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.IntKeyword)))
+                    .AddVariables(
+                        SyntaxFactory.VariableDeclarator(fieldName)
+                            .WithInitializer(SyntaxFactory.EqualsValueClause(propertyToId))))
+            .WithModifiers(
+                SyntaxFactory.TokenList(
+                    SyntaxFactory.Token(SyntaxKind.PrivateKeyword),
+                    SyntaxFactory.Token(SyntaxKind.StaticKeyword),
+                    SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword)))
+            .WithAdditionalAnnotations(Formatter.Annotation);
 
         replacedDeclaration = replacedDeclaration
             .WithMembers(replacedDeclaration.Members.Insert(0, field))
