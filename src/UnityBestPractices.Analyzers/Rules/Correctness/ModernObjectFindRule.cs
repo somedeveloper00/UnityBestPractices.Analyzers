@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,10 @@ namespace UnityBestPractices.Analyzers;
 
 internal static class ModernObjectFindRule
 {
+    private const string SortModeInstanceId = "global::UnityEngine.FindObjectsSortMode.InstanceID";
+    private const string InactiveInclude = "global::UnityEngine.FindObjectsInactive.Include";
+    private const string InactiveExclude = "global::UnityEngine.FindObjectsInactive.Exclude";
+
     internal static void AnalyzeInvocation(
         SyntaxNodeAnalysisContext context,
         InvocationExpressionSyntax invocation)
@@ -22,11 +27,24 @@ internal static class ModernObjectFindRule
             "UnityEngine.Object");
         if (method is null || objectType is null || !method.IsStatic ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingType, objectType) ||
-            !TryGetReplacement(method, out var replacementName, out var addsSortMode) ||
-            !objectType.GetMembers(replacementName).OfType<IMethodSymbol>().Any(candidate => candidate.IsStatic) ||
-            (addsSortMode && UnitySymbolCache.GetTypeByMetadataName(
+            !TryClassify(method, out var replacementName, out var needsSortMode, out var needsInactiveEnum) ||
+            !objectType.GetMembers(replacementName).OfType<IMethodSymbol>().Any(candidate => candidate.IsStatic))
+        {
+            return;
+        }
+
+        if (needsSortMode &&
+            UnitySymbolCache.GetTypeByMetadataName(
                 context.SemanticModel.Compilation,
-                "UnityEngine.FindObjectsSortMode") is null))
+                "UnityEngine.FindObjectsSortMode") is null)
+        {
+            return;
+        }
+
+        if (needsInactiveEnum &&
+            UnitySymbolCache.GetTypeByMetadataName(
+                context.SemanticModel.Compilation,
+                "UnityEngine.FindObjectsInactive") is null)
         {
             return;
         }
@@ -49,88 +67,148 @@ internal static class ModernObjectFindRule
             root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true)
                 .FirstAncestorOrSelf<InvocationExpressionSyntax>() is not { } invocation ||
             semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method ||
-            !TryGetReplacement(method, out var replacementName, out var addsSortMode))
+            !TryClassify(method, out var replacementName, out var needsSortMode, out _))
         {
             return document;
         }
 
-        // Prefer converting typeof(T) + cast to T / T[] into the generic form so the
-        // resulting call matches modern Unity style while keeping InstanceID ordering.
+        var includeInactive = TryGetIncludeInactiveArgument(method, invocation);
+
+        // Prefer typeof(T) + matching cast → generic form.
         if (!method.IsGenericMethod &&
-            TryGetTypeOfArgumentType(invocation, semanticModel, cancellationToken, out var typeOfTypeSyntax) &&
-            TryGetMatchingCast(invocation, typeOfTypeSyntax, addsSortMode, out var castNode, out var castTypeSyntax))
+            TryGetTypeOfArgumentType(invocation, out var typeOfTypeSyntax) &&
+            TryGetMatchingCast(invocation, typeOfTypeSyntax, isMultiple: needsSortMode, out var castNode))
+        {
+            var genericInvocation = BuildReplacement(
+                invocation,
+                replacementName,
+                typeArgument: typeOfTypeSyntax,
+                keepTypeArgument: false,
+                includeInactiveArgument: includeInactive,
+                needsSortMode: needsSortMode);
+
+            return document.WithSyntaxRoot(
+                root.ReplaceNode(castNode, genericInvocation.WithTriviaFrom(castNode)));
+        }
+
+        var replacement = BuildReplacement(
+            invocation,
+            replacementName,
+            typeArgument: null,
+            keepTypeArgument: !method.IsGenericMethod,
+            includeInactiveArgument: includeInactive,
+            needsSortMode: needsSortMode);
+
+        return document.WithSyntaxRoot(root.ReplaceNode(invocation, replacement));
+    }
+
+    private static InvocationExpressionSyntax BuildReplacement(
+        InvocationExpressionSyntax invocation,
+        string replacementName,
+        TypeSyntax? typeArgument,
+        bool keepTypeArgument,
+        ExpressionSyntax? includeInactiveArgument,
+        bool needsSortMode)
+    {
+        ExpressionSyntax newExpression;
+        if (typeArgument is not null)
         {
             var genericName = SyntaxFactory.GenericName(
                 SyntaxFactory.Identifier(replacementName),
                 SyntaxFactory.TypeArgumentList(
-                    SyntaxFactory.SingletonSeparatedList(typeOfTypeSyntax.WithoutTrivia())));
+                    SyntaxFactory.SingletonSeparatedList(typeArgument.WithoutTrivia())));
 
-            ExpressionSyntax newExpression = invocation.Expression switch
+            newExpression = invocation.Expression switch
             {
                 MemberAccessExpressionSyntax memberAccess =>
                     memberAccess.WithName(genericName.WithTriviaFrom(memberAccess.Name)),
                 _ => genericName.WithTriviaFrom(invocation.Expression),
             };
-
-            SeparatedSyntaxList<ArgumentSyntax> newArguments = default;
-            if (addsSortMode)
-            {
-                newArguments = SyntaxFactory.SingletonSeparatedList(
-                    SyntaxFactory.Argument(
-                        SyntaxFactory.ParseExpression("global::UnityEngine.FindObjectsSortMode.InstanceID")));
-            }
-
-            var newInvocation = invocation
-                .WithExpression(newExpression)
-                .WithArgumentList(SyntaxFactory.ArgumentList(newArguments).WithTriviaFrom(invocation.ArgumentList))
-                .WithAdditionalAnnotations(Formatter.Annotation);
-
-            // Replace the outer cast (as or explicit) with the generic invocation so
-            // the cast is no longer needed.
-            var nodeToReplace = (SyntaxNode)castNode;
-            var replacementNode = (SyntaxNode)newInvocation.WithTriviaFrom(castNode);
-
-            return document.WithSyntaxRoot(root.ReplaceNode(nodeToReplace, replacementNode));
         }
-
-        // Fallback: rename only (and add SortMode for the multi-object API).
-        var expression = Rename(invocation.Expression, replacementName);
-        var arguments = invocation.ArgumentList.Arguments;
-        if (addsSortMode)
+        else
         {
-            arguments = arguments.Add(
-                SyntaxFactory.Argument(
-                    SyntaxFactory.ParseExpression("global::UnityEngine.FindObjectsSortMode.InstanceID")));
+            newExpression = Rename(invocation.Expression, replacementName);
         }
 
-        var replacement = invocation
-            .WithExpression(expression)
-            .WithArgumentList(invocation.ArgumentList.WithArguments(arguments))
+        var newArgs = new List<ArgumentSyntax>();
+
+        if (keepTypeArgument && invocation.ArgumentList.Arguments.Count > 0)
+        {
+            newArgs.Add(invocation.ArgumentList.Arguments[0]);
+        }
+
+        if (includeInactiveArgument is not null)
+        {
+            newArgs.Add(SyntaxFactory.Argument(includeInactiveArgument));
+        }
+
+        if (needsSortMode)
+        {
+            newArgs.Add(SyntaxFactory.Argument(SyntaxFactory.ParseExpression(SortModeInstanceId)));
+        }
+
+        return invocation
+            .WithExpression(newExpression)
+            .WithArgumentList(
+                SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(newArgs))
+                    .WithTriviaFrom(invocation.ArgumentList))
             .WithAdditionalAnnotations(Formatter.Annotation);
-        return document.WithSyntaxRoot(root.ReplaceNode(invocation, replacement));
+    }
+
+    private static ExpressionSyntax? TryGetIncludeInactiveArgument(
+        IMethodSymbol method,
+        InvocationExpressionSyntax invocation)
+    {
+        if (method.Parameters.Length == 0)
+        {
+            return null;
+        }
+
+        var lastParam = method.Parameters[method.Parameters.Length - 1];
+        if (lastParam.Type.SpecialType != SpecialType.System_Boolean)
+        {
+            return null;
+        }
+
+        var inactiveArgIndex = method.IsGenericMethod ? 0 : 1;
+        if (invocation.ArgumentList.Arguments.Count <= inactiveArgIndex)
+        {
+            return null;
+        }
+
+        return ConvertBoolToFindObjectsInactive(
+            invocation.ArgumentList.Arguments[inactiveArgIndex].Expression);
+    }
+
+    private static ExpressionSyntax ConvertBoolToFindObjectsInactive(ExpressionSyntax boolExpression)
+    {
+        if (boolExpression.IsKind(SyntaxKind.TrueLiteralExpression))
+        {
+            return SyntaxFactory.ParseExpression(InactiveInclude);
+        }
+
+        if (boolExpression.IsKind(SyntaxKind.FalseLiteralExpression))
+        {
+            return SyntaxFactory.ParseExpression(InactiveExclude);
+        }
+
+        return SyntaxFactory.ConditionalExpression(
+            boolExpression.WithoutTrivia(),
+            SyntaxFactory.ParseExpression(InactiveInclude),
+            SyntaxFactory.ParseExpression(InactiveExclude));
     }
 
     private static bool TryGetTypeOfArgumentType(
         InvocationExpressionSyntax invocation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
         out TypeSyntax typeSyntax)
     {
         typeSyntax = null!;
-        if (invocation.ArgumentList.Arguments.Count != 1)
+        if (invocation.ArgumentList.Arguments.Count < 1)
         {
             return false;
         }
 
-        var argumentExpression = invocation.ArgumentList.Arguments[0].Expression;
-        if (argumentExpression is not TypeOfExpressionSyntax typeOfExpression)
-        {
-            return false;
-        }
-
-        // Ensure the argument really is a System.Type typeof(...) and not some other expression.
-        var typeInfo = semanticModel.GetTypeInfo(typeOfExpression.Type, cancellationToken);
-        if (typeInfo.Type is null)
+        if (invocation.ArgumentList.Arguments[0].Expression is not TypeOfExpressionSyntax typeOfExpression)
         {
             return false;
         }
@@ -142,15 +220,12 @@ internal static class ModernObjectFindRule
     private static bool TryGetMatchingCast(
         InvocationExpressionSyntax invocation,
         TypeSyntax typeOfTypeSyntax,
-        bool expectsArray,
-        out ExpressionSyntax castExpression,
-        out TypeSyntax castTypeSyntax)
+        bool isMultiple,
+        out ExpressionSyntax castExpression)
     {
         castExpression = null!;
-        castTypeSyntax = null!;
 
         var parent = invocation.Parent;
-        // Unwrap parentheses: ((T[])FindObjectsOfType(...))
         while (parent is ParenthesizedExpressionSyntax parenthesized)
         {
             parent = parenthesized.Parent;
@@ -178,8 +253,7 @@ internal static class ModernObjectFindRule
             return false;
         }
 
-        // Normalize array vs element: for FindObjectsOfType we expect T[], for FindObjectOfType we expect T.
-        if (expectsArray)
+        if (isMultiple)
         {
             if (candidateType is not ArrayTypeSyntax arrayType ||
                 !TypesMatchIgnoringTrivia(arrayType.ElementType, typeOfTypeSyntax))
@@ -187,16 +261,11 @@ internal static class ModernObjectFindRule
                 return false;
             }
         }
-        else
+        else if (!TypesMatchIgnoringTrivia(candidateType, typeOfTypeSyntax))
         {
-            if (!TypesMatchIgnoringTrivia(candidateType, typeOfTypeSyntax))
-            {
-                return false;
-            }
+            return false;
         }
 
-        // Prefer replacing the outermost parenthesized expression that wraps the cast
-        // so leftover parentheses are not left behind after the fix.
         ExpressionSyntax nodeToReplace = candidateNode;
         while (nodeToReplace.Parent is ParenthesizedExpressionSyntax outer)
         {
@@ -204,42 +273,73 @@ internal static class ModernObjectFindRule
         }
 
         castExpression = nodeToReplace;
-        castTypeSyntax = candidateType;
         return true;
     }
 
-    private static bool TypesMatchIgnoringTrivia(TypeSyntax left, TypeSyntax right)
-    {
-        return left.WithoutTrivia().ToFullString() == right.WithoutTrivia().ToFullString();
-    }
+    private static bool TypesMatchIgnoringTrivia(TypeSyntax left, TypeSyntax right) =>
+        left.WithoutTrivia().ToFullString() == right.WithoutTrivia().ToFullString();
 
-    private static bool TryGetReplacement(
+    private static bool TryClassify(
         IMethodSymbol method,
         out string replacementName,
-        out bool addsSortMode)
+        out bool needsSortMode,
+        out bool needsInactiveEnum)
     {
         replacementName = string.Empty;
-        addsSortMode = false;
-        var hasSupportedArguments = method.IsGenericMethod
-            ? method.TypeArguments.Length == 1 && method.Parameters.Length == 0
-            : method.Parameters.Length == 1 &&
-              method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ==
-              "global::System.Type";
-        if (!hasSupportedArguments)
+        needsSortMode = false;
+        needsInactiveEnum = false;
+
+        if (method.Name is not ("FindObjectOfType" or "FindObjectsOfType"))
         {
             return false;
         }
 
-        if (method.Name == "FindObjectOfType")
+        var isMultiple = method.Name == "FindObjectsOfType";
+        replacementName = isMultiple ? "FindObjectsByType" : "FindFirstObjectByType";
+        needsSortMode = isMultiple;
+
+        if (method.IsGenericMethod)
         {
-            replacementName = "FindFirstObjectByType";
+            if (method.TypeArguments.Length != 1)
+            {
+                return false;
+            }
+
+            if (method.Parameters.Length == 0)
+            {
+                return true;
+            }
+
+            if (method.Parameters.Length == 1 &&
+                method.Parameters[0].Type.SpecialType == SpecialType.System_Boolean)
+            {
+                needsInactiveEnum = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        if (method.Parameters.Length == 0)
+        {
+            return false;
+        }
+
+        var typeParam = method.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (typeParam != "global::System.Type")
+        {
+            return false;
+        }
+
+        if (method.Parameters.Length == 1)
+        {
             return true;
         }
 
-        if (method.Name == "FindObjectsOfType")
+        if (method.Parameters.Length == 2 &&
+            method.Parameters[1].Type.SpecialType == SpecialType.System_Boolean)
         {
-            replacementName = "FindObjectsByType";
-            addsSortMode = true;
+            needsInactiveEnum = true;
             return true;
         }
 
