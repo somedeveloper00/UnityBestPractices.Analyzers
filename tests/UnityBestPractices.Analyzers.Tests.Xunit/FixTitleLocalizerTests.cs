@@ -78,6 +78,7 @@ public sealed class FixTitleLocalizerTests
             (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle),
             (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title),
             (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title),
+            (FixTitleLocalizer.RemoveEmptyBrackets, RemoveEmptyBracketsCodeRefactoringProvider.Title),
             (FixTitleLocalizer.RemoveSymbol, RemoveSymbolCodeRefactoringProvider.Title),
         };
 
@@ -103,6 +104,7 @@ public sealed class FixTitleLocalizerTests
             (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle, "ステートメントを下へ移動"),
             (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title, "パラメーターを削除"),
             (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title, "連続する空行を削除"),
+            (FixTitleLocalizer.RemoveEmptyBrackets, RemoveEmptyBracketsCodeRefactoringProvider.Title, "空の括弧を削除"),
             (FixTitleLocalizer.RemoveSymbol, RemoveSymbolCodeRefactoringProvider.Title, "シンボルとすべての使用箇所を削除"),
         };
 

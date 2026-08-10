@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added **Remove empty brackets**, a caret-aware refactoring for removing empty
+  parentheses, square brackets, and braces.
+
 All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
