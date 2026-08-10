@@ -1,16 +1,18 @@
 # Changelog
 
-## Unreleased
-
-- Added **Remove empty brackets**, a caret-aware refactoring for removing empty
-  parentheses, square brackets, and braces.
-
 All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.42] - 2026-08-10
+
+### Added
+
+- Added **Remove empty brackets**, a caret-aware refactoring for removing empty
+  parentheses, square brackets, and braces.
 
 ## [0.4.41] - 2026-08-04
 
