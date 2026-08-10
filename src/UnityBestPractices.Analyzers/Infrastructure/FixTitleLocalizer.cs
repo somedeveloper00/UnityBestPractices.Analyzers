@@ -13,6 +13,7 @@ internal static class FixTitleLocalizer
     internal const string MoveStatementDown = "refactoring.move-statement-down";
     internal const string RemoveParameter = "refactoring.remove-parameter";
     internal const string RemoveDoubleEmptyLines = "refactoring.remove-double-empty-lines";
+    internal const string RemoveEmptyBrackets = "refactoring.remove-empty-brackets";
     internal const string RemoveSymbol = "refactoring.remove-symbol";
 
 #pragma warning disable RS1035 // Code fixes are displayed by the host UI and must follow its UI culture.
@@ -106,6 +107,7 @@ internal static class FixTitleLocalizer
         MoveStatementDown => "ステートメントを下へ移動",
         RemoveParameter => "パラメーターを削除",
         RemoveDoubleEmptyLines => "連続する空行を削除",
+        RemoveEmptyBrackets => "空の括弧を削除",
         RemoveSymbol => "シンボルとすべての使用箇所を削除",
         DiagnosticIds.EncapsulateSerializedField => "private にして SerializeField を追加",
         DiagnosticIds.YieldNull => "null を yield する",
@@ -138,6 +140,7 @@ internal static class FixTitleLocalizer
         MoveStatementDown => "انتقال دستور به پایین",
         RemoveParameter => "حذف پارامتر",
         RemoveDoubleEmptyLines => "حذف خطوط خالی تکراری",
+        RemoveEmptyBrackets => "حذف پرانتزهای خالی",
         RemoveSymbol => "حذف نماد و همهٔ کاربردهای آن",
         DiagnosticIds.EncapsulateSerializedField => "private کردن فیلد و افزودن SerializeField",
         DiagnosticIds.YieldNull => "yield کردن null",
@@ -170,6 +173,7 @@ internal static class FixTitleLocalizer
         MoveStatementDown => "Переместить инструкцию вниз",
         RemoveParameter => "Удалить параметр",
         RemoveDoubleEmptyLines => "Удалить повторяющиеся пустые строки",
+        RemoveEmptyBrackets => "Удалить пустые скобки",
         RemoveSymbol => "Удалить символ и все его использования",
         DiagnosticIds.EncapsulateSerializedField => "Сделать поле private и добавить SerializeField",
         DiagnosticIds.YieldNull => "Вернуть null через yield",
@@ -202,6 +206,7 @@ internal static class FixTitleLocalizer
         MoveStatementDown => "Anweisung nach unten verschieben",
         RemoveParameter => "Parameter entfernen",
         RemoveDoubleEmptyLines => "Doppelte Leerzeilen entfernen",
+        RemoveEmptyBrackets => "Leere Klammern entfernen",
         RemoveSymbol => "Symbol und alle Verwendungen entfernen",
         DiagnosticIds.EncapsulateSerializedField => "Feld als private festlegen und SerializeField hinzufügen",
         DiagnosticIds.YieldNull => "null mit yield zurückgeben",
@@ -234,6 +239,7 @@ internal static class FixTitleLocalizer
         MoveStatementDown => "Przenieś instrukcję w dół",
         RemoveParameter => "Usuń parametr",
         RemoveDoubleEmptyLines => "Usuń powtarzające się puste wiersze",
+        RemoveEmptyBrackets => "Usuń puste nawiasy",
         RemoveSymbol => "Usuń symbol i wszystkie jego użycia",
         DiagnosticIds.EncapsulateSerializedField => "Ustaw pole jako private i dodaj SerializeField",
         DiagnosticIds.YieldNull => "Zwróć null za pomocą yield",
