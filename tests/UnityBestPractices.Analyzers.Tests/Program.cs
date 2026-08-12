@@ -1289,6 +1289,41 @@ internal sealed partial class AnalyzerTests
             struct WorkJob : IJob { public void Execute() { } }
             """);
 
+        await VerifyFixAsync(
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update(bool useParallel)
+                {
+                    if (useParallel)
+                    {
+                        new WorkJob().ScheduleParallel();
+                    }
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """,
+            DiagnosticIds.DiscardedScheduledJobHandle,
+            """
+            using Unity.Burst;
+            using Unity.Jobs;
+            class Runner
+            {
+                void Update(bool useParallel)
+                {
+                    if (useParallel)
+                    {
+                        var jobHandle = new WorkJob().ScheduleParallel();
+                    }
+                }
+            }
+            [BurstCompile]
+            struct WorkJob : IJob { public void Execute() { } }
+            """);
+
         var shaderCases = new[]
         {
             (Property: "_Color", Field: "ColorId", Container: "class", Existing: ""),
@@ -1327,7 +1362,7 @@ internal sealed partial class AnalyzerTests
             await VerifyFixAsync(source, DiagnosticIds.CacheShaderPropertyId, expected);
         }
 
-        for (var index = 0; index < 4; index++)
+        for (var index = 0; index < 5; index++)
         {
             var source = $$"""
                 using UnityEngine;
@@ -1543,6 +1578,7 @@ internal sealed partial class AnalyzerTests
             ("entity", "position.ValueRW.Value++;"),
             ("unusedEntity", "position.ValueRW.Value += 2;"),
             ("ignored", "position.ValueRW.Value += 3;"),
+            ("discarded", "position.ValueRW.Value *= 2f;"),
         };
 
         foreach (var (entityName, body) in cases)
@@ -1600,6 +1636,9 @@ internal sealed partial class AnalyzerTests
             (
                 "UnityEngine.Object.FindObjectsOfType(typeof(UnityEngine.Component))",
                 "UnityEngine.Object.FindObjectsByType(typeof(UnityEngine.Component), global::UnityEngine.FindObjectsSortMode.InstanceID)"),
+            (
+                "UnityEngine.Object.FindObjectOfType<UnityEngine.Camera>()",
+                "UnityEngine.Object.FindFirstObjectByType<UnityEngine.Camera>()"),
         };
 
         foreach (var (invocation, replacement) in cases)
@@ -2033,6 +2072,11 @@ internal sealed partial class AnalyzerTests
             usingDirectives + "\nclass ExpressionQuickFixLocalCase { object Run() { object value = " + expression + "; return value; } }",
             diagnosticId,
             usingDirectives + "\nclass ExpressionQuickFixLocalCase { object Run() { object value = " + expectedExpression + "; return value; } }");
+
+        await VerifyFixAsync(
+            usingDirectives + "\nclass ExpressionQuickFixArgumentCase { object Run() { return Identity(" + expression + "); } object Identity(object value) => value; }",
+            diagnosticId,
+            usingDirectives + "\nclass ExpressionQuickFixArgumentCase { object Run() { return Identity(" + expectedExpression + "); } object Identity(object value) => value; }");
     }
 
     private async Task VerifyDotsQuickFixesAsync()
@@ -2367,7 +2411,7 @@ internal sealed partial class AnalyzerTests
         foreach (var metadata in DiagnosticCatalog.All.Where(metadata => metadata.HasCodeFix))
         {
             _positiveCaseCounts.TryGetValue(metadata.DiagnosticId, out var count);
-            var required = complicatedFixes.Contains(metadata.DiagnosticId) ? 10 : 4;
+            var required = complicatedFixes.Contains(metadata.DiagnosticId) ? 10 : 5;
             if (count < required)
             {
                 failures.Add(metadata.DiagnosticId + ": " + count + "/" + required);
@@ -2447,6 +2491,17 @@ internal sealed partial class AnalyzerTests
             {
                 delegate void PlayerEvent();
                 enum PlayerMode { Idle }
+            }
+            """,
+            firstNeighbor,
+            secondNeighbor);
+        await VerifyFixAsync(
+            "interface IPlayerState { }",
+            DiagnosticIds.MatchFolderNamespace,
+            """
+            namespace Game.Player
+            {
+                interface IPlayerState { }
             }
             """,
             firstNeighbor,

@@ -33,6 +33,10 @@ internal sealed partial class AnalyzerTests
             "class C : UnityEngine.MonoBehaviour { public double Weight = 2d; }",
             DiagnosticIds.EncapsulateSerializedField,
             "class C : UnityEngine.MonoBehaviour { [UnityEngine.SerializeField] private double Weight = 2d; }");
+        await VerifyFixAsync(
+            "using UnityEngine; class D : MonoBehaviour { public bool EnabledFlag = true; }",
+            DiagnosticIds.EncapsulateSerializedField,
+            "using UnityEngine; class D : MonoBehaviour { [UnityEngine.SerializeField] private bool EnabledFlag = true; }");
     }
 
     private async Task VerifyCoroutineCasesAsync()
@@ -40,6 +44,7 @@ internal sealed partial class AnalyzerTests
         await VerifyYieldFixAsync("false");
         await VerifyYieldFixAsync("true");
         await VerifyYieldFixAsync("default(bool)");
+        await VerifyYieldFixAsync("default(int)");
     }
 
     private Task VerifyYieldFixAsync(string value) => VerifyFixAsync(
@@ -57,11 +62,15 @@ internal sealed partial class AnalyzerTests
             "using UnityEngine; class B { bool Test(Vector3 value) => 3f > value.magnitude; }",
             DiagnosticIds.UseSquaredMagnitude,
             "using UnityEngine; class B { bool Test(Vector3 value) => (3f * 3f) > value.sqrMagnitude; }");
+        await VerifyFixAsync(
+            "using UnityEngine; class C { bool Test(Vector2 value) => value.magnitude >= 4f; }",
+            DiagnosticIds.UseSquaredMagnitude,
+            "using UnityEngine; class C { bool Test(Vector2 value) => value.sqrMagnitude >= (4f * 4f); }");
     }
 
     private async Task VerifyBurstCasesAsync()
     {
-        for (var index = 0; index < 3; index++)
+        for (var index = 0; index < 4; index++)
         {
             var name = "WorkerJob" + index;
             await VerifyFixAsync(
@@ -73,10 +82,17 @@ internal sealed partial class AnalyzerTests
 
     private async Task VerifyReadOnlyJobCasesAsync()
     {
-        for (var index = 0; index < 3; index++)
+        var reads = new[]
+        {
+            "var x = Input[0];",
+            "var x = Input.Length;",
+            "var x = Input[Input.Length - 1];",
+            "var x = Input[1] + Input[2];",
+        };
+        for (var index = 0; index < reads.Length; index++)
         {
             var name = "ReaderJob" + index;
-            var read = index == 0 ? "var x = Input[0];" : index == 1 ? "var x = Input.Length;" : "var x = Input[Input.Length - 1];";
+            var read = reads[index];
             await VerifyFixAsync(
                 "using Unity.Collections; using Unity.Jobs; struct " + name + " : IJob { public NativeArray<int> Input; public void Execute() { " + read + " } }",
                 DiagnosticIds.MarkNativeArrayReadOnly,
@@ -289,7 +305,7 @@ internal sealed partial class AnalyzerTests
 
     private async Task VerifyMathfSquareCasesAsync()
     {
-        for (var index = 0; index < 3; index++)
+        for (var index = 0; index < 4; index++)
         {
             var name = "value" + index;
             await VerifyFixAsync(

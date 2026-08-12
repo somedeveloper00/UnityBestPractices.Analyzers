@@ -18,7 +18,7 @@ dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Rele
 
 Every diagnostic must have a unique stable ID, central `RuleMetadata`, an `Info` default severity, a help link, a rule page, negative semantic tests, and a documented safety classification. Do not reuse or renumber IDs. A safe rule may support Fix All only when all documented preconditions preserve observable behavior. Review-required and experimental transformations must be applied one occurrence at a time.
 
-Keep the dependency-light regression harness at the existing coverage floor: four distinct positive quick-fix cases for every rule and ten for complicated transformations. Add focused xUnit tests under a file named for the diagnostic when changing symbol, solution, or Fix All behavior.
+Keep the dependency-light regression harness at the existing coverage floor: five distinct positive quick-fix cases for every rule and ten for complicated transformations. Add focused xUnit tests under a file named for the diagnostic when changing symbol, solution, or Fix All behavior.
 
 ### Quick fixes
 

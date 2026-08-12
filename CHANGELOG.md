@@ -7,6 +7,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.43] - 2026-08-12
+
+### Changed
+
+- Raised the dependency-light harness coverage floor to five distinct positive
+  quick-fix cases per rule (ten remains required for complicated transformations).
+
+### Added
+
+- Expanded positive quick-fix regression coverage for expression rewrites and
+  legacy, correctness, and DOTS rules that were previously at the four-case floor.
+
 ## [0.4.42] - 2026-08-10
 
 ### Added
