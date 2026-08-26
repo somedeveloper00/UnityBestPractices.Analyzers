@@ -7,6 +7,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.44] - 2026-08-26
+
+### Added
+
+- Added **Convert local variable to field**, a caret-aware refactoring that
+  promotes a method-local variable to a private field while preserving its
+  initialization point.
+
 ## [0.4.43] - 2026-08-12
 
 ### Changed
