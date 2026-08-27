@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,11 @@ namespace UnityBestPractices.Analyzers;
 
 internal static class ModernObjectFindRule
 {
+    internal static ImmutableArray<CodeFixHandler> Handlers { get; } = ImmutableArray.Create(
+        new CodeFixHandler(
+            DiagnosticCatalog.Get(DiagnosticIds.UseModernObjectFindApi),
+            ApplyFixAsync));
+
     private const string SortModeInstanceId = "global::UnityEngine.FindObjectsSortMode.InstanceID";
     private const string InactiveInclude = "global::UnityEngine.FindObjectsInactive.Include";
     private const string InactiveExclude = "global::UnityEngine.FindObjectsInactive.Exclude";

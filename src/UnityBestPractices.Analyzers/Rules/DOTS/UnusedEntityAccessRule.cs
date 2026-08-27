@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,11 @@ namespace UnityBestPractices.Analyzers;
 
 internal static class UnusedEntityAccessRule
 {
+    internal static ImmutableArray<CodeFixHandler> Handlers { get; } = ImmutableArray.Create(
+        new CodeFixHandler(
+            DiagnosticCatalog.Get(DiagnosticIds.RemoveUnusedEntityAccess),
+            RemoveAsync));
+
     private static readonly DiagnosticDescriptor Descriptor =
         DiagnosticCatalog.Get(DiagnosticIds.RemoveUnusedEntityAccess).Descriptor;
 

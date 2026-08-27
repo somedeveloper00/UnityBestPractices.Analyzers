@@ -13,6 +13,11 @@ namespace UnityBestPractices.Analyzers;
 
 internal static class NamespaceConsistencyRules
 {
+    internal static ImmutableArray<CodeFixHandler> Handlers { get; } = ImmutableArray.Create(
+        new CodeFixHandler(
+            DiagnosticCatalog.Get(DiagnosticIds.MatchFolderNamespace),
+            AddNamespaceAsync));
+
     private const string NamespaceProperty = "Namespace";
 
     internal static DiagnosticDescriptor Descriptor =>

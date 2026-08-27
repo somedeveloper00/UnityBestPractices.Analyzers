@@ -120,6 +120,12 @@ internal static class DotsQueryRules
     private static readonly ImmutableDictionary<string, DotsQueryQuickFixRule> RulesById =
         AllRules.ToImmutableDictionary(rule => rule.Descriptor.Id, StringComparer.Ordinal);
 
+    internal static ImmutableArray<CodeFixHandler> Handlers { get; } =
+        AllRules.Select(rule => new CodeFixHandler(
+            rule.Metadata,
+            (document, diagnostic, cancellationToken) =>
+                DotsQueryCodeFixes.ApplyFixAsync(document, diagnostic, rule, cancellationToken))).ToImmutableArray();
+
     internal static ImmutableArray<DiagnosticDescriptor> Descriptors { get; } =
         AllRules.Select(rule => rule.Descriptor).ToImmutableArray();
 
