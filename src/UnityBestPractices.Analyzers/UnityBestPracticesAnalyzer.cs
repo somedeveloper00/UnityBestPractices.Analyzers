@@ -9,7 +9,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace UnityBestPractices.Analyzers;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
+public sealed partial class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor EncapsulateSerializedFieldRule =
         DiagnosticCatalog.Get(DiagnosticIds.EncapsulateSerializedField).Descriptor;
@@ -38,57 +38,6 @@ public sealed class UnityBestPracticesAnalyzer : DiagnosticAnalyzer
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
         DiagnosticCatalog.All.Select(metadata => metadata.Descriptor).ToImmutableArray();
 
-    public override void Initialize(AnalysisContext context)
-    {
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-        context.EnableConcurrentExecution();
-
-        context.RegisterCompilationStartAction(startContext =>
-        {
-            _ = UnitySymbolCache.For(startContext.Compilation);
-            startContext.RegisterSyntaxNodeAction(AnalyzeFieldDeclaration, SyntaxKind.FieldDeclaration);
-            startContext.RegisterSyntaxNodeAction(AnalyzeYieldStatement, SyntaxKind.YieldReturnStatement);
-            startContext.RegisterSyntaxNodeAction(AnalyzeStructDeclaration, SyntaxKind.StructDeclaration);
-            startContext.RegisterSyntaxNodeAction(AnalyzeVariableDeclarator, SyntaxKind.VariableDeclarator);
-            startContext.RegisterSyntaxNodeAction(AnalyzeLocalDeclaration, SyntaxKind.LocalDeclarationStatement);
-            startContext.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
-            startContext.RegisterSyntaxNodeAction(AnalyzeObjectCreation, SyntaxKind.ObjectCreationExpression);
-            startContext.RegisterSyntaxNodeAction(AnalyzeInvocation, SyntaxKind.InvocationExpression);
-            startContext.RegisterSyntaxNodeAction(
-                AdvancedUnityRules.AnalyzeReturn,
-                SyntaxKind.ReturnStatement);
-            startContext.RegisterSyntaxNodeAction(
-                AdvancedUnityRules.AnalyzeAssignment,
-                SyntaxKind.SimpleAssignmentExpression);
-            startContext.RegisterSyntaxNodeAction(
-                AdvancedUnityRules.AnalyzeExpressionStatement,
-                SyntaxKind.ExpressionStatement);
-            startContext.RegisterSyntaxNodeAction(
-                AdvancedUnityRules.AnalyzeTypeDeclaration,
-                SyntaxKind.ClassDeclaration,
-                SyntaxKind.StructDeclaration);
-            startContext.RegisterSyntaxNodeAction(
-                AnalyzeExpressionQuickFix,
-                ExpressionQuickFixRegistry.SyntaxKinds.ToArray());
-            startContext.RegisterSyntaxNodeAction(
-                DotsQueryRules.AnalyzeExpressionStatement,
-                SyntaxKind.ExpressionStatement);
-            startContext.RegisterSyntaxNodeAction(
-                DotsQueryRules.AnalyzeSystemApiQuery,
-                SyntaxKind.ForEachStatement,
-                SyntaxKind.ForEachVariableStatement);
-            startContext.RegisterSyntaxNodeAction(
-                UnusedEntityAccessRule.Analyze,
-                SyntaxKind.ForEachVariableStatement);
-            startContext.RegisterSyntaxNodeAction(
-                AnalyzeRelationalExpression,
-                SyntaxKind.LessThanExpression,
-                SyntaxKind.LessThanOrEqualExpression,
-                SyntaxKind.GreaterThanExpression,
-                SyntaxKind.GreaterThanOrEqualExpression);
-            startContext.RegisterCompilationEndAction(NamespaceConsistencyRules.AnalyzeCompilation);
-        });
-    }
 
     private static void AnalyzeFieldDeclaration(SyntaxNodeAnalysisContext context)
     {
