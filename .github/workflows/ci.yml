@@ -5,6 +5,9 @@ on:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # Weekly licensed compatibility evidence; release policy is documented in the fixture README.
+    - cron: "17 3 * * 1"
 
 permissions:
   contents: read
@@ -67,6 +70,14 @@ jobs:
         shell: pwsh
         run: ./eng/Invoke-Validation.ps1 -SkipRestore
 
+      - name: Upload analyzer performance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-performance-results
+          if-no-files-found: warn
+          path: artifacts/performance/results.json
+
       - name: Upload validated packages
         uses: actions/upload-artifact@v4
         with:
@@ -80,7 +91,6 @@ jobs:
   unity-integration:
     name: Unity ${{ matrix.unity-version }} integration
     needs: validate
-    if: vars.ENABLE_UNITY_INTEGRATION == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -97,10 +107,23 @@ jobs:
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
     steps:
+      - name: Check licensed-test credentials
+        id: credentials
+        shell: bash
+        run: |
+          if [[ -n "$UNITY_LICENSE" && -n "$UNITY_EMAIL" && -n "$UNITY_PASSWORD" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Unity tests were not executed because credentials were unavailable."
+          fi
+
       - name: Check out repository
+        if: steps.credentials.outputs.available == 'true'
         uses: actions/checkout@v6
 
       - name: Download validated UPM package
+        if: steps.credentials.outputs.available == 'true'
         uses: actions/download-artifact@v4
         with:
           pattern: UnityBestPractices.Analyzers-*
@@ -108,6 +131,7 @@ jobs:
           merge-multiple: true
 
       - name: Install local analyzer package in fixture
+        if: steps.credentials.outputs.available == 'true'
         shell: bash
         run: |
           fixture="tests/UnityIntegration/${{ matrix.fixture }}"
@@ -119,8 +143,75 @@ jobs:
           mv "$fixture/Packages/manifest.updated.json" "$fixture/Packages/manifest.json"
 
       - name: Run Unity EditMode smoke tests
+        id: unity-test
+        if: steps.credentials.outputs.available == 'true'
+        continue-on-error: true
         uses: game-ci/unity-test-runner@v4
         with:
           projectPath: tests/UnityIntegration/${{ matrix.fixture }}
           unityVersion: ${{ matrix.unity-version }}
           testMode: EditMode
+          artifactsPath: artifacts/unity/${{ matrix.fixture }}
+          testResults: artifacts/unity-results/${{ matrix.fixture }}.xml
+
+      - name: Record matrix result
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/unity-status
+          if [[ "${{ steps.credentials.outputs.available }}" != "true" ]]; then
+            status="not executed because credentials were unavailable"
+          elif [[ "${{ steps.unity-test.outcome }}" == "success" ]]; then
+            status="passed"
+          else
+            status="failed"
+          fi
+          printf '%s\n' "$status" > "artifacts/unity-status/${{ matrix.fixture }}.txt"
+
+      - name: Upload Unity logs, XML, and status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-${{ matrix.fixture }}-results
+          if-no-files-found: warn
+          path: |
+            artifacts/unity/${{ matrix.fixture }}/**
+            artifacts/unity-results/${{ matrix.fixture }}.xml
+            artifacts/unity-status/${{ matrix.fixture }}.txt
+
+      - name: Propagate Unity test failure
+        if: steps.credentials.outputs.available == 'true' && steps.unity-test.outcome != 'success'
+        run: exit 1
+
+  unity-summary:
+    name: Unity integration summary
+    needs: unity-integration
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download matrix statuses
+        uses: actions/download-artifact@v4
+        with:
+          pattern: unity-*-results
+          path: artifacts/statuses
+
+      - name: Publish passed, failed, and unavailable entries
+        shell: bash
+        run: |
+          echo '## Licensed Unity EditMode matrix' >> "$GITHUB_STEP_SUMMARY"
+          echo '| Fixture | Result |' >> "$GITHUB_STEP_SUMMARY"
+          echo '| --- | --- |' >> "$GITHUB_STEP_SUMMARY"
+          for fixture in 2021.3 dots-2022.3 6000.3; do
+            file="$(find artifacts/statuses -path "*/unity-status/$fixture.txt" -print -quit)"
+            status="failed"
+            [[ -n "$file" ]] && status="$(cat "$file")"
+            echo "| $fixture | $status |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          if find artifacts/statuses -path '*/unity-status/*.txt' -exec grep -l '^failed$' {} + | grep -q .; then
+            exit 1
+          fi
+          if [[ "${{ github.event_name }}" =~ ^(schedule|workflow_dispatch)$ ]] && \
+             find artifacts/statuses -path '*/unity-status/*.txt' -exec grep -l '^not executed because credentials were unavailable$' {} + | grep -q .; then
+            echo 'Scheduled compatibility evidence requires licensed credentials.' >&2
+            exit 1
+          fi

@@ -1,3 +1,5 @@
+using UnityBestPractices.Analyzers;
+using UnityBestPractices.Analyzers.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -13,7 +15,7 @@ using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Rules.Correctness;
 
 internal static class AdvancedUnityRules
 {
@@ -85,6 +87,11 @@ internal static class AdvancedUnityRules
         TemporaryAllocatorEscape,
         ShaderPropertyId,
         CombineLocalPositionAndRotation);
+
+    internal static ImmutableArray<CodeFixHandler> Handlers => ImmutableArray.Create(
+        new CodeFixHandler(DiscardedJobHandle, AssignJobHandleAsync),
+        new CodeFixHandler(ShaderPropertyId, CacheShaderPropertyIdAsync),
+        new CodeFixHandler(CombineLocalPositionAndRotation, CombineLocalPositionAndRotationAsync));
 
     internal static ImmutableArray<DiagnosticDescriptor> Descriptors { get; } =
         Metadata.Select(metadata => metadata.Descriptor).ToImmutableArray();

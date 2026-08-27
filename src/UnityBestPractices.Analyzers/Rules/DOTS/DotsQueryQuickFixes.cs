@@ -1,3 +1,5 @@
+using UnityBestPractices.Analyzers;
+using UnityBestPractices.Analyzers.Infrastructure;
 // Diagnostic registration and analysis for DOTS query migrations.
 using System;
 using System.Collections.Immutable;
@@ -9,7 +11,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Rules.Dots;
 
 internal enum DotsQueryQuickFixKind
 {
@@ -119,6 +121,12 @@ internal static class DotsQueryRules
 
     private static readonly ImmutableDictionary<string, DotsQueryQuickFixRule> RulesById =
         AllRules.ToImmutableDictionary(rule => rule.Descriptor.Id, StringComparer.Ordinal);
+
+    internal static ImmutableArray<CodeFixHandler> Handlers =>
+        AllRules.Select(rule => new CodeFixHandler(
+            rule.Metadata,
+            (document, diagnostic, cancellationToken) =>
+                DotsQueryCodeFixes.ApplyFixAsync(document, diagnostic, rule, cancellationToken))).ToImmutableArray();
 
     internal static ImmutableArray<DiagnosticDescriptor> Descriptors { get; } =
         AllRules.Select(rule => rule.Descriptor).ToImmutableArray();

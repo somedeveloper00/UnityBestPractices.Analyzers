@@ -1,6 +1,7 @@
+using UnityBestPractices.Analyzers;
 using System;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 internal static class OmniSharpRefactoringTitle
 {

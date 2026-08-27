@@ -22,6 +22,8 @@ $analyzerDll = 'src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/Unit
 $regressionProject = 'tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj'
 $xunitProject = 'tests/UnityBestPractices.Analyzers.Tests.Xunit/UnityBestPractices.Analyzers.Tests.Xunit.csproj'
 $performanceProject = 'tests/UnityBestPractices.Analyzers.PerformanceTests/UnityBestPractices.Analyzers.PerformanceTests.csproj'
+$performanceResults = 'artifacts/performance/results.json'
+$performanceBaseline = 'eng/performance-baseline.json'
 $packageDirectory = 'artifacts/packages'
 $upmDirectory = 'artifacts/upm'
 
@@ -102,8 +104,8 @@ if ($selectedStages.Contains('Documentation')) {
     }
 }
 if ($selectedStages.Contains('Performance')) {
-    Invoke-Stage 'Performance regression checks' $performanceProject {
-        Invoke-Native dotnet @('run', '--project', $performanceProject, '--configuration', 'Release', '--no-build')
+    Invoke-Stage 'Performance regression checks' $performanceResults {
+        Invoke-Native dotnet @('run', '--project', $performanceProject, '--configuration', 'Release', '--no-build', '--', '--baseline', $performanceBaseline, '--output', $performanceResults)
     }
 }
 if ($selectedStages.Contains('NuGet')) {
@@ -121,14 +123,8 @@ if ($selectedStages.Contains('Upm')) {
     }
 }
 if ($selectedStages.Contains('UnityManifests')) {
-    Invoke-Stage 'Unity manifest validation' 'tests/UnityIntegration/*/Packages/manifest.json' {
-        $manifests = @(Get-ChildItem -Path 'tests/UnityIntegration/*/Packages/manifest.json' -File)
-        if ($manifests.Count -eq 0) { throw 'No Unity fixture manifests were found.' }
-        foreach ($manifest in $manifests) {
-            $command = "ConvertFrom-Json $($manifest.FullName)"
-            Write-Host "> $command"
-            Get-Content -LiteralPath $manifest.FullName -Raw | ConvertFrom-Json | Out-Null
-        }
+    Invoke-Stage 'Unity manifest validation' 'artifacts/unity-fixtures' {
+        Invoke-Native pwsh @('-NoProfile', '-File', './eng/Validate-UnityPackageFixtures.ps1', '-PackageRoot', "$upmDirectory/package", '-FixturesRoot', 'tests/UnityIntegration', '-ExpectedVersion', (Get-PackageVersion))
     }
 }
 

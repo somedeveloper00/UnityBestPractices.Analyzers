@@ -1,6 +1,8 @@
-internal static class TestSources
+namespace UnityBestPractices.Analyzers.Testing;
+
+public static class TestSources
 {
-    internal const string UnityEngine = """
+    public const string UnityEngine = """
         namespace UnityEngine
         {
             public sealed class SerializeField : System.Attribute { }
@@ -11,7 +13,7 @@ internal static class TestSources
         }
         """;
 
-    internal const string Jobs = """
+    public const string Jobs = """
         namespace Unity.Burst
         {
             public sealed class BurstCompileAttribute : System.Attribute { }
@@ -27,7 +29,7 @@ internal static class TestSources
         }
         """;
 
-    internal const string Collections = """
+    public const string Collections = """
         namespace Unity.Collections
         {
             public enum Allocator { Temp, TempJob, Persistent }
@@ -41,7 +43,7 @@ internal static class TestSources
         }
         """;
 
-    internal const string Shader = """
+    public const string Shader = """
         namespace UnityEngine
         {
             public static class Shader
@@ -51,7 +53,7 @@ internal static class TestSources
         }
         """;
 
-    internal const string Transform = """
+    public const string Transform = """
         namespace UnityEngine
         {
             public struct Vector2 { public Vector2(float x, float y) { } }
