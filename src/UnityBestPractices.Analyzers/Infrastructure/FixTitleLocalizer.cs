@@ -1,6 +1,7 @@
+using UnityBestPractices.Analyzers;
 using System.Globalization;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 /// <summary>Provides quick-fix labels in the IDE's current UI language.</summary>
 internal static class FixTitleLocalizer

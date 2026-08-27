@@ -1,10 +1,11 @@
+using UnityBestPractices.Analyzers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 internal sealed class RuleAwareFixAllProvider : FixAllProvider
 {

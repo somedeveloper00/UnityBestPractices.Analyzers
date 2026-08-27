@@ -1,3 +1,4 @@
+using UnityBestPractices.Analyzers.Infrastructure;
 using System.Composition;
 using System.Threading;
 using System.Threading.Tasks;
