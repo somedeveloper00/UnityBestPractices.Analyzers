@@ -4,15 +4,13 @@ Thank you for improving Unity Best Practices Analyzer. Changes should be conserv
 
 ## Development setup
 
-Install the .NET SDK selected by `global.json`, then run:
+Install the .NET SDK selected by `global.json` and PowerShell 7+. The canonical local stability command is:
 
 ```powershell
-dotnet restore UnityBestPractices.sln
-dotnet build UnityBestPractices.sln -c Release --no-restore
-dotnet run --project tests/UnityBestPractices.Analyzers.Tests -c Release --no-build
-dotnet test tests/UnityBestPractices.Analyzers.Tests.Xunit -c Release --no-build
-dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Release --no-build
+pwsh ./eng/Invoke-Validation.ps1
 ```
+
+This runs the same restore, Release CI build, test, documentation-drift, performance, and package validation profile used for releases. Pass `-SkipRestore` after restoring separately (for example, when using a package cache), or use `-Stages Build,RegressionHarness,XUnit` to run an explicit subset. Documentation validation requires `docs/rules` to be clean before generation and fails if generation changes the working tree, so a release checkout cannot publish silently regenerated documentation.
 
 ## Rule changes
 

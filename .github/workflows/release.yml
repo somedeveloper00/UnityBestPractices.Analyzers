@@ -72,64 +72,13 @@ jobs:
           test "$tag_version" = "$project_version"
           echo "value=$project_version" >> "$GITHUB_OUTPUT"
 
-      - name: Restore
-        run: dotnet restore UnityBestPractices.sln
-
-      - name: Build
-        run: >
-          dotnet build UnityBestPractices.sln
-          --configuration Release
-          --no-restore
-          -p:ContinuousIntegrationBuild=true
-
-      - name: Test
-        shell: bash
-        run: |
-          dotnet run \
-            --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj \
-            --configuration Release \
-            --no-build
-          dotnet test \
-            tests/UnityBestPractices.Analyzers.Tests.Xunit/UnityBestPractices.Analyzers.Tests.Xunit.csproj \
-            --configuration Release \
-            --no-build \
-            --no-restore
-
-      - name: Validate assembly version coherence
+      - name: Restore through shared validation entry point
         shell: pwsh
-        run: >
-          ./eng/Validate-VersionCoherence.ps1
-          -AnalyzerDll "src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll"
-          -ExpectedVersion "${{ steps.version.outputs.value }}"
+        run: ./eng/Invoke-Validation.ps1 -Stages Restore
 
-      - name: Pack NuGet and symbols
-        run: >
-          dotnet pack
-          src/UnityBestPractices.Analyzers/UnityBestPractices.Analyzers.csproj
-          --configuration Release
-          --no-build
-          --no-restore
-          --output artifacts/packages
-          -p:ContinuousIntegrationBuild=true
-
-      - name: Validate NuGet package
+      - name: Run canonical stability validation
         shell: pwsh
-        run: >
-          ./eng/Validate-NuGetPackage.ps1
-          -PackagePath "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.nupkg"
-          -ExpectedVersion "${{ steps.version.outputs.value }}"
-          -SymbolPackagePath "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.snupkg"
-
-      - name: Assemble UPM package
-        shell: pwsh
-        run: |
-          ./eng/Assemble-UpmPackage.ps1 `
-            -Version "${{ steps.version.outputs.value }}" `
-            -AnalyzerDll "src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll" `
-            -OutputDirectory "artifacts/upm"
-          ./eng/Validate-UpmPackage.ps1 `
-            -PackageRoot "artifacts/upm/package" `
-            -ExpectedVersion "${{ steps.version.outputs.value }}"
+        run: ./eng/Invoke-Validation.ps1 -SkipRestore
 
       - name: Prepare release assets and checksums
         shell: bash

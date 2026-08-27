@@ -29,30 +29,9 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Restore
-        run: dotnet restore UnityBestPractices.sln
-
-      - name: Build
-        run: >
-          dotnet build UnityBestPractices.sln
-          --configuration Release
-          --no-restore
-          -p:ContinuousIntegrationBuild=true
-
-      - name: Run regression tests
-        run: >
-          dotnet run
-          --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj
-          --configuration Release
-          --no-build
-
-      - name: Run xUnit integration tests
-        run: >
-          dotnet test
-          tests/UnityBestPractices.Analyzers.Tests.Xunit/UnityBestPractices.Analyzers.Tests.Xunit.csproj
-          --configuration Release
-          --no-build
-          --no-restore
+      - name: Run shared build and test validation
+        shell: pwsh
+        run: ./eng/Invoke-Validation.ps1 -Stages Restore,Build,RegressionHarness,XUnit
 
   validate:
     name: Build, test, and package
@@ -83,57 +62,13 @@ jobs:
           version="$(dotnet msbuild src/UnityBestPractices.Analyzers/UnityBestPractices.Analyzers.csproj -getProperty:Version)"
           echo "value=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Restore
-        run: dotnet restore UnityBestPractices.sln
-
-      - name: Release build and compatibility build
-        run: >
-          dotnet build UnityBestPractices.sln
-          --configuration Release
-          --no-restore
-          -p:ContinuousIntegrationBuild=true
-
-      - name: Run 78-rule regression and Fix All tests
-        run: >
-          dotnet run
-          --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj
-          --configuration Release
-          --no-build
-
-      - name: Validate assembly version coherence
+      - name: Restore through shared validation entry point
         shell: pwsh
-        run: >
-          ./eng/Validate-VersionCoherence.ps1
-          -AnalyzerDll "src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll"
-          -ExpectedVersion "${{ steps.version.outputs.value }}"
+        run: ./eng/Invoke-Validation.ps1 -Stages Restore
 
-      - name: Run xUnit Roslyn integration tests
-        run: >
-          dotnet test
-          tests/UnityBestPractices.Analyzers.Tests.Xunit/UnityBestPractices.Analyzers.Tests.Xunit.csproj
-          --configuration Release
-          --no-build
-          --no-restore
-
-      - name: Validate documentation and catalog generation
-        shell: bash
-        run: |
-          dotnet run \
-            --project tests/UnityBestPractices.Analyzers.Tests/UnityBestPractices.Analyzers.Tests.csproj \
-            --configuration Release \
-            --no-build \
-            -- --generate-rule-docs .
-          git diff --exit-code -- docs/rules
-
-      - name: Run analyzer performance regression checks
-        run: >
-          dotnet run
-          --project tests/UnityBestPractices.Analyzers.PerformanceTests/UnityBestPractices.Analyzers.PerformanceTests.csproj
-          --configuration Release
-          --no-build
-          --
-          --baseline eng/performance-baseline.json
-          --output artifacts/performance/results.json
+      - name: Run canonical stability validation
+        shell: pwsh
+        run: ./eng/Invoke-Validation.ps1 -SkipRestore
 
       - name: Upload analyzer performance results
         if: always()
@@ -142,43 +77,6 @@ jobs:
           name: analyzer-performance-results
           if-no-files-found: warn
           path: artifacts/performance/results.json
-
-      - name: Pack NuGet and symbols
-        run: >
-          dotnet pack
-          src/UnityBestPractices.Analyzers/UnityBestPractices.Analyzers.csproj
-          --configuration Release
-          --no-build
-          --no-restore
-          --output artifacts/packages
-          -p:ContinuousIntegrationBuild=true
-
-      - name: Validate NuGet contents and metadata
-        shell: pwsh
-        run: >
-          ./eng/Validate-NuGetPackage.ps1
-          -PackagePath "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.nupkg"
-          -ExpectedVersion "${{ steps.version.outputs.value }}"
-          -SymbolPackagePath "artifacts/packages/UnityBestPractices.Analyzers.${{ steps.version.outputs.value }}.snupkg"
-
-      - name: Assemble and validate UPM package
-        shell: pwsh
-        run: |
-          ./eng/Assemble-UpmPackage.ps1 `
-            -Version "${{ steps.version.outputs.value }}" `
-            -AnalyzerDll "src/UnityBestPractices.Analyzers/bin/Release/netstandard2.0/UnityBestPractices.Analyzers.dll" `
-            -OutputDirectory "artifacts/upm"
-          ./eng/Validate-UpmPackage.ps1 `
-            -PackageRoot "artifacts/upm/package" `
-            -ExpectedVersion "${{ steps.version.outputs.value }}"
-
-      - name: Install and validate the UPM package in every Unity fixture
-        shell: pwsh
-        run: >
-          ./eng/Validate-UnityPackageFixtures.ps1
-          -PackageRoot "artifacts/upm/package"
-          -FixturesRoot "tests/UnityIntegration"
-          -ExpectedVersion "${{ steps.version.outputs.value }}"
 
       - name: Upload validated packages
         uses: actions/upload-artifact@v4
