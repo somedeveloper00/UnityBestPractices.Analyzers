@@ -15,7 +15,7 @@ namespace UnityBestPractices.Analyzers.Rules.Correctness;
 
 internal static class NamespaceConsistencyRules
 {
-    internal static ImmutableArray<CodeFixHandler> Handlers { get; } = ImmutableArray.Create(
+    internal static ImmutableArray<CodeFixHandler> Handlers => ImmutableArray.Create(
         new CodeFixHandler(
             DiagnosticCatalog.Get(DiagnosticIds.MatchFolderNamespace),
             AddNamespaceAsync));

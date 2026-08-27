@@ -88,7 +88,7 @@ internal static class AdvancedUnityRules
         ShaderPropertyId,
         CombineLocalPositionAndRotation);
 
-    internal static ImmutableArray<CodeFixHandler> Handlers { get; } = ImmutableArray.Create(
+    internal static ImmutableArray<CodeFixHandler> Handlers => ImmutableArray.Create(
         new CodeFixHandler(DiscardedJobHandle, AssignJobHandleAsync),
         new CodeFixHandler(ShaderPropertyId, CacheShaderPropertyIdAsync),
         new CodeFixHandler(CombineLocalPositionAndRotation, CombineLocalPositionAndRotationAsync));

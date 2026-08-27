@@ -14,7 +14,7 @@ namespace UnityBestPractices.Analyzers.Rules.Dots;
 
 internal static class UnusedEntityAccessRule
 {
-    internal static ImmutableArray<CodeFixHandler> Handlers { get; } = ImmutableArray.Create(
+    internal static ImmutableArray<CodeFixHandler> Handlers => ImmutableArray.Create(
         new CodeFixHandler(
             DiagnosticCatalog.Get(DiagnosticIds.RemoveUnusedEntityAccess),
             RemoveAsync));

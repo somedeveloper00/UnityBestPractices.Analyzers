@@ -63,7 +63,7 @@ internal static class ExpressionQuickFixRegistry
     private static readonly ImmutableDictionary<string, ExpressionQuickFixRule> RulesByDiagnosticId =
         AllRules.ToImmutableDictionary(rule => rule.DiagnosticId, StringComparer.Ordinal);
 
-    internal static ImmutableArray<CodeFixHandler> Handlers { get; } =
+    internal static ImmutableArray<CodeFixHandler> Handlers =>
         AllRules.Select(rule => new CodeFixHandler(
             rule.Metadata,
             (document, diagnostic, cancellationToken) =>

@@ -15,7 +15,7 @@ namespace UnityBestPractices.Analyzers.Rules.Core;
 
 internal static class LegacyCoreCodeFixes
 {
-    internal static ImmutableArray<CodeFixHandler> Handlers { get; } = ImmutableArray.Create(
+    internal static ImmutableArray<CodeFixHandler> Handlers => ImmutableArray.Create(
         Handler(DiagnosticIds.EncapsulateSerializedField, EncapsulateFieldAsync, CanSafelyEncapsulateFieldAsync),
         Handler(DiagnosticIds.YieldNull, YieldNullAsync),
         Handler(DiagnosticIds.UseSquaredMagnitude, UseSquaredMagnitudeAsync),

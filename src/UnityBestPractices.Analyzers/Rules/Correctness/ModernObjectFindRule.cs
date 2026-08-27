@@ -15,7 +15,7 @@ namespace UnityBestPractices.Analyzers.Rules.Correctness;
 
 internal static class ModernObjectFindRule
 {
-    internal static ImmutableArray<CodeFixHandler> Handlers { get; } = ImmutableArray.Create(
+    internal static ImmutableArray<CodeFixHandler> Handlers => ImmutableArray.Create(
         new CodeFixHandler(
             DiagnosticCatalog.Get(DiagnosticIds.UseModernObjectFindApi),
             ApplyFixAsync));
