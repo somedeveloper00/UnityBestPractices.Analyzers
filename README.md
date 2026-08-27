@@ -356,11 +356,11 @@ dotnet restore UnityBestPractices.sln
 dotnet build UnityBestPractices.sln -c Release --no-restore
 dotnet run --project tests/UnityBestPractices.Analyzers.Tests -c Release --no-build
 dotnet test tests/UnityBestPractices.Analyzers.Tests.Xunit -c Release --no-build
-dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Release --no-build
+dotnet run --project tests/UnityBestPractices.Analyzers.PerformanceTests -c Release --no-build -- --baseline eng/performance-baseline.json --output artifacts/performance/results.json
 dotnet pack src/UnityBestPractices.Analyzers -c Release --no-build -o artifacts/packages
 ```
 
-The dependency-light harness verifies the full 78-rule catalog, at least five positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. Broad performance checks cover non-matching files, repeated Unity patterns, large DOTS files, malformed syntax, many documents, incremental edits, diagnostics, elapsed time, and allocations.
+The dependency-light harness verifies the full 78-rule catalog, at least five positive quick-fix cases per fix and ten for complicated fixes, semantic negative cases, solution-wide accessibility, all DOTS query targets, and document/project/solution Fix All. The xUnit layer uses `Microsoft.CodeAnalysis.Testing` for structured Roslyn integration tests. The performance harness measures clean and diagnostic-heavy Core, Correctness, Expressions, and DOTS workloads independently for cold-start and repeated analysis. It records elapsed time, tree and source size, diagnostics, and stable runtime allocation counters in both a console table and a JSON artifact. CI compares that artifact with the explicitly selected checked-in baseline, using conservative family limits and material-regression margins rather than microbenchmarks.
 
 ## Release process
 
