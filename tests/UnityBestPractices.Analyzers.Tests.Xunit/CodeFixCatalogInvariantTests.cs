@@ -21,6 +21,62 @@ public sealed class CodeFixCatalogInvariantTests
             DiagnosticIds.CacheShaderPropertyId);
 
     [Fact]
+    public void CatalogAndHandlerRegistryHaveOneToOneCodeFixCoverage()
+    {
+        var handlersById = CodeFixRegistry.All
+            .GroupBy(handler => handler.DiagnosticId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+
+        Assert.Equal(CodeFixRegistry.All.Length, handlersById.Count);
+        foreach (var metadata in DiagnosticCatalog.All)
+        {
+            if (metadata.HasCodeFix)
+            {
+                var handler = Assert.Single(handlersById[metadata.DiagnosticId]);
+                Assert.Equal(metadata.SupportsFixAll, handler.SupportsFixAll);
+                Assert.Equal(metadata.FixTitle, handler.FixTitle);
+                Assert.Equal(metadata.DiagnosticId, handler.EquivalenceKey);
+            }
+            else
+            {
+                Assert.False(handlersById.ContainsKey(metadata.DiagnosticId));
+            }
+        }
+
+        foreach (var handler in CodeFixRegistry.All)
+        {
+            var metadata = DiagnosticCatalog.Get(handler.DiagnosticId);
+            Assert.True(metadata.HasCodeFix);
+            Assert.False(
+                handler.SupportsFixAll && metadata.Safety != RuleSafety.Safe,
+                $"{handler.DiagnosticId} exposes an unsafe Fix All handler.");
+        }
+    }
+
+    [Fact]
+    public void RegistryConstructionRejectsDuplicateDiagnosticIds()
+    {
+        var handler = CodeFixRegistry.All[0];
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            CodeFixRegistry.Create(ImmutableArray.Create(handler, handler)));
+
+        Assert.Contains(handler.DiagnosticId, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HandlerConstructionRejectsDiagnosticOnlyMetadata()
+    {
+        var metadata = DiagnosticCatalog.All.First(rule => !rule.HasCodeFix);
+
+        var exception = Assert.Throws<ArgumentException>(() => new CodeFixHandler(
+            metadata,
+            (document, _, _) => Task.FromResult(document)));
+
+        Assert.Contains(metadata.DiagnosticId, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProviderRegistersExactlyTheCatalogCodeFixes()
     {
         var provider = new UnityBestPracticesCodeFixProvider();

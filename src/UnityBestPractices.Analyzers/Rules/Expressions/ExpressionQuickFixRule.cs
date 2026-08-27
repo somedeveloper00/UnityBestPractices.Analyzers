@@ -6,9 +6,11 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Formatting;
 
 namespace UnityBestPractices.Analyzers.Rules.Expressions;
 
@@ -61,6 +63,12 @@ internal static class ExpressionQuickFixRegistry
     private static readonly ImmutableDictionary<string, ExpressionQuickFixRule> RulesByDiagnosticId =
         AllRules.ToImmutableDictionary(rule => rule.DiagnosticId, StringComparer.Ordinal);
 
+    internal static ImmutableArray<CodeFixHandler> Handlers =>
+        AllRules.Select(rule => new CodeFixHandler(
+            rule.Metadata,
+            (document, diagnostic, cancellationToken) =>
+                ApplyAsync(document, diagnostic, rule, cancellationToken))).ToImmutableArray();
+
     internal static ImmutableArray<DiagnosticDescriptor> Descriptors { get; } =
         AllRules.Select(rule => rule.Descriptor).ToImmutableArray();
 
@@ -80,6 +88,36 @@ internal static class ExpressionQuickFixRegistry
 
     internal static bool TryGetRule(string diagnosticId, out ExpressionQuickFixRule rule) =>
         RulesByDiagnosticId.TryGetValue(diagnosticId, out rule!);
+
+    private static async Task<Document> ApplyAsync(
+        Document document,
+        Diagnostic diagnostic,
+        ExpressionQuickFixRule rule,
+        CancellationToken cancellationToken)
+    {
+        var (root, semanticModel) = await CodeFixDocument.TryLoadAsync(document, cancellationToken)
+            .ConfigureAwait(false);
+        if (root is null || semanticModel is null)
+        {
+            return document;
+        }
+
+        var expression = CodeFixDocument.FindExpression(root, diagnostic);
+        while (expression is not null)
+        {
+            if (expression.Kind() == rule.SyntaxKind &&
+                rule.TryGetReplacement(expression, semanticModel, cancellationToken, out var replacement))
+            {
+                replacement = replacement.WithTriviaFrom(expression)
+                    .WithAdditionalAnnotations(Formatter.Annotation);
+                return document.WithSyntaxRoot(root.ReplaceNode(expression, replacement));
+            }
+
+            expression = expression.Parent?.FirstAncestorOrSelf<ExpressionSyntax>();
+        }
+
+        return document;
+    }
 }
 
 internal static class ExpressionRuleHelpers

@@ -1,6 +1,7 @@
 using UnityBestPractices.Analyzers;
 using UnityBestPractices.Analyzers.Infrastructure;
 // Apply paths for the original UBP0001–UBP0011 fixes (co-located apply logic).
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,28 @@ namespace UnityBestPractices.Analyzers.Rules.Core;
 
 internal static class LegacyCoreCodeFixes
 {
+    internal static ImmutableArray<CodeFixHandler> Handlers => ImmutableArray.Create(
+        Handler(DiagnosticIds.EncapsulateSerializedField, EncapsulateFieldAsync, CanSafelyEncapsulateFieldAsync),
+        Handler(DiagnosticIds.YieldNull, YieldNullAsync),
+        Handler(DiagnosticIds.UseSquaredMagnitude, UseSquaredMagnitudeAsync),
+        Handler(DiagnosticIds.AddBurstCompile, AddBurstCompileAsync),
+        Handler(DiagnosticIds.MarkNativeArrayReadOnly, MarkNativeArrayReadOnlyAsync),
+        Handler(DiagnosticIds.UseStackalloc, UseStackallocAsync),
+        Handler(DiagnosticIds.UseRefLocal, UseRefLocalAsync),
+        Handler(DiagnosticIds.CacheCameraMain, CacheCameraMainAsync),
+        Handler(DiagnosticIds.PreallocateList, PreallocateListAsync),
+        Handler(DiagnosticIds.UseMultiplicationForSquare, UseMultiplicationForSquareAsync),
+        Handler(DiagnosticIds.UseUninitializedNativeArray, UseUninitializedNativeArrayAsync));
+
+    private static CodeFixHandler Handler(
+        string diagnosticId,
+        System.Func<Document, Diagnostic, CancellationToken, Task<Document>> apply,
+        System.Func<Document, Diagnostic, CancellationToken, Task<bool>>? applicable = null) =>
+        new(Metadata(diagnosticId), apply, applicable);
+
+    private static RuleMetadata Metadata(string diagnosticId) =>
+        DiagnosticCatalog.All.Single(metadata => metadata.DiagnosticId == diagnosticId);
+
     internal static async Task<bool> CanSafelyEncapsulateFieldAsync(
         Document document,
         Diagnostic diagnostic,

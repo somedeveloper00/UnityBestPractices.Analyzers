@@ -17,18 +17,20 @@ internal static class CodeFixRegistration
     internal static void Register(
         CodeFixContext context,
         Diagnostic diagnostic,
-        Func<CancellationToken, Task<Document>> createChangedDocument)
+        CodeFixHandler handler)
     {
-        if (!DiagnosticCatalog.TryGet(diagnostic.Id, out var metadata) || !metadata.HasCodeFix)
+        if (!DiagnosticCatalog.TryGet(diagnostic.Id, out var metadata) ||
+            !metadata.HasCodeFix ||
+            handler.DiagnosticId != diagnostic.Id)
         {
             return;
         }
 
         context.RegisterCodeFix(
             CodeAction.Create(
-                FixTitleLocalizer.Get(diagnostic.Id, metadata.FixTitle),
-                createChangedDocument,
-                equivalenceKey: diagnostic.Id),
+                FixTitleLocalizer.Get(diagnostic.Id, handler.FixTitle),
+                cancellationToken => handler.ApplyAsync(context.Document, diagnostic, cancellationToken),
+                equivalenceKey: handler.EquivalenceKey),
             diagnostic);
     }
 }
