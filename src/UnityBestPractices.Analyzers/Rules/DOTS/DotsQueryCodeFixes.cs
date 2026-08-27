@@ -1,3 +1,5 @@
+using UnityBestPractices.Analyzers;
+using UnityBestPractices.Analyzers.Infrastructure;
 // DOTS query transformations and job extraction.
 using System.Collections.Immutable;
 using System.Linq;
@@ -8,7 +10,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Formatting;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Rules.Dots;
 
 internal static class DotsQueryCodeFixes
 {

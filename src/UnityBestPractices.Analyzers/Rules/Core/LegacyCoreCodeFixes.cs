@@ -1,3 +1,5 @@
+using UnityBestPractices.Analyzers;
+using UnityBestPractices.Analyzers.Infrastructure;
 // Apply paths for the original UBP0001–UBP0011 fixes (co-located apply logic).
 using System.Linq;
 using System.Threading;
@@ -8,7 +10,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Formatting;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Rules.Core;
 
 internal static class LegacyCoreCodeFixes
 {
@@ -31,7 +33,7 @@ internal static class LegacyCoreCodeFixes
             : semanticModel.GetDeclaredSymbol(variable, cancellationToken) as IFieldSymbol;
         if (fieldDeclaration is null ||
             fieldSymbol?.ContainingType is null ||
-            !UnityBestPracticesAnalyzer.IsEncapsulatableSerializedField(
+            !LegacyRuleMatchers.IsEncapsulatableSerializedField(
                 fieldDeclaration,
                 semanticModel,
                 cancellationToken))
@@ -83,7 +85,7 @@ internal static class LegacyCoreCodeFixes
 
         var field = CodeFixDocument.FindAncestor<FieldDeclarationSyntax>(root, diagnostic);
         if (field is null ||
-            !UnityBestPracticesAnalyzer.IsEncapsulatableSerializedField(
+            !LegacyRuleMatchers.IsEncapsulatableSerializedField(
                 field,
                 semanticModel,
                 cancellationToken))
@@ -140,7 +142,7 @@ internal static class LegacyCoreCodeFixes
 
         var yieldStatement = CodeFixDocument.FindAncestor<YieldStatementSyntax>(root, diagnostic);
         if (yieldStatement is null ||
-            !UnityBestPracticesAnalyzer.IsBoxedNextFrameYield(yieldStatement, semanticModel, cancellationToken))
+            !LegacyRuleMatchers.IsBoxedNextFrameYield(yieldStatement, semanticModel, cancellationToken))
         {
             return document;
         }
@@ -165,7 +167,7 @@ internal static class LegacyCoreCodeFixes
 
         var binary = CodeFixDocument.FindAncestor<BinaryExpressionSyntax>(root, diagnostic);
         if (binary is null ||
-            !UnityBestPracticesAnalyzer.TryGetMagnitudeComparison(
+            !LegacyRuleMatchers.TryGetMagnitudeComparison(
                 binary,
                 semanticModel,
                 cancellationToken,
@@ -205,7 +207,7 @@ internal static class LegacyCoreCodeFixes
 
         var declaration = CodeFixDocument.FindAncestor<StructDeclarationSyntax>(root, diagnostic);
         if (declaration is null ||
-            !UnityBestPracticesAnalyzer.CanAddBurstCompile(declaration, semanticModel, cancellationToken))
+            !LegacyRuleMatchers.CanAddBurstCompile(declaration, semanticModel, cancellationToken))
         {
             return document;
         }
@@ -230,7 +232,7 @@ internal static class LegacyCoreCodeFixes
 
         var field = CodeFixDocument.FindAncestor<FieldDeclarationSyntax>(root, diagnostic);
         if (field is null ||
-            !UnityBestPracticesAnalyzer.IsReadOnlyNativeArrayCandidate(field, semanticModel, cancellationToken))
+            !LegacyRuleMatchers.IsReadOnlyNativeArrayCandidate(field, semanticModel, cancellationToken))
         {
             return document;
         }
@@ -258,7 +260,7 @@ internal static class LegacyCoreCodeFixes
             document.Project.AnalyzerOptions.AnalyzerConfigOptionsProvider,
             root.SyntaxTree);
         if (declarator is null ||
-            !UnityBestPracticesAnalyzer.CanUseStackalloc(
+            !LegacyRuleMatchers.CanUseStackalloc(
                 declarator,
                 semanticModel,
                 cancellationToken,
@@ -316,7 +318,7 @@ internal static class LegacyCoreCodeFixes
 
         var declaration = CodeFixDocument.FindAncestor<LocalDeclarationStatementSyntax>(root, diagnostic);
         if (declaration is null ||
-            !UnityBestPracticesAnalyzer.TryGetCopyBackPattern(
+            !LegacyRuleMatchers.TryGetCopyBackPattern(
                 declaration,
                 semanticModel,
                 cancellationToken,
@@ -359,7 +361,7 @@ internal static class LegacyCoreCodeFixes
 
         var access = CodeFixDocument.FindAncestor<MemberAccessExpressionSyntax>(root, diagnostic);
         if (access is null ||
-            !UnityBestPracticesAnalyzer.TryGetRepeatedCameraMain(
+            !LegacyRuleMatchers.TryGetRepeatedCameraMain(
                 access,
                 semanticModel,
                 cancellationToken,
@@ -411,7 +413,7 @@ internal static class LegacyCoreCodeFixes
             document.Project.AnalyzerOptions.AnalyzerConfigOptionsProvider,
             root.SyntaxTree);
         if (creation is null ||
-            !UnityBestPracticesAnalyzer.TryGetListPreallocation(
+            !LegacyRuleMatchers.TryGetListPreallocation(
                 creation,
                 semanticModel,
                 cancellationToken,
@@ -445,7 +447,7 @@ internal static class LegacyCoreCodeFixes
 
         var invocation = CodeFixDocument.FindAncestor<InvocationExpressionSyntax>(root, diagnostic);
         if (invocation is null ||
-            !UnityBestPracticesAnalyzer.TryGetMathfSquare(
+            !LegacyRuleMatchers.TryGetMathfSquare(
                 invocation,
                 semanticModel,
                 cancellationToken,
@@ -478,7 +480,7 @@ internal static class LegacyCoreCodeFixes
 
         var creation = CodeFixDocument.FindAncestor<ObjectCreationExpressionSyntax>(root, diagnostic);
         if (creation is null ||
-            !UnityBestPracticesAnalyzer.TryGetNativeArrayInitialization(
+            !LegacyRuleMatchers.TryGetNativeArrayInitialization(
                 creation,
                 semanticModel,
                 cancellationToken,
