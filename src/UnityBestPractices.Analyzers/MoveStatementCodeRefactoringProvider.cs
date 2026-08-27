@@ -1,3 +1,4 @@
+using UnityBestPractices.Analyzers.Infrastructure;
 using System;
 using System.Composition;
 using System.Linq;

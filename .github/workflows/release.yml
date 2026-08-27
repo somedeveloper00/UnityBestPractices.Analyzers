@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
@@ -24,6 +25,30 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Enforce fresh licensed Unity matrix evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cutoff="$(date -u -d '7 days ago' +%s)"
+          evidence=''
+          while IFS=$'\t' read -r sha created url event; do
+            [[ "$(date -u -d "$created" +%s)" -ge "$cutoff" ]] || continue
+            if [[ "$event" == 'workflow_dispatch' && "$sha" == "$GITHUB_SHA" ]] || \
+               { [[ "$event" == 'schedule' ]] && git merge-base --is-ancestor "$sha" "$GITHUB_SHA"; }; then
+              evidence="$url"
+              break
+            fi
+          done < <(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?status=success&per_page=50" \
+            --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | [.head_sha, .created_at, .html_url, .event] | @tsv')
+          if [[ -z "$evidence" ]]; then
+            echo 'No successful scheduled CI matrix was found on a recent ancestor (maximum age: 7 days).' >&2
+            echo 'Manually run CI with licensed credentials before releasing.' >&2
+            exit 1
+          fi
+          echo "Using licensed Unity evidence: $evidence"
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v5

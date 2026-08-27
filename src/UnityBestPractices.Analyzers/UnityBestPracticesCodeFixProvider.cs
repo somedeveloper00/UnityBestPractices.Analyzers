@@ -1,3 +1,8 @@
+using UnityBestPractices.Analyzers.Infrastructure;
+using UnityBestPractices.Analyzers.Rules.Core;
+using UnityBestPractices.Analyzers.Rules.Correctness;
+using UnityBestPractices.Analyzers.Rules.Expressions;
+using UnityBestPractices.Analyzers.Rules.Dots;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;

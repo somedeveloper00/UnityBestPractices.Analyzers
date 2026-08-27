@@ -1,8 +1,9 @@
+using UnityBestPractices.Analyzers;
 using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 internal readonly struct AnalyzerConfiguration
 {

@@ -1,10 +1,14 @@
+using UnityBestPractices.Analyzers.Infrastructure;
+using UnityBestPractices.Analyzers.Rules.Correctness;
+using UnityBestPractices.Analyzers.Rules.Expressions;
+using UnityBestPractices.Analyzers.Rules.Dots;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Rules.Core;
 
 internal abstract class AnalyzerRuleModule : IAnalyzerRuleModule
 {
