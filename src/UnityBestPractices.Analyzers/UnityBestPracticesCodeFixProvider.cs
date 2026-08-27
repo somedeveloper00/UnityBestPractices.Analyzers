@@ -29,8 +29,10 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
         foreach (var diagnostic in context.Diagnostics)
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             if (diagnostic.Id == DiagnosticIds.DiscardedScheduledJobHandle)
             {
                 CodeFixRegistration.Register(
