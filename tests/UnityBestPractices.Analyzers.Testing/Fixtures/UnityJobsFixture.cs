@@ -1,6 +1,8 @@
-internal static class UnityJobsFixture
+namespace UnityBestPractices.Analyzers.Testing;
+
+public static class UnityJobsFixture
 {
-    internal const string Source = """
+    public const string Source = """
         namespace Unity.Jobs
         {
             public struct JobHandle { }

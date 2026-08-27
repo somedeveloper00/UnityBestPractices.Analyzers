@@ -1,6 +1,8 @@
-internal static class UnityEngineFixture
+namespace UnityBestPractices.Analyzers.Testing;
+
+public static class UnityEngineFixture
 {
-    internal const string Source = """
+    public const string Source = """
         namespace UnityEngine
         {
             public sealed class SerializeField : System.Attribute { }

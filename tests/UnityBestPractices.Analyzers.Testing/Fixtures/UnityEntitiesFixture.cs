@@ -1,6 +1,8 @@
-internal static class UnityEntitiesFixture
+namespace UnityBestPractices.Analyzers.Testing;
+
+public static class UnityEntitiesFixture
 {
-    internal const string Source = """
+    public const string Source = """
         namespace Unity.Entities
         {
             public interface IComponentData { }

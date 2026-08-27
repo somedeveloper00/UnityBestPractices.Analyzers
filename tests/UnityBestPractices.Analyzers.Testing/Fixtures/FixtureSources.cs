@@ -1,6 +1,8 @@
-internal static class FixtureSources
+namespace UnityBestPractices.Analyzers.Testing;
+
+public static class FixtureSources
 {
-    internal static string Unity => string.Join(
+    public static string Unity => string.Join(
         System.Environment.NewLine,
         UnityEngineFixture.Source,
         BurstFixture.Source,

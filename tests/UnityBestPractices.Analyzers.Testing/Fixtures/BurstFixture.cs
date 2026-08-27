@@ -1,6 +1,8 @@
-internal static class BurstFixture
+namespace UnityBestPractices.Analyzers.Testing;
+
+public static class BurstFixture
 {
-    internal const string Source = """
+    public const string Source = """
         namespace Unity.Burst
         {
             public sealed class BurstCompileAttribute : System.Attribute { }

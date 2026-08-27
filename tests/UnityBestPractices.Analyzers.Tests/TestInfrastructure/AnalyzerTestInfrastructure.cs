@@ -189,25 +189,12 @@ internal sealed partial class AnalyzerTests
 
     private async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(Document document)
     {
-        var compilation = await document.Project.GetCompilationAsync()
-            ?? throw new InvalidOperationException("Could not create a compilation.");
-        var compilerErrors = compilation.GetDiagnostics().Where(item => item.Severity == DiagnosticSeverity.Error).ToArray();
-        if (compilerErrors.Length != 0)
-        {
-            throw new InvalidOperationException($"Test input did not compile: {FormatDiagnostics(compilerErrors)}");
-        }
-
-        var diagnostics = await compilation
-            .WithAnalyzers(
-                ImmutableArray.Create<DiagnosticAnalyzer>(_analyzer),
-                document.Project.AnalyzerOptions)
-            .GetAnalyzerDiagnosticsAsync();
-        foreach (var diagnostic in diagnostics)
-        {
+        var result = await AnalyzerTestHost.RunAnalyzerAsync(document, _analyzer);
+        if (!result.InputCompiled)
+            throw new InvalidOperationException($"Test input did not compile: {FormatDiagnostics(result.CompilerDiagnostics)}");
+        foreach (var diagnostic in result.AnalyzerDiagnostics)
             AssertSuggestion(diagnostic);
-        }
-
-        return diagnostics;
+        return result.AnalyzerDiagnostics;
     }
 
     private static Document CreateDocument(
@@ -216,62 +203,12 @@ internal sealed partial class AnalyzerTests
         string? additionalSource = null,
         string? secondAdditionalSource = null)
     {
-        var workspace = new AdhocWorkspace();
-        var virtualProjectDirectory = Path.Combine(Path.GetTempPath(), "UnityBestPracticesAnalyzerTests");
-        var projectId = ProjectId.CreateNewId();
-        var stubsDocumentId = DocumentId.CreateNewId(projectId);
-        var documentId = DocumentId.CreateNewId(projectId);
-        var solution = workspace.CurrentSolution
-            .AddProject(projectId, "AnalyzerTest", "AnalyzerTest", LanguageNames.CSharp)
-            .WithProjectCompilationOptions(
-                projectId,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-            .WithProjectParseOptions(projectId, new CSharpParseOptions(LanguageVersion.CSharp9));
-
-        foreach (var reference in PlatformReferenceFixture.Discover())
-        {
-            solution = solution.AddMetadataReference(projectId, reference);
-        }
-
-        solution = solution.AddDocument(
-            stubsDocumentId,
-            "UnityStubs.cs",
-            SourceText.From(FixtureSources.Unity));
-        solution = solution.AddDocument(
-            documentId,
-            "Test.cs",
-            SourceText.From(source),
-            filePath: Path.Combine(virtualProjectDirectory, "Test.cs"));
+        var additionalSources = new List<(string Name, string Source)>();
         if (additionalSource != null)
-        {
-            solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectId),
-                "Additional.cs",
-                SourceText.From(additionalSource),
-                filePath: Path.Combine(virtualProjectDirectory, "Additional.cs"));
-        }
-
+            additionalSources.Add(("Additional.cs", additionalSource));
         if (secondAdditionalSource != null)
-        {
-            solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectId),
-                "SecondAdditional.cs",
-                SourceText.From(secondAdditionalSource),
-                filePath: Path.Combine(virtualProjectDirectory, "SecondAdditional.cs"));
-        }
-
-        if (editorConfig != null)
-        {
-            var configDocumentId = DocumentId.CreateNewId(projectId);
-            solution = solution.AddAnalyzerConfigDocument(
-                configDocumentId,
-                ".editorconfig",
-                SourceText.From(editorConfig),
-                filePath: Path.Combine(virtualProjectDirectory, ".editorconfig"));
-        }
-
-        return solution.GetDocument(documentId)
-            ?? throw new InvalidOperationException("Could not create the test document.");
+            additionalSources.Add(("SecondAdditional.cs", secondAdditionalSource));
+        return AnalyzerTestHost.CreateDocument(source, editorConfig, additionalSources).Document;
     }
 
     private static void AssertSuggestion(Diagnostic diagnostic)

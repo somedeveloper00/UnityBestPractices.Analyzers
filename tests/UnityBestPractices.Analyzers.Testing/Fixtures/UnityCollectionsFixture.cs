@@ -1,6 +1,8 @@
-internal static class UnityCollectionsFixture
+namespace UnityBestPractices.Analyzers.Testing;
+
+public static class UnityCollectionsFixture
 {
-    internal const string Source = """
+    public const string Source = """
         namespace Unity.Collections
         {
             public sealed class ReadOnlyAttribute : System.Attribute { }
