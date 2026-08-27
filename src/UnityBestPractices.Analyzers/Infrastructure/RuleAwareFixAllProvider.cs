@@ -1,10 +1,11 @@
+using UnityBestPractices.Analyzers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 internal sealed class RuleAwareFixAllProvider : FixAllProvider
 {
@@ -22,6 +23,7 @@ internal sealed class RuleAwareFixAllProvider : FixAllProvider
 
     public override Task<CodeAction?> GetFixAsync(FixAllContext fixAllContext)
     {
+        fixAllContext.CancellationToken.ThrowIfCancellationRequested();
         if (fixAllContext.DiagnosticIds.Any(
                 diagnosticId =>
                     !DiagnosticCatalog.TryGet(diagnosticId, out var metadata) ||

@@ -55,7 +55,7 @@ public static class AnalyzerTestHost
         foreach (var reference in PlatformReferences)
             solution = solution.AddMetadataReference(projectId, reference);
         if (includeUnityStubs)
-            solution = solution.AddDocument(DocumentId.CreateNewId(projectId), "UnityStubs.cs", SourceText.From(UnityTestSources.UnityAndDots));
+            solution = solution.AddDocument(DocumentId.CreateNewId(projectId), "UnityStubs.cs", SourceText.From(FixtureSources.Unity));
         solution = solution.AddDocument(documentId, "Test.cs", SourceText.From(source), filePath: Path.Combine(directory, "Test.cs"));
         if (additionalSources != null)
             foreach (var item in additionalSources)

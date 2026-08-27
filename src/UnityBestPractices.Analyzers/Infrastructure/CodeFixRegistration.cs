@@ -1,3 +1,4 @@
+using UnityBestPractices.Analyzers;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -5,7 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 /// <summary>
 /// Shared registration policy for diagnostic quick fixes: catalog title, localized

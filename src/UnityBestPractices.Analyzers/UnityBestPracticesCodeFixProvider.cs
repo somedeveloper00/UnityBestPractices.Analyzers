@@ -1,3 +1,8 @@
+using UnityBestPractices.Analyzers.Infrastructure;
+using UnityBestPractices.Analyzers.Rules.Core;
+using UnityBestPractices.Analyzers.Rules.Correctness;
+using UnityBestPractices.Analyzers.Rules.Expressions;
+using UnityBestPractices.Analyzers.Rules.Dots;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
@@ -24,8 +29,10 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
         foreach (var diagnostic in context.Diagnostics)
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             if (diagnostic.Id == DiagnosticIds.DiscardedScheduledJobHandle)
             {
                 CodeFixRegistration.Register(

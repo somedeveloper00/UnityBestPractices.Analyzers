@@ -1,10 +1,11 @@
+using UnityBestPractices.Analyzers;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 internal sealed class UnitySymbolCache
 {
