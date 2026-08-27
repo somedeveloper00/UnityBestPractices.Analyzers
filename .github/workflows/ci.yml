@@ -131,6 +131,17 @@ jobs:
           --project tests/UnityBestPractices.Analyzers.PerformanceTests/UnityBestPractices.Analyzers.PerformanceTests.csproj
           --configuration Release
           --no-build
+          --
+          --baseline eng/performance-baseline.json
+          --output artifacts/performance/results.json
+
+      - name: Upload analyzer performance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-performance-results
+          if-no-files-found: warn
+          path: artifacts/performance/results.json
 
       - name: Pack NuGet and symbols
         run: >

@@ -1,0 +1,186 @@
+{
+  "SchemaVersion": 1,
+  "CreatedUtc": "2026-08-27T10:45:03.8185272+00:00",
+  "Runtime": ".NET 8.0.11",
+  "Os": "Ubuntu 24.04.4 LTS",
+  "ProcessorCount": 2,
+  "AllocationsStable": true,
+  "Results": [
+    {
+      "Family": "Core",
+      "Workload": "Clean",
+      "Scenario": "ColdStart",
+      "Iterations": 1,
+      "ElapsedMilliseconds": 1699.9712,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 2595,
+      "DiagnosticCount": 0,
+      "AllocatedBytes": 10655192
+    },
+    {
+      "Family": "Core",
+      "Workload": "Clean",
+      "Scenario": "Repeated",
+      "Iterations": 5,
+      "ElapsedMilliseconds": 464.5088,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 2595,
+      "DiagnosticCount": 0,
+      "AllocatedBytes": 7080288
+    },
+    {
+      "Family": "Core",
+      "Workload": "DiagnosticHeavy",
+      "Scenario": "ColdStart",
+      "Iterations": 1,
+      "ElapsedMilliseconds": 334.5423,
+      "SyntaxTreeCount": 81,
+      "SourceBytes": 8421,
+      "DiagnosticCount": 81,
+      "AllocatedBytes": 3050384
+    },
+    {
+      "Family": "Core",
+      "Workload": "DiagnosticHeavy",
+      "Scenario": "Repeated",
+      "Iterations": 5,
+      "ElapsedMilliseconds": 390.3925,
+      "SyntaxTreeCount": 81,
+      "SourceBytes": 8421,
+      "DiagnosticCount": 405,
+      "AllocatedBytes": 13867408
+    },
+    {
+      "Family": "Correctness",
+      "Workload": "Clean",
+      "Scenario": "ColdStart",
+      "Iterations": 1,
+      "ElapsedMilliseconds": 51.5889,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 96,
+      "DiagnosticCount": 0,
+      "AllocatedBytes": 692528
+    },
+    {
+      "Family": "Correctness",
+      "Workload": "Clean",
+      "Scenario": "Repeated",
+      "Iterations": 5,
+      "ElapsedMilliseconds": 149.4604,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 96,
+      "DiagnosticCount": 0,
+      "AllocatedBytes": 3140784
+    },
+    {
+      "Family": "Correctness",
+      "Workload": "DiagnosticHeavy",
+      "Scenario": "ColdStart",
+      "Iterations": 1,
+      "ElapsedMilliseconds": 297.0875,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 7599,
+      "DiagnosticCount": 60,
+      "AllocatedBytes": 2904024
+    },
+    {
+      "Family": "Correctness",
+      "Workload": "DiagnosticHeavy",
+      "Scenario": "Repeated",
+      "Iterations": 5,
+      "ElapsedMilliseconds": 534.3823,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 7599,
+      "DiagnosticCount": 300,
+      "AllocatedBytes": 13309120
+    },
+    {
+      "Family": "Expressions",
+      "Workload": "Clean",
+      "Scenario": "ColdStart",
+      "Iterations": 1,
+      "ElapsedMilliseconds": 60.2497,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 77,
+      "DiagnosticCount": 0,
+      "AllocatedBytes": 588608
+    },
+    {
+      "Family": "Expressions",
+      "Workload": "Clean",
+      "Scenario": "Repeated",
+      "Iterations": 5,
+      "ElapsedMilliseconds": 93.2425,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 77,
+      "DiagnosticCount": 0,
+      "AllocatedBytes": 2672488
+    },
+    {
+      "Family": "Expressions",
+      "Workload": "DiagnosticHeavy",
+      "Scenario": "ColdStart",
+      "Iterations": 1,
+      "ElapsedMilliseconds": 277.6041,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 7068,
+      "DiagnosticCount": 100,
+      "AllocatedBytes": 9683448
+    },
+    {
+      "Family": "Expressions",
+      "Workload": "DiagnosticHeavy",
+      "Scenario": "Repeated",
+      "Iterations": 5,
+      "ElapsedMilliseconds": 1423.8622,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 7068,
+      "DiagnosticCount": 500,
+      "AllocatedBytes": 43049912
+    },
+    {
+      "Family": "DOTS",
+      "Workload": "Clean",
+      "Scenario": "ColdStart",
+      "Iterations": 1,
+      "ElapsedMilliseconds": 74.5906,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 130,
+      "DiagnosticCount": 0,
+      "AllocatedBytes": 1321336
+    },
+    {
+      "Family": "DOTS",
+      "Workload": "Clean",
+      "Scenario": "Repeated",
+      "Iterations": 5,
+      "ElapsedMilliseconds": 185.5659,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 130,
+      "DiagnosticCount": 0,
+      "AllocatedBytes": 3301296
+    },
+    {
+      "Family": "DOTS",
+      "Workload": "DiagnosticHeavy",
+      "Scenario": "ColdStart",
+      "Iterations": 1,
+      "ElapsedMilliseconds": 168.0781,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 5730,
+      "DiagnosticCount": 120,
+      "AllocatedBytes": 3846120
+    },
+    {
+      "Family": "DOTS",
+      "Workload": "DiagnosticHeavy",
+      "Scenario": "Repeated",
+      "Iterations": 5,
+      "ElapsedMilliseconds": 610.7661,
+      "SyntaxTreeCount": 1,
+      "SourceBytes": 5730,
+      "DiagnosticCount": 600,
+      "AllocatedBytes": 18645184
+    }
+  ]
+}

@@ -5,235 +5,215 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using UnityBestPractices.Analyzers;
 
-const double maximumTotalSeconds = 30;
-const long maximumTotalAllocatedBytes = 1_500_000_000;
-
+const int repeatedAnalysisCount = 5;
+var outputPath = GetOption(args, "--output") ?? "artifacts/performance/results.json";
+var baselinePath = GetOption(args, "--baseline");
 var references = GetPlatformReferences().ToImmutableArray();
-var analyzer = new UnityBestPracticesAnalyzer();
+var workloads = CreateWorkloads();
+var results = new List<Measurement>();
+var allocationsStable = IsAllocationMeasurementStable();
 
-await AnalyzeAsync("warmup", new[] { "class Warmup { int Value => 1; }" }, expectedMinimum: 0);
-var measurements = new List<Measurement>
+foreach (var workload in workloads)
 {
-    await AnalyzeAsync("large-no-unity-symbols", new[] { CreateNoUnitySource(2000) }, expectedMinimum: 0),
-    await AnalyzeAsync("repeated-unity-patterns", new[] { CreateUnitySource(250) }, expectedMinimum: 250),
-    await AnalyzeAsync("large-dots-job-file", new[] { CreateDotsSource(200) }, expectedMinimum: 400),
-    await AnalyzeAsync("incomplete-syntax", new[] { CreateIncompleteSource(1000) }, expectedMinimum: 0),
-    await AnalyzeAsync(
-        "many-documents",
-        Enumerable.Range(0, 100).Select(index => $"class Document{index} {{ int Value => {index}; }}"),
-        expectedMinimum: 0),
-};
-measurements.Add(await MeasureIncrementalEditsAsync());
+    results.Add(await AnalyzeAsync(workload, 1));
+    results.Add(await AnalyzeAsync(workload, repeatedAnalysisCount));
+}
 
-var totalSeconds = measurements.Sum(item => item.Elapsed.TotalSeconds);
-var totalAllocated = measurements.Sum(item => item.AllocatedBytes);
-foreach (var measurement in measurements)
+var artifact = new PerformanceArtifact(
+    SchemaVersion: 1,
+    CreatedUtc: DateTimeOffset.UtcNow,
+    Runtime: System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+    Os: System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+    ProcessorCount: Environment.ProcessorCount,
+    AllocationsStable: allocationsStable,
+    Results: results);
+
+Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
+await File.WriteAllTextAsync(
+    outputPath,
+    JsonSerializer.Serialize(artifact, new JsonSerializerOptions { WriteIndented = true }));
+
+Console.WriteLine("Family       Workload          Scenario   Time       Trees   Source       Diagnostics   Allocated");
+foreach (var result in results)
 {
     Console.WriteLine(
-        $"{measurement.Name}: {measurement.Elapsed.TotalMilliseconds:F0} ms, " +
-        $"{measurement.AllocatedBytes / 1024d / 1024d:F1} MiB, " +
-        $"{measurement.Diagnostics} diagnostics, {measurement.DocumentCount} documents");
+        $"{result.Family,-12} {result.Workload,-17} {result.Scenario,-10} " +
+        $"{result.ElapsedMilliseconds,7:F0} ms {result.SyntaxTreeCount,7} " +
+        $"{result.SourceBytes / 1024d,8:F1} KiB {result.DiagnosticCount,13} " +
+        (result.AllocatedBytes is long bytes ? $"{bytes / 1024d / 1024d,9:F1} MiB" : "       n/a"));
 }
 
-Console.WriteLine($"Total: {totalSeconds:F2} s, {totalAllocated / 1024d / 1024d:F1} MiB allocated");
-if (totalSeconds > maximumTotalSeconds)
+Console.WriteLine($"JSON artifact: {outputPath}");
+ValidateFamilyThresholds(results);
+if (baselinePath is not null)
 {
-    throw new InvalidOperationException(
-        $"Analyzer performance exceeded the broad {maximumTotalSeconds:F0} second CI threshold.");
+    CompareWithBaseline(results, baselinePath);
+}
+else
+{
+    Console.WriteLine("No baseline selected; only conservative absolute thresholds were applied.");
 }
 
-if (totalAllocated > maximumTotalAllocatedBytes)
+async Task<Measurement> AnalyzeAsync(Workload workload, int iterations)
 {
-    throw new InvalidOperationException(
-        $"Analyzer allocations exceeded the broad {maximumTotalAllocatedBytes / 1024 / 1024} MiB CI threshold.");
-}
-
-async Task<Measurement> AnalyzeAsync(
-    string name,
-    IEnumerable<string> sources,
-    int expectedMinimum)
-{
-    var trees = sources
-        .Select((source, index) => CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.CSharp9),
-            $"{name}-{index}.cs"))
-        .ToImmutableArray();
-    var compilation = CSharpCompilation.Create(
-        name,
-        trees,
-        references,
-        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-    var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
-    var stopwatch = Stopwatch.StartNew();
-    var diagnostics = await compilation
-        .WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(analyzer))
-        .GetAnalyzerDiagnosticsAsync();
-    stopwatch.Stop();
-    var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
-    if (diagnostics.Length < expectedMinimum)
+    var sources = workload.Sources.ToImmutableArray();
+    var sourceBytes = sources.Sum(source => Encoding.UTF8.GetByteCount(source));
+    var elapsed = TimeSpan.Zero;
+    long allocated = 0;
+    var diagnostics = 0;
+    for (var iteration = 0; iteration < iterations; iteration++)
     {
-        throw new InvalidOperationException(
-            $"{name} produced {diagnostics.Length} diagnostics; expected at least {expectedMinimum}.");
+        var trees = sources.Select((source, index) => CSharpSyntaxTree.ParseText(
+            source, new CSharpParseOptions(LanguageVersion.CSharp9),
+            $"/{workload.Family}/{workload.Kind}/{index}.cs")).ToImmutableArray();
+        var compilation = CSharpCompilation.Create(
+            $"{workload.Family}-{workload.Kind}-{iteration}", trees, references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var before = GC.GetTotalAllocatedBytes(precise: true);
+        var stopwatch = Stopwatch.StartNew();
+        var current = await compilation.WithAnalyzers(
+            ImmutableArray.Create<DiagnosticAnalyzer>(new UnityBestPracticesAnalyzer()))
+            .GetAnalyzerDiagnosticsAsync();
+        stopwatch.Stop();
+        elapsed += stopwatch.Elapsed;
+        allocated += GC.GetTotalAllocatedBytes(precise: true) - before;
+        diagnostics += current.Length;
     }
 
-    if (name == "large-no-unity-symbols" && diagnostics.Length != 0)
-    {
-        throw new InvalidOperationException("Non-Unity workload unexpectedly produced diagnostics.");
-    }
+    if (workload.Kind == "Clean" && diagnostics != 0)
+        throw new InvalidOperationException($"{workload.Family} clean workload produced {diagnostics} diagnostics.");
+    if (workload.Kind == "DiagnosticHeavy" && diagnostics < iterations)
+        throw new InvalidOperationException($"{workload.Family} diagnostic workload produced only {diagnostics} diagnostics.");
 
-    return new Measurement(name, stopwatch.Elapsed, allocated, diagnostics.Length, trees.Length);
-}
-
-async Task<Measurement> MeasureIncrementalEditsAsync()
-{
-    var tree = CSharpSyntaxTree.ParseText(
-        "class Incremental { int Value => 0; }",
-        new CSharpParseOptions(LanguageVersion.CSharp9),
-        "Incremental.cs");
-    var compilation = CSharpCompilation.Create(
-        "incremental-edits",
-        new[] { tree },
-        references,
-        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-    var stopwatch = Stopwatch.StartNew();
-    var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
-    var diagnosticCount = 0;
-    for (var edit = 1; edit <= 10; edit++)
-    {
-        var replacement = CSharpSyntaxTree.ParseText(
-            $"class Incremental {{ int Value => {edit}; }}",
-            new CSharpParseOptions(LanguageVersion.CSharp9),
-            "Incremental.cs");
-        compilation = compilation.ReplaceSyntaxTree(tree, replacement);
-        tree = replacement;
-        diagnosticCount += (await compilation
-                .WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(analyzer))
-                .GetAnalyzerDiagnosticsAsync())
-            .Length;
-    }
-
-    stopwatch.Stop();
     return new Measurement(
-        "incremental-edits",
-        stopwatch.Elapsed,
-        GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore,
-        diagnosticCount,
-        1);
+        workload.Family, workload.Kind, iterations == 1 ? "ColdStart" : "Repeated",
+        iterations, elapsed.TotalMilliseconds, sources.Length, sourceBytes, diagnostics,
+        allocationsStable ? allocated : null);
 }
 
-static string CreateNoUnitySource(int methodCount)
+static void ValidateFamilyThresholds(IEnumerable<Measurement> measurements)
 {
-    var builder = new StringBuilder("using System;\nclass LargeFile\n{\n");
-    for (var index = 0; index < methodCount; index++)
+    var limits = new Dictionary<string, (double Milliseconds, long Bytes)>(StringComparer.Ordinal)
     {
-        builder.Append("    int Method")
-            .Append(index)
-            .Append("(int value) => value + ")
-            .Append(index)
-            .AppendLine(";");
+        ["Core"] = (12_000, 900_000_000),
+        ["Correctness"] = (15_000, 1_100_000_000),
+        ["Expressions"] = (12_000, 900_000_000),
+        ["DOTS"] = (18_000, 1_300_000_000),
+    };
+    foreach (var family in measurements.GroupBy(result => result.Family))
+    {
+        var elapsed = family.Sum(result => result.ElapsedMilliseconds);
+        var bytes = family.Sum(result => result.AllocatedBytes ?? 0);
+        var limit = limits[family.Key];
+        if (elapsed > limit.Milliseconds)
+            throw new InvalidOperationException($"{family.Key} took {elapsed:F0} ms; limit is {limit.Milliseconds:F0} ms.");
+        if (family.All(result => result.AllocatedBytes.HasValue) && bytes > limit.Bytes)
+            throw new InvalidOperationException($"{family.Key} allocated {bytes} bytes; limit is {limit.Bytes} bytes.");
     }
-
-    return builder.AppendLine("}").ToString();
 }
 
-static string CreateUnitySource(int typeCount)
+static void CompareWithBaseline(IReadOnlyCollection<Measurement> current, string path)
 {
-    var builder = new StringBuilder(
-        """
-        using System.Collections;
-        namespace UnityEngine
+    var baseline = JsonSerializer.Deserialize<PerformanceArtifact>(File.ReadAllText(path))
+        ?? throw new InvalidOperationException($"Could not deserialize baseline '{path}'.");
+    if (baseline.SchemaVersion != 1)
+        throw new InvalidOperationException($"Baseline schema {baseline.SchemaVersion} is not supported.");
+    var failures = new List<string>();
+    foreach (var result in current)
+    {
+        var prior = baseline.Results.SingleOrDefault(candidate => candidate.Key == result.Key)
+            ?? throw new InvalidOperationException($"Baseline has no result for '{result.Key}'.");
+        if (prior.Iterations != result.Iterations ||
+            prior.SyntaxTreeCount != result.SyntaxTreeCount ||
+            prior.SourceBytes != result.SourceBytes)
         {
-            public class Object { }
-            public class Component : Object { }
-            public class MonoBehaviour : Component { }
+            throw new InvalidOperationException(
+                $"Baseline workload shape for '{result.Key}' does not match the current workload.");
         }
-        """);
-    for (var index = 0; index < typeCount; index++)
-    {
-        builder.Append(
-            $$"""
-
-            class Coroutine{{index}} : UnityEngine.MonoBehaviour
-            {
-                IEnumerator Run()
-                {
-                    yield return 0;
-                }
-            }
-            """);
-    }
-
-    return builder.ToString();
-}
-
-static string CreateDotsSource(int typeCount)
-{
-    var builder = new StringBuilder(
-        """
-        using Unity.Entities;
-        namespace Unity.Entities
+        // Both a generous ratio and a meaningful absolute increase are required to absorb runner noise.
+        var timeLimit = Math.Max(prior.ElapsedMilliseconds * 1.75, prior.ElapsedMilliseconds + 500);
+        if (result.ElapsedMilliseconds > timeLimit)
+            failures.Add($"{result.Key} time {result.ElapsedMilliseconds:F0} ms > {timeLimit:F0} ms");
+        if (result.AllocatedBytes is long bytes && prior.AllocatedBytes is long priorBytes)
         {
-            public interface IJobEntity { }
-            public static class IJobEntityExtensions
-            {
-                public static void Run<T>(this T job) where T : struct, IJobEntity { }
-                public static void Schedule<T>(this T job) where T : struct, IJobEntity { }
-                public static void ScheduleParallel<T>(this T job) where T : struct, IJobEntity { }
-            }
-            public static class SystemAPI { }
+            var allocationLimit = Math.Max(priorBytes * 1.75, priorBytes + 64L * 1024 * 1024);
+            if (bytes > allocationLimit)
+                failures.Add($"{result.Key} allocations {bytes} > {allocationLimit:F0} bytes");
         }
-        """);
-    for (var index = 0; index < typeCount; index++)
-    {
-        builder.Append(
-            $$"""
-
-            struct Job{{index}} : Unity.Entities.IJobEntity { }
-            class JobRunner{{index}}
-            {
-                void Update()
-                {
-                    new Job{{index}}().Run();
-                }
-            }
-            """);
     }
 
-    return builder.ToString();
+    Console.WriteLine($"Baseline: {path}");
+    if (failures.Count != 0)
+        throw new InvalidOperationException("Material performance regressions:\n" + string.Join("\n", failures));
 }
 
-static string CreateIncompleteSource(int statementCount)
+static List<Workload> CreateWorkloads() =>
+[
+    new("Core", "Clean", [CreatePlainSource(100)]),
+    new("Core", "DiagnosticHeavy", CreateCoroutineSources(80)),
+    new("Correctness", "Clean", ["namespace Unity.Collections { public struct NativeArray<T> { } } class Clean { int Value => 1; }"]),
+    new("Correctness", "DiagnosticHeavy", [CreateCorrectnessSource(60)]),
+    new("Expressions", "Clean", ["using System.Linq; class CleanExpressions { int Count(int[] x) => x.Length; }"]),
+    new("Expressions", "DiagnosticHeavy", [CreateExpressionSource(100)]),
+    new("DOTS", "Clean", ["namespace Unity.Entities { public interface IComponentData { } } struct Position : Unity.Entities.IComponentData { public int X; }"]),
+    new("DOTS", "DiagnosticHeavy", [CreateDotsSource(60)]),
+];
+
+static string CreatePlainSource(int count) => "class Plain {\n" +
+    string.Concat(Enumerable.Range(0, count).Select(i => $"int M{i}(int x) => x + {i};\n")) + "}";
+
+static IReadOnlyList<string> CreateCoroutineSources(int count) =>
+    new[]
+    {
+        "namespace UnityEngine { public class Object {} public class Component:Object {} public class MonoBehaviour:Component {} }",
+    }.Concat(Enumerable.Range(0, count).Select(i =>
+        $"using System.Collections; class C{i}:UnityEngine.MonoBehaviour {{ IEnumerator Run() {{ yield return {i}; }} }}"))
+    .ToArray();
+
+static string CreateCorrectnessSource(int count) => "namespace Unity.Collections { public enum Allocator { Persistent } public struct NativeArray<T> { public NativeArray(int n, Allocator a) {} public void Dispose() {} } }\n" +
+    string.Concat(Enumerable.Range(0, count).Select(i => $"class Leak{i} {{ void M() {{ var data = new Unity.Collections.NativeArray<int>(4, Unity.Collections.Allocator.Persistent); }} }}\n"));
+
+static string CreateExpressionSource(int count) => "using System; using System.Linq; using System.Collections.Generic; class Expressions {\n" +
+    string.Concat(Enumerable.Range(0, count).Select(i => $"bool M{i}(IEnumerable<int> values) => values.Where(x => x > {i}).Any();\n")) + "}";
+
+static string CreateDotsSource(int count) => "using Unity.Entities; namespace Unity.Entities { public interface IJobEntity {} public static class JobExt { public static void Run<T>(this T job) where T:struct,IJobEntity {} } }\n" +
+    string.Concat(Enumerable.Range(0, count).Select(i => $"struct Job{i}:Unity.Entities.IJobEntity {{}} class Runner{i} {{ void M() {{ new Job{i}().Run(); }} }}\n"));
+
+static string? GetOption(string[] arguments, string name)
 {
-    var builder = new StringBuilder("class Broken { void Update() {\n");
-    for (var index = 0; index < statementCount; index++)
-    {
-        builder.Append("value").Append(index).AppendLine(" = Call(");
-    }
-
-    return builder.ToString();
+    var index = Array.IndexOf(arguments, name);
+    if (index < 0) return null;
+    if (index == arguments.Length - 1) throw new ArgumentException($"{name} requires a path.");
+    return arguments[index + 1];
 }
+
+static bool IsAllocationMeasurementStable() =>
+    System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription.StartsWith(
+        ".NET ",
+        StringComparison.Ordinal);
 
 static IEnumerable<MetadataReference> GetPlatformReferences()
 {
-    var trustedAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
+    var trusted = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
         ?? throw new InvalidOperationException("The runtime did not provide platform assemblies.");
-    return trustedAssemblies
-        .Split(Path.PathSeparator)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
+    return trusted.Split(Path.PathSeparator).Distinct(StringComparer.OrdinalIgnoreCase)
         .Select(path => MetadataReference.CreateFromFile(path));
 }
 
-internal sealed record Measurement(
-    string Name,
-    TimeSpan Elapsed,
-    long AllocatedBytes,
-    int Diagnostics,
-    int DocumentCount);
+internal sealed record Workload(string Family, string Kind, IReadOnlyList<string> Sources);
+internal sealed record Measurement(string Family, string Workload, string Scenario, int Iterations,
+    double ElapsedMilliseconds, int SyntaxTreeCount, int SourceBytes, int DiagnosticCount, long? AllocatedBytes)
+{
+    [JsonIgnore]
+    public string Key => $"{Family}/{Workload}/{Scenario}";
+}
+internal sealed record PerformanceArtifact(int SchemaVersion, DateTimeOffset CreatedUtc, string Runtime,
+    string Os, int ProcessorCount, bool AllocationsStable, IReadOnlyList<Measurement> Results);
