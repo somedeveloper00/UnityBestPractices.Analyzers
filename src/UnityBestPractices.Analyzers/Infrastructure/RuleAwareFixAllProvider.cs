@@ -22,6 +22,7 @@ internal sealed class RuleAwareFixAllProvider : FixAllProvider
 
     public override Task<CodeAction?> GetFixAsync(FixAllContext fixAllContext)
     {
+        fixAllContext.CancellationToken.ThrowIfCancellationRequested();
         if (fixAllContext.DiagnosticIds.Any(
                 diagnosticId =>
                     !DiagnosticCatalog.TryGet(diagnosticId, out var metadata) ||
