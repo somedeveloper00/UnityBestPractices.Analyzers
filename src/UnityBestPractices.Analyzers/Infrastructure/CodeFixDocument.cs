@@ -1,10 +1,11 @@
+using UnityBestPractices.Analyzers;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 /// <summary>Common document loading and diagnostic-span node location for code fixes.</summary>
 internal static class CodeFixDocument

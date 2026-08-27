@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
+using UnityBestPractices.Analyzers.Rules.Core;
+using UnityBestPractices.Analyzers.Rules.Correctness;
+using UnityBestPractices.Analyzers.Rules.Dots;
+using UnityBestPractices.Analyzers.Rules.Expressions;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Infrastructure;
 
 internal static class CodeFixRegistry
 {

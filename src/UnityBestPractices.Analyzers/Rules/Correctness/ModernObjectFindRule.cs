@@ -1,3 +1,5 @@
+using UnityBestPractices.Analyzers;
+using UnityBestPractices.Analyzers.Infrastructure;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -9,7 +11,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Formatting;
 
-namespace UnityBestPractices.Analyzers;
+namespace UnityBestPractices.Analyzers.Rules.Correctness;
 
 internal static class ModernObjectFindRule
 {

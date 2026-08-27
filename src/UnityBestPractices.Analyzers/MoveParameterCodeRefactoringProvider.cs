@@ -1,3 +1,4 @@
+using UnityBestPractices.Analyzers.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

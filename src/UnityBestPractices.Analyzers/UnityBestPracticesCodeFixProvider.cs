@@ -1,3 +1,4 @@
+using UnityBestPractices.Analyzers.Infrastructure;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
@@ -17,8 +18,10 @@ public sealed class UnityBestPracticesCodeFixProvider : CodeFixProvider
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
         foreach (var diagnostic in context.Diagnostics)
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             if (CodeFixRegistry.TryGet(diagnostic.Id, out var handler) &&
                 await handler.CanApplyAsync(
                     context.Document,
