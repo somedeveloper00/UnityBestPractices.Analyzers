@@ -7,6 +7,24 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.45] - 2026-08-27
+
+### Changed
+
+- Split the monolithic analyzer into focused rule modules with a shared
+  registration surface and configuration-aware diagnostic reporter.
+- Enforced internal namespace and dependency direction so rule families depend
+  inward on infrastructure and the public catalog.
+- Code-fix and refactoring providers now honor cancellation during registration.
+
+### Added
+
+- Host-robustness tests covering workspace cancellation and analyzer/fix
+  resilience.
+- Family-split regression harness, fixtures, and rule cases for core,
+  correctness, expression, and DOTS analyzers.
+- Stronger Unity package integration validation and licensed Unity CI coverage.
+
 ## [0.4.44] - 2026-08-26
 
 ### Added
