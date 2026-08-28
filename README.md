@@ -216,6 +216,10 @@ support one-line statements, braced blocks, switch sections, accessors, enum
 members, methods, properties, fields, nested types, namespaces, and top-level
 type declarations. Comments and other trivia attached to the moved syntax travel
 with it, and an action is omitted when there is no sibling in that direction.
+Inside a binary-expression chain such as `A && B && C`, **Move statement left**
+and **Move statement right** exchange the selected operand with its neighbor.
+Roslyn's syntax kinds and precedence tree determine each chain's boundaries, so
+mixed operators and parenthesized subexpressions are not accidentally flattened.
 
 When VS Code uses the legacy OmniSharp language server, the two directions are
 exposed as distinct code-action kinds and can be invoked directly from

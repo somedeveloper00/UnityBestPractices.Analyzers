@@ -14,6 +14,68 @@ using Xunit;
 public sealed class MoveStatementCodeRefactoringProviderTests
 {
     [Theory]
+    [InlineData(MoveStatementCodeRefactoringProvider.MoveLeftTitle, "return B && A && C;")]
+    [InlineData(MoveStatementCodeRefactoringProvider.MoveRightTitle, "return A && C && B;")]
+    public async Task MovesMiddleBinaryOperandInEitherDirection(string title, string expectedStatement)
+    {
+        var changed = await ApplyAsync(
+            "class C { bool M(bool A, bool B, bool C) { return A && $$B && C; } }",
+            title,
+            "B");
+
+        Assert.Contains(expectedStatement, changed);
+    }
+
+    [Fact]
+    public async Task BinaryOperandActionsRespectChainBoundsAndOperatorPrecedence()
+    {
+        var first = await GetActionsAsync("class C { bool M(bool A, bool B, bool C) => $$A && B && C; }");
+        Assert.DoesNotContain(first, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveLeftTitle);
+        Assert.Contains(first, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveRightTitle);
+
+        var middle = await GetActionsAsync("class C { bool M(bool A, bool B, bool C) => A || $$B && C; }");
+        Assert.DoesNotContain(middle, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveLeftTitle);
+        Assert.Contains(middle, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveRightTitle);
+    }
+
+    [Theory]
+    [InlineData(";")]
+    [InlineData("Work();")]
+    [InlineData("int value = 0;")]
+    [InlineData("label: Work();")]
+    [InlineData("goto label;")]
+    [InlineData("break;")]
+    [InlineData("continue;")]
+    [InlineData("return;")]
+    [InlineData("throw null;")]
+    [InlineData("yield return null;")]
+    [InlineData("yield break;")]
+    [InlineData("while (false) { }")]
+    [InlineData("do { } while (false);")]
+    [InlineData("for (;;) { }")]
+    [InlineData("foreach (var item in items) { }")]
+    [InlineData("foreach (var (key, value) in pairs) { }")]
+    [InlineData("using (resource) { }")]
+    [InlineData("fixed (int* pointer = buffer) { }")]
+    [InlineData("checked { }")]
+    [InlineData("unchecked { }")]
+    [InlineData("unsafe { }")]
+    [InlineData("lock (gate) { }")]
+    [InlineData("if (true) { }")]
+    [InlineData("switch (value) { }")]
+    [InlineData("try { } finally { }")]
+    [InlineData("void Local() { }")]
+    [InlineData("{ Work(); }")]
+    public async Task MovesEveryCSharpStatementShape(string statement)
+    {
+        var source = "class C { void M() { Before(); $$" + statement + " After(); } }";
+        var actions = await GetActionsAsync(source);
+
+        Assert.Contains(actions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveUpTitle);
+        Assert.Contains(actions, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveDownTitle);
+    }
+
+    [Theory]
     [InlineData(MoveStatementCodeRefactoringProvider.MoveUpTitle, "Third();\n        First();\n        Second();")]
     [InlineData(MoveStatementCodeRefactoringProvider.MoveDownTitle, "First();\n        Second();\n        Third();")]
     public async Task MovesSimpleStatementsInEitherDirection(string title, string expectedBody)
@@ -235,13 +297,18 @@ public sealed class MoveStatementCodeRefactoringProviderTests
         {
             var actions = await GetActionsAsync(document, cursor);
             var action = Assert.Single(actions.Where(candidate => candidate.EquivalenceKey == title));
-            var localizedTitle = FixTitleLocalizer.Get(
-                title == MoveStatementCodeRefactoringProvider.MoveUpTitle
-                    ? FixTitleLocalizer.MoveStatementUp
-                    : FixTitleLocalizer.MoveStatementDown,
-                title);
+            var movesBackward = title == MoveStatementCodeRefactoringProvider.MoveUpTitle ||
+                title == MoveStatementCodeRefactoringProvider.MoveLeftTitle;
+            var resource = title == MoveStatementCodeRefactoringProvider.MoveUpTitle
+                ? FixTitleLocalizer.MoveStatementUp
+                : title == MoveStatementCodeRefactoringProvider.MoveDownTitle
+                    ? FixTitleLocalizer.MoveStatementDown
+                    : title == MoveStatementCodeRefactoringProvider.MoveLeftTitle
+                        ? FixTitleLocalizer.MoveStatementLeft
+                        : FixTitleLocalizer.MoveStatementRight;
+            var localizedTitle = FixTitleLocalizer.Get(resource, title);
             Assert.Equal(
-                title == MoveStatementCodeRefactoringProvider.MoveUpTitle
+                movesBackward
                     ? OmniSharpRefactoringTitle.Inline(localizedTitle, title)
                     : OmniSharpRefactoringTitle.Extract(localizedTitle, title),
                 action.Title);

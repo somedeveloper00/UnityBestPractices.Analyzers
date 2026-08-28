@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Move statement left** and **Move statement right** now reorder any operand
+  in a same-operator binary-expression chain, using Roslyn's syntax tree to
+  preserve precedence and parenthesized boundaries.
+
 ## [0.4.45] - 2026-08-27
 
 ### Changed

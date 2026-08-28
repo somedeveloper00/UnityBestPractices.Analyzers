@@ -12,6 +12,8 @@ internal static class FixTitleLocalizer
     internal const string MoveParameterRight = "refactoring.move-parameter-right";
     internal const string MoveStatementUp = "refactoring.move-statement-up";
     internal const string MoveStatementDown = "refactoring.move-statement-down";
+    internal const string MoveStatementLeft = "refactoring.move-statement-left";
+    internal const string MoveStatementRight = "refactoring.move-statement-right";
     internal const string RemoveParameter = "refactoring.remove-parameter";
     internal const string RemoveDoubleEmptyLines = "refactoring.remove-double-empty-lines";
     internal const string RemoveEmptyBrackets = "refactoring.remove-empty-brackets";
