@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeRefactorings;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
@@ -17,6 +18,8 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
 {
     public const string MoveUpTitle = "Move statement up";
     public const string MoveDownTitle = "Move statement down";
+    public const string MoveLeftTitle = "Move statement left";
+    public const string MoveRightTitle = "Move statement right";
 
     // NavigationAnnotation is internal in the Roslyn 3.8 API used by Unity, so use
     // the annotation kind understood by the workspace host directly.
@@ -36,14 +39,15 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
             return;
         }
 
+        var horizontal = node is ExpressionSyntax;
         if (index > 0)
         {
-            Register(context, node, index - 1, MoveUpTitle);
+            Register(context, node, index - 1, horizontal ? MoveLeftTitle : MoveUpTitle);
         }
 
         if (index < count - 1)
         {
-            Register(context, node, index + 1, MoveDownTitle);
+            Register(context, node, index + 1, horizontal ? MoveRightTitle : MoveDownTitle);
         }
     }
 
@@ -53,16 +57,19 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         int destinationIndex,
         string title)
     {
-        var localizedTitle = FixTitleLocalizer.Get(
-            title == MoveUpTitle ? FixTitleLocalizer.MoveStatementUp : FixTitleLocalizer.MoveStatementDown,
-            title);
+        var movesBackward = title == MoveUpTitle || title == MoveLeftTitle;
+        var resource = title == MoveUpTitle ? FixTitleLocalizer.MoveStatementUp
+            : title == MoveDownTitle ? FixTitleLocalizer.MoveStatementDown
+            : title == MoveLeftTitle ? FixTitleLocalizer.MoveStatementLeft
+            : FixTitleLocalizer.MoveStatementRight;
+        var localizedTitle = FixTitleLocalizer.Get(resource, title);
 
         // Legacy OmniSharp maps these title prefixes to VS Code's
         // refactor.inline and refactor.extract CodeActionKind values. Giving
         // each direction a distinct kind lets keybindings invoke it directly.
-        var routedTitle = title == MoveUpTitle
-            ? OmniSharpRefactoringTitle.Inline(localizedTitle, MoveUpTitle)
-            : OmniSharpRefactoringTitle.Extract(localizedTitle, MoveDownTitle);
+        var routedTitle = movesBackward
+            ? OmniSharpRefactoringTitle.Inline(localizedTitle, title)
+            : OmniSharpRefactoringTitle.Extract(localizedTitle, title);
 
         context.RegisterRefactoring(CodeAction.Create(
             routedTitle,
@@ -97,6 +104,12 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
 
         if (node is IfStatementSyntax ifStatement &&
             TryGetIfBranchPosition(ifStatement, out index, out count))
+        {
+            return true;
+        }
+
+        if (node is ExpressionSyntax expression &&
+            TryGetBinaryOperandPosition(expression, out index, out count))
         {
             return true;
         }
@@ -138,6 +151,55 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         }
 
         return index >= 0;
+    }
+
+    private static bool TryGetBinaryOperandPosition(ExpressionSyntax expression, out int index, out int count)
+    {
+        index = -1;
+        count = 0;
+
+        // A binary chain is represented by Roslyn as a nested tree rather than a
+        // list. Flatten only nodes with the same SyntaxKind, so precedence and
+        // explicit parentheses continue to define the chain boundaries.
+        var binary = expression.Parent as BinaryExpressionSyntax;
+        if (binary is null)
+        {
+            return false;
+        }
+
+        var kind = binary.Kind();
+        var root = binary;
+        while (root.Parent is BinaryExpressionSyntax parent && parent.IsKind(kind))
+        {
+            root = parent;
+        }
+
+        var operands = GetBinaryOperands(root, kind).ToArray();
+        index = Array.IndexOf(operands, expression);
+        count = operands.Length;
+        return index >= 0 && count > 1;
+    }
+
+    private static System.Collections.Generic.IEnumerable<ExpressionSyntax> GetBinaryOperands(
+        ExpressionSyntax expression,
+        SyntaxKind kind)
+    {
+        if (expression is BinaryExpressionSyntax binary && binary.IsKind(kind))
+        {
+            foreach (var operand in GetBinaryOperands(binary.Left, kind))
+            {
+                yield return operand;
+            }
+
+            foreach (var operand in GetBinaryOperands(binary.Right, kind))
+            {
+                yield return operand;
+            }
+
+            yield break;
+        }
+
+        yield return expression;
     }
 
     private static bool TryGetIfBranchPosition(
@@ -211,6 +273,31 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         if (node?.Parent is null || destinationIndex < 0 || destinationIndex >= count)
         {
             return document;
+        }
+
+        if (node is ExpressionSyntax expression &&
+            TryGetBinaryOperandPosition(expression, out _, out _))
+        {
+            var binary = (BinaryExpressionSyntax)expression.Parent!;
+            var kind = binary.Kind();
+            var binaryRoot = binary;
+            while (binaryRoot.Parent is BinaryExpressionSyntax parent && parent.IsKind(kind))
+            {
+                binaryRoot = parent;
+            }
+
+            var operands = GetBinaryOperands(binaryRoot, kind).ToArray();
+            var destinationOperand = operands[destinationIndex];
+            // Binary operator whitespace is stored on the adjacent operands.
+            // Retain each slot's exterior trivia while exchanging its syntax;
+            // otherwise a right move can produce text such as `C&& B `.
+            var replacementAtSource = destinationOperand.WithTriviaFrom(expression);
+            var movedExpression = expression
+                .WithTriviaFrom(destinationOperand)
+                .WithAdditionalAnnotations(new SyntaxAnnotation(NavigationAnnotationKind));
+            return document.WithSyntaxRoot(root.ReplaceNodes(
+                new[] { expression, destinationOperand },
+                (original, _) => original == expression ? replacementAtSource : movedExpression));
         }
 
         if (node is IfStatementSyntax ifBranch &&
