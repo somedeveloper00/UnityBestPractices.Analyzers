@@ -5,6 +5,24 @@ using Xunit;
 
 public sealed class FixTitleLocalizerTests
 {
+    private static readonly (string Key, string EnglishTitle, string JapaneseTitle)[] RefactoringSuggestions =
+    {
+        (FixTitleLocalizer.ConvertStringLiteralToNameof, ConvertStringLiteralToNameofCodeRefactoringProvider.Title, "文字列リテラルを nameof に置換"),
+        (FixTitleLocalizer.ConvertLocalToField, ConvertLocalToFieldCodeRefactoringProvider.Title, "ローカル変数をフィールドに変換"),
+        (FixTitleLocalizer.ConvertSystemBaseToISystem, ConvertSystemBaseToISystemCodeRefactoringProvider.Title, "SystemBase を ISystem に変換"),
+        (FixTitleLocalizer.InlineMethod, InlineMethodCodeRefactoringProvider.Title, "メソッドをインライン化"),
+        (FixTitleLocalizer.MoveParameterLeft, MoveParameterCodeRefactoringProvider.MoveLeftTitle, "パラメーターを左へ移動"),
+        (FixTitleLocalizer.MoveParameterRight, MoveParameterCodeRefactoringProvider.MoveRightTitle, "パラメーターを右へ移動"),
+        (FixTitleLocalizer.MoveStatementUp, MoveStatementCodeRefactoringProvider.MoveUpTitle, "ステートメントを上へ移動"),
+        (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle, "ステートメントを下へ移動"),
+        (FixTitleLocalizer.MoveStatementLeft, MoveStatementCodeRefactoringProvider.MoveLeftTitle, "ステートメントを左へ移動"),
+        (FixTitleLocalizer.MoveStatementRight, MoveStatementCodeRefactoringProvider.MoveRightTitle, "ステートメントを右へ移動"),
+        (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title, "パラメーターを削除"),
+        (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title, "連続する空行を削除"),
+        (FixTitleLocalizer.RemoveEmptyBrackets, RemoveEmptyBracketsCodeRefactoringProvider.Title, "空の括弧を削除"),
+        (FixTitleLocalizer.RemoveSymbol, RemoveSymbolCodeRefactoringProvider.Title, "シンボルとすべての使用箇所を削除"),
+    };
+
     private static readonly CultureInfo[] SupportedCultures =
     {
         CultureInfo.GetCultureInfo("ja-JP"),
@@ -68,21 +86,7 @@ public sealed class FixTitleLocalizerTests
     [Fact]
     public void EveryRefactoringSuggestionHasEverySupportedLocalization()
     {
-        var suggestions = new[]
-        {
-            (FixTitleLocalizer.ConvertStringLiteralToNameof, ConvertStringLiteralToNameofCodeRefactoringProvider.Title),
-            (FixTitleLocalizer.InlineMethod, InlineMethodCodeRefactoringProvider.Title),
-            (FixTitleLocalizer.MoveParameterLeft, MoveParameterCodeRefactoringProvider.MoveLeftTitle),
-            (FixTitleLocalizer.MoveParameterRight, MoveParameterCodeRefactoringProvider.MoveRightTitle),
-            (FixTitleLocalizer.MoveStatementUp, MoveStatementCodeRefactoringProvider.MoveUpTitle),
-            (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle),
-            (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title),
-            (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title),
-            (FixTitleLocalizer.RemoveEmptyBrackets, RemoveEmptyBracketsCodeRefactoringProvider.Title),
-            (FixTitleLocalizer.RemoveSymbol, RemoveSymbolCodeRefactoringProvider.Title),
-        };
-
-        foreach (var (key, englishTitle) in suggestions)
+        foreach (var (key, englishTitle, _) in RefactoringSuggestions)
         {
             foreach (var culture in SupportedCultures)
             {
@@ -94,22 +98,8 @@ public sealed class FixTitleLocalizerTests
     [Fact]
     public void JapaneseRefactoringSuggestionsUseJapaneseDisplayTitles()
     {
-        var suggestions = new[]
-        {
-            (FixTitleLocalizer.ConvertStringLiteralToNameof, ConvertStringLiteralToNameofCodeRefactoringProvider.Title, "文字列リテラルを nameof に置換"),
-            (FixTitleLocalizer.InlineMethod, InlineMethodCodeRefactoringProvider.Title, "メソッドをインライン化"),
-            (FixTitleLocalizer.MoveParameterLeft, MoveParameterCodeRefactoringProvider.MoveLeftTitle, "パラメーターを左へ移動"),
-            (FixTitleLocalizer.MoveParameterRight, MoveParameterCodeRefactoringProvider.MoveRightTitle, "パラメーターを右へ移動"),
-            (FixTitleLocalizer.MoveStatementUp, MoveStatementCodeRefactoringProvider.MoveUpTitle, "ステートメントを上へ移動"),
-            (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle, "ステートメントを下へ移動"),
-            (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title, "パラメーターを削除"),
-            (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title, "連続する空行を削除"),
-            (FixTitleLocalizer.RemoveEmptyBrackets, RemoveEmptyBracketsCodeRefactoringProvider.Title, "空の括弧を削除"),
-            (FixTitleLocalizer.RemoveSymbol, RemoveSymbolCodeRefactoringProvider.Title, "シンボルとすべての使用箇所を削除"),
-        };
-
         var culture = CultureInfo.GetCultureInfo("ja-JP");
-        foreach (var (key, englishTitle, japaneseTitle) in suggestions)
+        foreach (var (key, englishTitle, japaneseTitle) in RefactoringSuggestions)
         {
             Assert.Equal(japaneseTitle, FixTitleLocalizer.Get(key, englishTitle, culture));
         }

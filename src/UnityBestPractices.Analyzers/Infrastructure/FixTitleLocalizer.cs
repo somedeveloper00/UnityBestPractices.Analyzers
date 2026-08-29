@@ -7,6 +7,8 @@ namespace UnityBestPractices.Analyzers.Infrastructure;
 internal static class FixTitleLocalizer
 {
     internal const string ConvertStringLiteralToNameof = "refactoring.convert-string-to-nameof";
+    internal const string ConvertLocalToField = "refactoring.convert-local-to-field";
+    internal const string ConvertSystemBaseToISystem = "refactoring.convert-system-base-to-isystem";
     internal const string InlineMethod = "refactoring.inline-method";
     internal const string MoveParameterLeft = "refactoring.move-parameter-left";
     internal const string MoveParameterRight = "refactoring.move-parameter-right";
@@ -103,11 +105,15 @@ internal static class FixTitleLocalizer
     private static string TranslateJapanese(string diagnosticId, string englishTitle) => diagnosticId switch
     {
         ConvertStringLiteralToNameof => "文字列リテラルを nameof に置換",
+        ConvertLocalToField => "ローカル変数をフィールドに変換",
+        ConvertSystemBaseToISystem => "SystemBase を ISystem に変換",
         InlineMethod => "メソッドをインライン化",
         MoveParameterLeft => "パラメーターを左へ移動",
         MoveParameterRight => "パラメーターを右へ移動",
         MoveStatementUp => "ステートメントを上へ移動",
         MoveStatementDown => "ステートメントを下へ移動",
+        MoveStatementLeft => "ステートメントを左へ移動",
+        MoveStatementRight => "ステートメントを右へ移動",
         RemoveParameter => "パラメーターを削除",
         RemoveDoubleEmptyLines => "連続する空行を削除",
         RemoveEmptyBrackets => "空の括弧を削除",
@@ -136,11 +142,15 @@ internal static class FixTitleLocalizer
     private static string TranslatePersian(string diagnosticId, string englishTitle) => diagnosticId switch
     {
         ConvertStringLiteralToNameof => "جایگزینی لفظ رشته با nameof",
+        ConvertLocalToField => "تبدیل متغیر محلی به فیلد",
+        ConvertSystemBaseToISystem => "تبدیل SystemBase به ISystem",
         InlineMethod => "درون‌خطی کردن متد",
         MoveParameterLeft => "انتقال پارامتر به چپ",
         MoveParameterRight => "انتقال پارامتر به راست",
         MoveStatementUp => "انتقال دستور به بالا",
         MoveStatementDown => "انتقال دستور به پایین",
+        MoveStatementLeft => "انتقال دستور به چپ",
+        MoveStatementRight => "انتقال دستور به راست",
         RemoveParameter => "حذف پارامتر",
         RemoveDoubleEmptyLines => "حذف خطوط خالی تکراری",
         RemoveEmptyBrackets => "حذف پرانتزهای خالی",
@@ -169,11 +179,15 @@ internal static class FixTitleLocalizer
     private static string TranslateRussian(string diagnosticId, string englishTitle) => diagnosticId switch
     {
         ConvertStringLiteralToNameof => "Заменить строковый литерал на nameof",
+        ConvertLocalToField => "Преобразовать локальную переменную в поле",
+        ConvertSystemBaseToISystem => "Преобразовать SystemBase в ISystem",
         InlineMethod => "Встроить метод",
         MoveParameterLeft => "Переместить параметр влево",
         MoveParameterRight => "Переместить параметр вправо",
         MoveStatementUp => "Переместить инструкцию вверх",
         MoveStatementDown => "Переместить инструкцию вниз",
+        MoveStatementLeft => "Переместить инструкцию влево",
+        MoveStatementRight => "Переместить инструкцию вправо",
         RemoveParameter => "Удалить параметр",
         RemoveDoubleEmptyLines => "Удалить повторяющиеся пустые строки",
         RemoveEmptyBrackets => "Удалить пустые скобки",
@@ -202,11 +216,15 @@ internal static class FixTitleLocalizer
     private static string TranslateGerman(string diagnosticId, string englishTitle) => diagnosticId switch
     {
         ConvertStringLiteralToNameof => "Zeichenfolgenliteral durch nameof ersetzen",
+        ConvertLocalToField => "Lokale Variable in ein Feld konvertieren",
+        ConvertSystemBaseToISystem => "SystemBase in ISystem konvertieren",
         InlineMethod => "Methode inline erweitern",
         MoveParameterLeft => "Parameter nach links verschieben",
         MoveParameterRight => "Parameter nach rechts verschieben",
         MoveStatementUp => "Anweisung nach oben verschieben",
         MoveStatementDown => "Anweisung nach unten verschieben",
+        MoveStatementLeft => "Anweisung nach links verschieben",
+        MoveStatementRight => "Anweisung nach rechts verschieben",
         RemoveParameter => "Parameter entfernen",
         RemoveDoubleEmptyLines => "Doppelte Leerzeilen entfernen",
         RemoveEmptyBrackets => "Leere Klammern entfernen",
@@ -235,11 +253,15 @@ internal static class FixTitleLocalizer
     private static string TranslatePolish(string diagnosticId, string englishTitle) => diagnosticId switch
     {
         ConvertStringLiteralToNameof => "Zastąp literał ciągu operatorem nameof",
+        ConvertLocalToField => "Przekonwertuj zmienną lokalną na pole",
+        ConvertSystemBaseToISystem => "Przekonwertuj SystemBase na ISystem",
         InlineMethod => "Rozwiń metodę w miejscu wywołania",
         MoveParameterLeft => "Przenieś parametr w lewo",
         MoveParameterRight => "Przenieś parametr w prawo",
         MoveStatementUp => "Przenieś instrukcję w górę",
         MoveStatementDown => "Przenieś instrukcję w dół",
+        MoveStatementLeft => "Przenieś instrukcję w lewo",
+        MoveStatementRight => "Przenieś instrukcję w prawo",
         RemoveParameter => "Usuń parametr",
         RemoveDoubleEmptyLines => "Usuń powtarzające się puste wiersze",
         RemoveEmptyBrackets => "Usuń puste nawiasy",
