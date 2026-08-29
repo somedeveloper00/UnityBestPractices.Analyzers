@@ -33,7 +33,7 @@ public sealed class ConvertLocalToFieldCodeRefactoringProvider : CodeRefactoring
         }
 
         context.RegisterRefactoring(CodeAction.Create(
-            Title,
+            FixTitleLocalizer.Get(FixTitleLocalizer.ConvertLocalToField, Title),
             cancellationToken => ConvertAsync(context.Document, root, declaration, declarator, type, containingType, makeStatic),
             Title));
     }

@@ -70,12 +70,16 @@ public sealed class FixTitleLocalizerTests
     {
         var suggestions = new[]
         {
+            (FixTitleLocalizer.ConvertLocalToField, ConvertLocalToFieldCodeRefactoringProvider.Title),
             (FixTitleLocalizer.ConvertStringLiteralToNameof, ConvertStringLiteralToNameofCodeRefactoringProvider.Title),
+            (FixTitleLocalizer.ConvertSystemBaseToISystem, ConvertSystemBaseToISystemCodeRefactoringProvider.Title),
             (FixTitleLocalizer.InlineMethod, InlineMethodCodeRefactoringProvider.Title),
             (FixTitleLocalizer.MoveParameterLeft, MoveParameterCodeRefactoringProvider.MoveLeftTitle),
             (FixTitleLocalizer.MoveParameterRight, MoveParameterCodeRefactoringProvider.MoveRightTitle),
             (FixTitleLocalizer.MoveStatementUp, MoveStatementCodeRefactoringProvider.MoveUpTitle),
             (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle),
+            (FixTitleLocalizer.MoveStatementLeft, MoveStatementCodeRefactoringProvider.MoveLeftTitle),
+            (FixTitleLocalizer.MoveStatementRight, MoveStatementCodeRefactoringProvider.MoveRightTitle),
             (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title),
             (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title),
             (FixTitleLocalizer.RemoveEmptyBrackets, RemoveEmptyBracketsCodeRefactoringProvider.Title),
@@ -96,12 +100,16 @@ public sealed class FixTitleLocalizerTests
     {
         var suggestions = new[]
         {
+            (FixTitleLocalizer.ConvertLocalToField, ConvertLocalToFieldCodeRefactoringProvider.Title, "ローカル変数をフィールドに変換"),
             (FixTitleLocalizer.ConvertStringLiteralToNameof, ConvertStringLiteralToNameofCodeRefactoringProvider.Title, "文字列リテラルを nameof に置換"),
+            (FixTitleLocalizer.ConvertSystemBaseToISystem, ConvertSystemBaseToISystemCodeRefactoringProvider.Title, "SystemBase を ISystem に変換"),
             (FixTitleLocalizer.InlineMethod, InlineMethodCodeRefactoringProvider.Title, "メソッドをインライン化"),
             (FixTitleLocalizer.MoveParameterLeft, MoveParameterCodeRefactoringProvider.MoveLeftTitle, "パラメーターを左へ移動"),
             (FixTitleLocalizer.MoveParameterRight, MoveParameterCodeRefactoringProvider.MoveRightTitle, "パラメーターを右へ移動"),
             (FixTitleLocalizer.MoveStatementUp, MoveStatementCodeRefactoringProvider.MoveUpTitle, "ステートメントを上へ移動"),
             (FixTitleLocalizer.MoveStatementDown, MoveStatementCodeRefactoringProvider.MoveDownTitle, "ステートメントを下へ移動"),
+            (FixTitleLocalizer.MoveStatementLeft, MoveStatementCodeRefactoringProvider.MoveLeftTitle, "ステートメントを左へ移動"),
+            (FixTitleLocalizer.MoveStatementRight, MoveStatementCodeRefactoringProvider.MoveRightTitle, "ステートメントを右へ移動"),
             (FixTitleLocalizer.RemoveParameter, RemoveParameterCodeRefactoringProvider.Title, "パラメーターを削除"),
             (FixTitleLocalizer.RemoveDoubleEmptyLines, RemoveDoubleEmptyLinesCodeRefactoringProvider.Title, "連続する空行を削除"),
             (FixTitleLocalizer.RemoveEmptyBrackets, RemoveEmptyBracketsCodeRefactoringProvider.Title, "空の括弧を削除"),
