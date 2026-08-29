@@ -20,6 +20,7 @@ internal static class FixTitleLocalizer
     internal const string RemoveDoubleEmptyLines = "refactoring.remove-double-empty-lines";
     internal const string RemoveEmptyBrackets = "refactoring.remove-empty-brackets";
     internal const string RemoveSymbol = "refactoring.remove-symbol";
+    internal const string SwitchIndexer = "refactoring.switch-indexer";
 
 #pragma warning disable RS1035 // Code fixes are displayed by the host UI and must follow its UI culture.
     internal static string Get(string diagnosticId, string englishTitle) =>
