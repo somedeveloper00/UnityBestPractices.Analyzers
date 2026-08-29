@@ -7,6 +7,23 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.48] - 2026-08-29
+
+### Added
+
+- Added **Use indexer [...]**, a caret-aware refactoring that switches an
+  element access to another accessible indexer overload, including inherited
+  and interface indexers. Compatible arguments are preserved, missing or
+  incompatible arguments receive `default(T)` placeholders, and alternatives
+  incompatible with the current read/write context are excluded.
+
+### Changed
+
+- Completed Japanese, Persian, Russian, German, and Polish title localization
+  for **Convert local variable to field**, **Convert SystemBase to ISystem**,
+  **Move statement left**, **Move statement right**, and the new indexer
+  switching actions.
+
 ## [0.4.47] - 2026-08-29
 
 ### Fixed
