@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,10 +10,25 @@ using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using UnityBestPractices.Analyzers;
+using UnityBestPractices.Analyzers.Infrastructure;
 using Xunit;
 
 public sealed class SwitchIndexerCodeRefactoringProviderTests
 {
+    [Theory]
+    [InlineData("ja-JP", "インデクサーを使用 [int index]")]
+    [InlineData("fa-IR", "استفاده از نمایه‌ساز [int index]")]
+    [InlineData("ru-RU", "Использовать индексатор [int index]")]
+    [InlineData("de-DE", "Indexer verwenden [int index]")]
+    [InlineData("pl-PL", "Użyj indeksatora [int index]")]
+    public void LocalizesTheCompleteIndexerAction(string cultureName, string expected)
+    {
+        Assert.Equal(expected, FixTitleLocalizer.Get(
+            FixTitleLocalizer.SwitchIndexer,
+            "Use indexer [int index]",
+            CultureInfo.GetCultureInfo(cultureName)));
+    }
+
     [Fact]
     public async Task FindsEveryOverloadAndChangesItsArguments()
     {
@@ -63,6 +79,31 @@ public sealed class SwitchIndexerCodeRefactoringProviderTests
         using (workspace)
         {
             Assert.Single(await GetActionsAsync(document, span));
+        }
+    }
+
+    [Fact]
+    public async Task RetainsACompatibleNamedArgumentByParameterName()
+    {
+        const string source = "class C { public int this[int value]=>0; public int this[int other, int value]=>0; int M()=>this[value: $$1]; }";
+        var (workspace, document, span) = CreateDocument(source);
+        using (workspace)
+        {
+            var action = Assert.Single(await GetActionsAsync(document, span));
+            var changed = await ApplyAsync(document, action);
+            Assert.Contains("this[default(int), 1]", changed, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("class C { public int this[int i] { get=>0; set{} } public int this[string s]=>0; void M()=>this[$$0]=1; }")]
+    [InlineData("class C { public int this[int i]=>0; public int this[string s] { set{} } int M()=>this[$$0]; }")]
+    public async Task ExcludesIndexerWithoutTheRequiredAccessor(string source)
+    {
+        var (workspace, document, span) = CreateDocument(source);
+        using (workspace)
+        {
+            Assert.Empty(await GetActionsAsync(document, span));
         }
     }
 

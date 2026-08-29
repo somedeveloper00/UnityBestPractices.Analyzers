@@ -39,7 +39,9 @@ public sealed class SwitchIndexerCodeRefactoringProvider : CodeRefactoringProvid
         }
 
         foreach (var indexer in FindIndexers(receiverType, model, access.SpanStart)
-                     .Where(candidate => !SymbolEqualityComparer.Default.Equals(candidate, operation.Property)))
+                     .Where(candidate =>
+                         !SymbolEqualityComparer.Default.Equals(candidate, operation.Property) &&
+                         SupportsUsage(candidate, access, model, access.SpanStart)))
         {
             var signature = FormatSignature(indexer, model, access.SpanStart);
             var englishTitle = TitlePrefix + signature;
@@ -105,6 +107,26 @@ public sealed class SwitchIndexerCodeRefactoringProvider : CodeRefactoringProvid
         "[" + string.Join(", ", indexer.Parameters.Select(parameter =>
             parameter.Type.ToMinimalDisplayString(model, position) + " " + parameter.Name)) + "]";
 
+    private static bool SupportsUsage(
+        IPropertySymbol indexer,
+        ElementAccessExpressionSyntax access,
+        SemanticModel model,
+        int position)
+    {
+        var isWrite = access.Parent is AssignmentExpressionSyntax assignment && assignment.Left == access ||
+                      access.Parent is PrefixUnaryExpressionSyntax or PostfixUnaryExpressionSyntax ||
+                      access.Parent is ArgumentSyntax argument && argument.RefKindKeyword.Kind() is
+                          SyntaxKind.RefKeyword or SyntaxKind.OutKeyword;
+        var isRead = !(access.Parent is AssignmentExpressionSyntax simpleAssignment &&
+                       simpleAssignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                       simpleAssignment.Left == access) &&
+                     !(access.Parent is ArgumentSyntax writeArgument &&
+                       writeArgument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword));
+
+        return (!isRead || indexer.GetMethod is not null && model.IsAccessible(position, indexer.GetMethod)) &&
+               (!isWrite || indexer.SetMethod is not null && model.IsAccessible(position, indexer.SetMethod));
+    }
+
     private static async Task<Document> SwitchAsync(
         Document document,
         ElementAccessExpressionSyntax access,
@@ -122,11 +144,18 @@ public sealed class SwitchIndexerCodeRefactoringProvider : CodeRefactoringProvid
         var arguments = new List<ArgumentSyntax>(indexer.Parameters.Length);
         for (var i = 0; i < indexer.Parameters.Length; i++)
         {
-            ExpressionSyntax expression;
-            if (i < oldArguments.Count && oldArguments[i].NameColon is null &&
-                model.ClassifyConversion(oldArguments[i].Expression, indexer.Parameters[i].Type).IsImplicit)
+            var matchingArgument = oldArguments.FirstOrDefault(argument =>
+                argument.NameColon?.Name.Identifier.ValueText == indexer.Parameters[i].Name);
+            if (matchingArgument == default && i < oldArguments.Count && oldArguments[i].NameColon is null)
             {
-                expression = oldArguments[i].Expression.WithoutTrivia();
+                matchingArgument = oldArguments[i];
+            }
+
+            ExpressionSyntax expression;
+            if (matchingArgument != default &&
+                model.ClassifyConversion(matchingArgument.Expression, indexer.Parameters[i].Type).IsImplicit)
+            {
+                expression = matchingArgument.Expression.WithoutTrivia();
             }
             else
             {

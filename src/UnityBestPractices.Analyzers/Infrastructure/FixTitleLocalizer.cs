@@ -119,6 +119,7 @@ internal static class FixTitleLocalizer
         RemoveDoubleEmptyLines => "連続する空行を削除",
         RemoveEmptyBrackets => "空の括弧を削除",
         RemoveSymbol => "シンボルとすべての使用箇所を削除",
+        SwitchIndexer => TranslateIndexer(englishTitle, "インデクサーを使用 "),
         DiagnosticIds.EncapsulateSerializedField => "private にして SerializeField を追加",
         DiagnosticIds.YieldNull => "null を yield する",
         DiagnosticIds.AddBurstCompile => "BurstCompile を追加",
@@ -156,6 +157,7 @@ internal static class FixTitleLocalizer
         RemoveDoubleEmptyLines => "حذف خطوط خالی تکراری",
         RemoveEmptyBrackets => "حذف پرانتزهای خالی",
         RemoveSymbol => "حذف نماد و همهٔ کاربردهای آن",
+        SwitchIndexer => TranslateIndexer(englishTitle, "استفاده از نمایه‌ساز "),
         DiagnosticIds.EncapsulateSerializedField => "private کردن فیلد و افزودن SerializeField",
         DiagnosticIds.YieldNull => "yield کردن null",
         DiagnosticIds.AddBurstCompile => "افزودن BurstCompile",
@@ -193,6 +195,7 @@ internal static class FixTitleLocalizer
         RemoveDoubleEmptyLines => "Удалить повторяющиеся пустые строки",
         RemoveEmptyBrackets => "Удалить пустые скобки",
         RemoveSymbol => "Удалить символ и все его использования",
+        SwitchIndexer => TranslateIndexer(englishTitle, "Использовать индексатор "),
         DiagnosticIds.EncapsulateSerializedField => "Сделать поле private и добавить SerializeField",
         DiagnosticIds.YieldNull => "Вернуть null через yield",
         DiagnosticIds.AddBurstCompile => "Добавить BurstCompile",
@@ -230,6 +233,7 @@ internal static class FixTitleLocalizer
         RemoveDoubleEmptyLines => "Doppelte Leerzeilen entfernen",
         RemoveEmptyBrackets => "Leere Klammern entfernen",
         RemoveSymbol => "Symbol und alle Verwendungen entfernen",
+        SwitchIndexer => TranslateIndexer(englishTitle, "Indexer verwenden "),
         DiagnosticIds.EncapsulateSerializedField => "Feld als private festlegen und SerializeField hinzufügen",
         DiagnosticIds.YieldNull => "null mit yield zurückgeben",
         DiagnosticIds.AddBurstCompile => "BurstCompile hinzufügen",
@@ -267,6 +271,7 @@ internal static class FixTitleLocalizer
         RemoveDoubleEmptyLines => "Usuń powtarzające się puste wiersze",
         RemoveEmptyBrackets => "Usuń puste nawiasy",
         RemoveSymbol => "Usuń symbol i wszystkie jego użycia",
+        SwitchIndexer => TranslateIndexer(englishTitle, "Użyj indeksatora "),
         DiagnosticIds.EncapsulateSerializedField => "Ustaw pole jako private i dodaj SerializeField",
         DiagnosticIds.YieldNull => "Zwróć null za pomocą yield",
         DiagnosticIds.AddBurstCompile => "Dodaj BurstCompile",
@@ -291,5 +296,10 @@ internal static class FixTitleLocalizer
     private static string TranslateUse(string englishTitle, string prefix) =>
         englishTitle.StartsWith("Use ", System.StringComparison.Ordinal)
             ? prefix + englishTitle.Substring("Use ".Length)
+            : englishTitle;
+
+    private static string TranslateIndexer(string englishTitle, string prefix) =>
+        englishTitle.StartsWith("Use indexer ", System.StringComparison.Ordinal)
+            ? prefix + englishTitle.Substring("Use indexer ".Length)
             : englishTitle;
 }
