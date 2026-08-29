@@ -6,8 +6,8 @@ namespace UnityBestPractices.Analyzers.Infrastructure;
 /// <summary>Provides quick-fix labels in the IDE's current UI language.</summary>
 internal static class FixTitleLocalizer
 {
-    internal const string ConvertStringLiteralToNameof = "refactoring.convert-string-to-nameof";
     internal const string ConvertLocalToField = "refactoring.convert-local-to-field";
+    internal const string ConvertStringLiteralToNameof = "refactoring.convert-string-to-nameof";
     internal const string ConvertSystemBaseToISystem = "refactoring.convert-system-base-to-isystem";
     internal const string InlineMethod = "refactoring.inline-method";
     internal const string MoveParameterLeft = "refactoring.move-parameter-left";
@@ -104,8 +104,8 @@ internal static class FixTitleLocalizer
 
     private static string TranslateJapanese(string diagnosticId, string englishTitle) => diagnosticId switch
     {
-        ConvertStringLiteralToNameof => "文字列リテラルを nameof に置換",
         ConvertLocalToField => "ローカル変数をフィールドに変換",
+        ConvertStringLiteralToNameof => "文字列リテラルを nameof に置換",
         ConvertSystemBaseToISystem => "SystemBase を ISystem に変換",
         InlineMethod => "メソッドをインライン化",
         MoveParameterLeft => "パラメーターを左へ移動",
@@ -141,8 +141,8 @@ internal static class FixTitleLocalizer
 
     private static string TranslatePersian(string diagnosticId, string englishTitle) => diagnosticId switch
     {
-        ConvertStringLiteralToNameof => "جایگزینی لفظ رشته با nameof",
         ConvertLocalToField => "تبدیل متغیر محلی به فیلد",
+        ConvertStringLiteralToNameof => "جایگزینی لفظ رشته با nameof",
         ConvertSystemBaseToISystem => "تبدیل SystemBase به ISystem",
         InlineMethod => "درون‌خطی کردن متد",
         MoveParameterLeft => "انتقال پارامتر به چپ",
@@ -178,8 +178,8 @@ internal static class FixTitleLocalizer
 
     private static string TranslateRussian(string diagnosticId, string englishTitle) => diagnosticId switch
     {
-        ConvertStringLiteralToNameof => "Заменить строковый литерал на nameof",
         ConvertLocalToField => "Преобразовать локальную переменную в поле",
+        ConvertStringLiteralToNameof => "Заменить строковый литерал на nameof",
         ConvertSystemBaseToISystem => "Преобразовать SystemBase в ISystem",
         InlineMethod => "Встроить метод",
         MoveParameterLeft => "Переместить параметр влево",
@@ -215,8 +215,8 @@ internal static class FixTitleLocalizer
 
     private static string TranslateGerman(string diagnosticId, string englishTitle) => diagnosticId switch
     {
-        ConvertStringLiteralToNameof => "Zeichenfolgenliteral durch nameof ersetzen",
         ConvertLocalToField => "Lokale Variable in ein Feld konvertieren",
+        ConvertStringLiteralToNameof => "Zeichenfolgenliteral durch nameof ersetzen",
         ConvertSystemBaseToISystem => "SystemBase in ISystem konvertieren",
         InlineMethod => "Methode inline erweitern",
         MoveParameterLeft => "Parameter nach links verschieben",
@@ -252,8 +252,8 @@ internal static class FixTitleLocalizer
 
     private static string TranslatePolish(string diagnosticId, string englishTitle) => diagnosticId switch
     {
-        ConvertStringLiteralToNameof => "Zastąp literał ciągu operatorem nameof",
         ConvertLocalToField => "Przekonwertuj zmienną lokalną na pole",
+        ConvertStringLiteralToNameof => "Zastąp literał ciągu operatorem nameof",
         ConvertSystemBaseToISystem => "Przekonwertuj SystemBase na ISystem",
         InlineMethod => "Rozwiń metodę w miejscu wywołania",
         MoveParameterLeft => "Przenieś parametr w lewo",
