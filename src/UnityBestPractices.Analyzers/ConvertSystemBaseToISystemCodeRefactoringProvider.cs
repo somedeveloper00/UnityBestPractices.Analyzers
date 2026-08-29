@@ -53,7 +53,7 @@ public sealed class ConvertSystemBaseToISystemCodeRefactoringProvider : CodeRefa
         }
 
         context.RegisterRefactoring(CodeAction.Create(
-            Title,
+            FixTitleLocalizer.Get(FixTitleLocalizer.ConvertSystemBaseToISystem, Title),
             cancellationToken => ConvertAsync(context.Document, declaration, semanticModel, cancellationToken),
             Title));
     }
