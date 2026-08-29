@@ -7,6 +7,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.47] - 2026-08-29
+
 ### Fixed
 
 - Tagged releases no longer fail when Unity CI credentials are not configured.
