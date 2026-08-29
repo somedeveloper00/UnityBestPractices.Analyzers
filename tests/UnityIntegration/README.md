@@ -25,9 +25,11 @@ To upgrade a fixture:
 
 ## CI and release policy
 
-Every CI run assembles the UPM payload and installs it into every fixture without requiring a Unity license. The licensed GameCI matrix runs weekly at 03:17 UTC on Monday, on branch pushes, before tagged releases through the evidence gate below, and when manually dispatched. Pull requests from forks can complete the required license-free job when secrets are unavailable; the summary reports that the licensed entries were not executed rather than implying success.
+Every CI run assembles the UPM payload and installs it into every fixture without requiring a Unity license. The licensed GameCI matrix runs weekly at 03:17 UTC on Monday, on branch pushes, and when manually dispatched. Pull requests from forks can complete the required license-free job when secrets are unavailable; the summary reports that the licensed entries were not executed rather than implying success.
 
-A release commit must have a successful licensed matrix run, or be a descendant of a commit with a successful scheduled matrix run completed within the previous **7 days**. Release managers must link that run in the release notes. Results older than seven days are stale: rerun the matrix manually on the release commit before creating the tag. A failed or credential-unavailable run is never acceptable release evidence.
+When `UNITY_LICENSE`, `UNITY_EMAIL`, and `UNITY_PASSWORD` are configured, a release must have a successful licensed matrix run on the release commit, or be a descendant of a successful scheduled matrix run from the previous **7 days**. Dispatch CI on that commit before tagging if the scheduled evidence is missing or stale. A failed licensed run is never acceptable release evidence.
+
+Without those credentials, the release workflow skips the licensed evidence gate and still runs the license-free package and fixture validators. A credential-unavailable Unity job is not treated as licensed evidence, and it does not block the release. Existing tags can be published or retried with **Run workflow** on `release.yml` from `master`, passing the tag name (for example `v0.4.46`).
 
 Unity identifies Unity 6.3 as the current LTS release on its [release support page](https://unity.com/releases/unity-6/support). Unity's 2022.3 documentation lists Entities 1.0.11 as released for that editor, and the Unity 6.0 documentation lists Entities 1.4.3 and Collections 2.6.3 as released. The current-LTS fixture intentionally does not pin DOTS packages until Unity publishes an equivalent verified 6000.3 package matrix.
 

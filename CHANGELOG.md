@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Tagged releases no longer fail when Unity CI credentials are not configured.
+  The licensed matrix evidence gate is skipped in that case, and an existing
+  version tag can be published by dispatching the release workflow from
+  `master`.
+
 ## [0.4.46] - 2026-08-28
 
 ### Changed

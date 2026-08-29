@@ -4,6 +4,11 @@ on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release (for example v0.4.46)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -16,36 +21,79 @@ env:
 jobs:
   release:
     name: Build and publish release assets
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     env:
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
     steps:
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            tag="$DISPATCH_TAG"
+          else
+            tag="$GITHUB_REF_NAME"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must match vMAJOR.MINOR.PATCH, got: $tag" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
       - name: Check out tagged source
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Record tagged commit
+        id: commit
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Enforce fresh licensed Unity matrix evidence
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.commit.outputs.sha }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: |
+          if [[ -z "$UNITY_LICENSE" || -z "$UNITY_EMAIL" || -z "$UNITY_PASSWORD" ]]; then
+            echo 'Unity CI credentials are not configured (UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD).'
+            echo 'Skipping licensed Unity matrix evidence gate. License-free package validation still runs.'
+            exit 0
+          fi
+
           cutoff="$(date -u -d '7 days ago' +%s)"
           evidence=''
+
+          list_runs() {
+            local event="$1"
+            gh api --paginate \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?status=success&event=${event}&per_page=50" \
+              --jq '.workflow_runs[] | [.head_sha, .created_at, .html_url, .event] | @tsv'
+          }
+
           while IFS=$'\t' read -r sha created url event; do
+            [[ -n "${sha:-}" ]] || continue
             [[ "$(date -u -d "$created" +%s)" -ge "$cutoff" ]] || continue
-            if [[ "$event" == 'workflow_dispatch' && "$sha" == "$GITHUB_SHA" ]] || \
-               { [[ "$event" == 'schedule' ]] && git merge-base --is-ancestor "$sha" "$GITHUB_SHA"; }; then
+            if [[ "$sha" == "$RELEASE_SHA" ]] || \
+               { [[ "$event" == 'schedule' ]] && git merge-base --is-ancestor "$sha" "$RELEASE_SHA"; }; then
               evidence="$url"
               break
             fi
-          done < <(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?status=success&per_page=50" \
-            --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | [.head_sha, .created_at, .html_url, .event] | @tsv')
+          done < <({ list_runs workflow_dispatch; list_runs schedule; })
+
           if [[ -z "$evidence" ]]; then
-            echo 'No successful scheduled CI matrix was found on a recent ancestor (maximum age: 7 days).' >&2
-            echo 'Manually run CI with licensed credentials before releasing.' >&2
+            echo 'No successful licensed Unity matrix was found on this commit or a recent scheduled ancestor (maximum age: 7 days).' >&2
+            echo 'Dispatch CI on this commit with UNITY_LICENSE, UNITY_EMAIL, and UNITY_PASSWORD, then rerun the release.' >&2
             exit 1
           fi
           echo "Using licensed Unity evidence: $evidence"
@@ -66,10 +114,11 @@ jobs:
       - name: Verify tag and project versions match
         id: version
         shell: bash
+        env:
+          TAG_VERSION: ${{ steps.release.outputs.version }}
         run: |
           project_version="$(dotnet msbuild src/UnityBestPractices.Analyzers/UnityBestPractices.Analyzers.csproj -getProperty:Version)"
-          tag_version="${GITHUB_REF_NAME#v}"
-          test "$tag_version" = "$project_version"
+          test "$TAG_VERSION" = "$project_version"
           echo "value=$project_version" >> "$GITHUB_OUTPUT"
 
       - name: Restore through shared validation entry point
@@ -98,16 +147,18 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_SHA: ${{ steps.commit.outputs.sha }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" release/* \
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release/* \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
           else
-            gh release create "$GITHUB_REF_NAME" release/* \
+            gh release create "$RELEASE_TAG" release/* \
               --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" \
-              --title "$GITHUB_REF_NAME" \
+              --target "$RELEASE_SHA" \
+              --title "$RELEASE_TAG" \
               --generate-notes
           fi
 
