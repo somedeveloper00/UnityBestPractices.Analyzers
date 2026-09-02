@@ -10,6 +10,7 @@
     <ProjectReference Include="..\UnityBestPractices.Analyzers.Testing\UnityBestPractices.Analyzers.Testing.csproj" />
     <!-- Pin the test host to the same Roslyn generation Unity loads. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="3.8.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Features" Version="3.8.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing.XUnit" Version="1.1.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.4.2" />
