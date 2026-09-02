@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -13,6 +14,30 @@ using Xunit;
 
 public sealed class MoveStatementCodeRefactoringProviderTests
 {
+    [Theory]
+    [InlineData(MoveStatementCodeRefactoringProvider.MoveUpTitle)]
+    [InlineData(MoveStatementCodeRefactoringProvider.MoveDownTitle)]
+    public async Task KeepsCursorAtSameRelativePositionAfterVerticalMove(string title)
+    {
+        const string sourceWithCursor = "class C { void M() { First(); Th$$ird(); Second(); } }";
+        var (workspace, document, cursor) = CreateDocument(sourceWithCursor);
+        using (workspace)
+        {
+            var actions = await GetActionsAsync(document, cursor);
+            var action = Assert.Single(actions.Where(candidate => candidate.EquivalenceKey == title));
+            var operations = await action.GetOperationsAsync(CancellationToken.None);
+            var changedSolution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
+            var changedText = (await changedSolution.GetDocument(document.Id)!.GetTextAsync()).ToString();
+            var navigation = Assert.Single(operations.Where(
+                operation => operation.GetType().Name == "DocumentNavigationOperation"));
+            var position = (int)navigation.GetType()
+                .GetField("_position", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(navigation)!;
+
+            Assert.Equal(changedText.IndexOf("Third", StringComparison.Ordinal) + 2, position);
+        }
+    }
+
     [Theory]
     [InlineData(MoveStatementCodeRefactoringProvider.MoveLeftTitle, "return B && A && C;")]
     [InlineData(MoveStatementCodeRefactoringProvider.MoveRightTitle, "return A && C && B;")]

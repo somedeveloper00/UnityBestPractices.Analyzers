@@ -1,5 +1,6 @@
 using UnityBestPractices.Analyzers.Infrastructure;
 using System;
+using System.Collections.Generic;
 using System.Composition;
 using System.Linq;
 using System.Threading;
@@ -71,10 +72,14 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
             ? OmniSharpRefactoringTitle.Inline(localizedTitle, title)
             : OmniSharpRefactoringTitle.Extract(localizedTitle, title);
 
-        context.RegisterRefactoring(CodeAction.Create(
+        var cursorOffset = Math.Max(0, Math.Min(context.Span.Start - node.SpanStart, node.Span.Length));
+        context.RegisterRefactoring(new MoveCodeAction(
             routedTitle,
-            cancellationToken => MoveAsync(context.Document, node.Span, destinationIndex, cancellationToken),
-            title));
+            title,
+            context.Document,
+            node.Span,
+            destinationIndex,
+            cursorOffset));
     }
 
     private static SyntaxNode? FindMovableNode(SyntaxNode root, TextSpan span)
@@ -254,6 +259,7 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         Document document,
         TextSpan originalSpan,
         int destinationIndex,
+        int cursorOffset,
         CancellationToken cancellationToken)
     {
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
@@ -294,7 +300,7 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
             var replacementAtSource = destinationOperand.WithTriviaFrom(expression);
             var movedExpression = expression
                 .WithTriviaFrom(destinationOperand)
-                .WithAdditionalAnnotations(new SyntaxAnnotation(NavigationAnnotationKind));
+                .WithAdditionalAnnotations(CreateNavigationAnnotation(cursorOffset));
             return document.WithSyntaxRoot(root.ReplaceNodes(
                 new[] { expression, destinationOperand },
                 (original, _) => original == expression ? replacementAtSource : movedExpression));
@@ -303,7 +309,7 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         if (node is IfStatementSyntax ifBranch &&
             TryGetIfBranchPosition(ifBranch, out _, out _))
         {
-            var navigationAnnotation = new SyntaxAnnotation(NavigationAnnotationKind);
+            var navigationAnnotation = CreateNavigationAnnotation(cursorOffset);
             var first = GetFirstIfBranch(ifBranch);
             var branchDestination = GetIfBranches(first)[destinationIndex];
             var branchChangedRoot = root.ReplaceNodes(
@@ -343,10 +349,67 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
         }
 
         var destination = siblings[destinationIndex];
-        var movedNode = node.WithAdditionalAnnotations(new SyntaxAnnotation(NavigationAnnotationKind));
+        var movedNode = node.WithAdditionalAnnotations(CreateNavigationAnnotation(cursorOffset));
         var changedRoot = root.ReplaceNodes(
             new[] { node, destination },
             (original, _) => original == node ? destination : movedNode);
         return document.WithSyntaxRoot(changedRoot);
+    }
+
+    private static SyntaxAnnotation CreateNavigationAnnotation(int cursorOffset) =>
+        new SyntaxAnnotation(
+            NavigationAnnotationKind,
+            cursorOffset.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    private sealed class MoveCodeAction : CodeAction
+    {
+        private readonly string _title;
+        private readonly string _equivalenceKey;
+        private readonly Document _document;
+        private readonly TextSpan _originalSpan;
+        private readonly int _destinationIndex;
+        private readonly int _cursorOffset;
+
+        public MoveCodeAction(
+            string title,
+            string equivalenceKey,
+            Document document,
+            TextSpan originalSpan,
+            int destinationIndex,
+            int cursorOffset)
+        {
+            _title = title;
+            _equivalenceKey = equivalenceKey;
+            _document = document;
+            _originalSpan = originalSpan;
+            _destinationIndex = destinationIndex;
+            _cursorOffset = cursorOffset;
+        }
+
+        public override string Title => _title;
+
+        public override string EquivalenceKey => _equivalenceKey;
+
+        protected override async Task<IEnumerable<CodeActionOperation>> ComputeOperationsAsync(
+            CancellationToken cancellationToken)
+        {
+            var changedDocument = await MoveAsync(
+                _document,
+                _originalSpan,
+                _destinationIndex,
+                _cursorOffset,
+                cancellationToken).ConfigureAwait(false);
+            var changedRoot = await changedDocument.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            var navigationTarget = changedRoot?
+                .GetAnnotatedNodesAndTokens(NavigationAnnotationKind)
+                .SingleOrDefault();
+            var targetPosition = navigationTarget?.Span.Start + _cursorOffset ?? 0;
+
+            return new CodeActionOperation[]
+            {
+                new ApplyChangesOperation(changedDocument.Project.Solution),
+                new DocumentNavigationOperation(changedDocument.Id, targetPosition),
+            };
+        }
     }
 }
