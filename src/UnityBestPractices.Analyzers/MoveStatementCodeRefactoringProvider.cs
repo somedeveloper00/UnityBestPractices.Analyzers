@@ -39,7 +39,7 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
             return;
         }
 
-        var horizontal = node is ExpressionSyntax;
+        var horizontal = node is ExpressionSyntax or ArgumentSyntax;
         if (index > 0)
         {
             Register(context, node, index - 1, horizontal ? MoveLeftTitle : MoveUpTitle);
@@ -112,6 +112,14 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
             TryGetBinaryOperandPosition(expression, out index, out count))
         {
             return true;
+        }
+
+        if (node is ArgumentSyntax argument &&
+            argument.Parent is BaseArgumentListSyntax argumentList)
+        {
+            index = argumentList.Arguments.IndexOf(argument);
+            count = argumentList.Arguments.Count;
+            return index >= 0;
         }
 
         switch (node)
@@ -334,6 +342,21 @@ public sealed class MoveStatementCodeRefactoringProvider : CodeRefactoringProvid
                     return ifBranch.Statement.WithAdditionalAnnotations(navigationAnnotation);
                 });
             return document.WithSyntaxRoot(branchChangedRoot);
+        }
+
+        if (node is ArgumentSyntax argument &&
+            argument.Parent is BaseArgumentListSyntax argumentList)
+        {
+            var destinationArgument = argumentList.Arguments[destinationIndex];
+            // Whitespace and comments around commas belong to the argument
+            // slots. Exchange the syntax while retaining each slot's trivia.
+            var replacementAtSource = destinationArgument.WithTriviaFrom(argument);
+            var movedArgument = argument
+                .WithTriviaFrom(destinationArgument)
+                .WithAdditionalAnnotations(new SyntaxAnnotation(NavigationAnnotationKind));
+            return document.WithSyntaxRoot(root.ReplaceNodes(
+                new[] { argument, destinationArgument },
+                (original, _) => original == argument ? replacementAtSource : movedArgument));
         }
 
         var siblings = node.Parent.ChildNodes().Where(candidate => TryGetPosition(candidate, out _, out _)).ToArray();

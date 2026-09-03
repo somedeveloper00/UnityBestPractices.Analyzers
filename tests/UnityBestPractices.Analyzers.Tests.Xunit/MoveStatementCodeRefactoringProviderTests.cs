@@ -39,6 +39,35 @@ public sealed class MoveStatementCodeRefactoringProviderTests
     }
 
     [Theory]
+    [InlineData(
+        MoveStatementCodeRefactoringProvider.MoveLeftTitle,
+        "AddCommands(cmds.AsSpan()[..carSpawnAreasA.Length], carSpawnAreasA, mask.AsSpan()[..carSpawnAreasA.Length]);")]
+    [InlineData(
+        MoveStatementCodeRefactoringProvider.MoveRightTitle,
+        "AddCommands(carSpawnAreasA, mask.AsSpan()[..carSpawnAreasA.Length], cmds.AsSpan()[..carSpawnAreasA.Length]);")]
+    public async Task MovesFunctionArgumentInEitherDirection(string title, string expectedInvocation)
+    {
+        var changed = await ApplyAsync(
+            "class C { void M() { AddCommands(carSpawnAreasA, $$cmds.AsSpan()[..carSpawnAreasA.Length], mask.AsSpan()[..carSpawnAreasA.Length]); } }",
+            title,
+            "cmds.AsSpan()[..carSpawnAreasA.Length]");
+
+        Assert.Contains(expectedInvocation, changed);
+    }
+
+    [Fact]
+    public async Task ArgumentActionsRespectListBounds()
+    {
+        var first = await GetActionsAsync("class C { void M() { AddCommands($$first, second, third); } }");
+        Assert.DoesNotContain(first, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveLeftTitle);
+        Assert.Contains(first, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveRightTitle);
+
+        var last = await GetActionsAsync("class C { void M() { AddCommands(first, second, $$third); } }");
+        Assert.Contains(last, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveLeftTitle);
+        Assert.DoesNotContain(last, action => action.EquivalenceKey == MoveStatementCodeRefactoringProvider.MoveRightTitle);
+    }
+
+    [Theory]
     [InlineData(";")]
     [InlineData("Work();")]
     [InlineData("int value = 0;")]
