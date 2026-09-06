@@ -286,7 +286,7 @@ inline and extract kinds are shared with other providers, use `"apply":
 "never"` instead if you prefer a picker whenever more than one matching action
 is available.
 
-Use **Remove double empty lines** to collapse every run of consecutive empty
+Use **Collapse multiple blank lines** to collapse every run of consecutive empty
 lines in the current document to one. Lines containing only spaces or tabs are
 treated as empty, while the document's existing line-ending style is preserved.
 
