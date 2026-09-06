@@ -13,12 +13,12 @@ namespace UnityBestPractices.Analyzers;
 [ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = nameof(RemoveDoubleEmptyLinesCodeRefactoringProvider)), Shared]
 public sealed class RemoveDoubleEmptyLinesCodeRefactoringProvider : CodeRefactoringProvider
 {
-    public const string Title = "Remove double empty lines";
+    public const string Title = "Collapse multiple blank lines";
 
     public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
     {
         var text = await context.Document.GetTextAsync(context.CancellationToken).ConfigureAwait(false);
-        if (!HasDoubleEmptyLines(text))
+        if (!HasMultipleBlankLines(text))
         {
             return;
         }
@@ -29,7 +29,7 @@ public sealed class RemoveDoubleEmptyLinesCodeRefactoringProvider : CodeRefactor
             Title));
     }
 
-    private static bool HasDoubleEmptyLines(SourceText text)
+    private static bool HasMultipleBlankLines(SourceText text)
     {
         var previousLineWasEmpty = false;
         foreach (var line in text.Lines)

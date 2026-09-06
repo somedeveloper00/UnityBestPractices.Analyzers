@@ -15,9 +15,17 @@ public sealed class RemoveDoubleEmptyLinesCodeRefactoringProviderTests
     [Fact]
     public async Task CollapsesEveryRunOfEmptyLinesInTheDocument()
     {
-        var changed = await ApplyAsync("class First\n{\n\n\n}\n\n\nclass Second { }\n");
+        var changed = await ApplyAsync("class First\n{\n\n\n\n\n}\n\n\nclass Second { }\n");
 
         Assert.Equal("class First\n{\n\n}\n\nclass Second { }\n", changed);
+    }
+
+    [Fact]
+    public async Task CollapsesBlankLinesAtTheStartAndEndOfTheDocument()
+    {
+        var changed = await ApplyAsync("\n\n\nclass Example { }\n\n\n");
+
+        Assert.Equal("\nclass Example { }\n\n", changed);
     }
 
     [Fact]
